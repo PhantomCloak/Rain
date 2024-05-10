@@ -124,7 +124,6 @@ void Application::OnStart() {
       {1, GroupLayoutVisibility::Both, GroupLayoutType::Default}};
 
   m_pipeline = m_PipelineManager->CreatePipeline("RP_Default", "SH_Default", vertexLayout, groupLayout, m_surface, render->m_adapter);
-  //m_pipeline_lit = m_PipelineManager->CreatePipeline("RP_Default_Lit", "SH_Default_Lit", vertexLayout, groupLayout, m_surface, render->m_adapter);
 
   render->SetClearColor(0.52, 0.80, 0.92, 1);
 
@@ -224,11 +223,7 @@ void Application::OnUpdate() {
 
   Cam->Begin(render->renderPass);
   for (auto v : renderMeshes) {
-    //if (v->name != "floor") {
-      render->SetPipeline(m_pipeline);
-    //} else {
-    //  render->SetPipeline(m_pipeline_lit);
-    //}
+		render->SetPipeline(m_pipeline);
     v->SetRenderPass(render->renderPass);
     wgpuRenderPassEncoderDraw(render->renderPass, v->meshVertexCount, 1, 0, 0);
   }
