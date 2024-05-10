@@ -1,0 +1,53 @@
+# Ignore build directories
+/build/
+/cmake-build-debug/
+/cmake-build-release/
+/.cache
+
+# Emscripten build artifacts
+*.wasm
+*.js
+*.html
+*.data
+*.wast
+*.asm.js
+*.mem
+*.symbols
+*.bc
+*.map
+/a.out.js
+/a.out.wasm
+
+# Ignore CMake temporary files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Ignore CMake user files
+*.user
+*.user.*
+
+# Ignore Clang/LLVM compilation artifacts
+*.o
+*.a
+*.d
+*.s
+
+# Ignore temporary files created by editors or IDEs
+*.swp
+*~
+.DS_Store
+
+# Ignore specific configuration files that may contain sensitive information or user-specific settings
+/.vscode/
+/.idea/
+
+# Ignore other common directories that are not part of the source code
+/node_modules/
+/logs/
+/temp/
+
+imgui.ini
+compile_commands.json
+

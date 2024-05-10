@@ -1,0 +1,83 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 19,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "description": "Base configuration for all builds",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_CXX_STANDARD": "17",
+        "CMAKE_CXX_STANDARD_REQUIRED": "TRUE",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "dawn-base",
+      "inherits": "base",
+      "hidden": true,
+      "description": "Common Dawn configuration for all platforms",
+      "cacheVariables": {
+        "DAWN_FETCH_DEPENDENCIES": "ON",
+        "DAWN_ENABLE_D3D11": "OFF",
+        "DAWN_ENABLE_D3D12": "OFF",
+        "DAWN_ENABLE_METAL": "OFF",
+        "DAWN_ENABLE_VULKAN": "OFF",
+        "DAWN_BUILD_SAMPLES": "OFF",
+        "TINT_BUILD_TINT": "OFF",
+        "DEV_MODE": "ON"
+      }
+    },
+    {
+      "name": "dawn-windows",
+      "inherits": "dawn-base",
+      "description": "Build with Dawn for Windows",
+      "cacheVariables": {
+        "USE_VULKAN": "ON",
+        "DAWN_ENABLE_D3D12": "ON",
+        "DAWN_ENABLE_VULKAN": "ON"
+      }
+    },
+    {
+      "name": "dawn-macos",
+      "inherits": "dawn-base",
+      "description": "Build with Dawn for macOS",
+      "cacheVariables": {
+        "USE_METAL": "ON",
+        "DAWN_ENABLE_METAL": "ON",
+        "RN_DEBUG": "ON"
+      }
+    },
+    {
+      "name": "dawn-linux",
+      "inherits": "dawn-base",
+      "description": "Build with Dawn for Linux",
+      "cacheVariables": {
+        "USE_VULKAN": "ON",
+        "DAWN_ENABLE_VULKAN": "ON"
+      }
+    },
+    {
+      "name": "emscripten",
+      "inherits": "base",
+      "description": "Build for WebAssembly with Emscripten",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "/opt/homebrew/Cellar/emscripten/3.1.48/libexec/cmake/Modules/Platform/Emscripten.cmake",
+        "EMSCRIPTEN": "ON",
+        "USE_GLFW": "3",
+        "USE_WEBGPU": "ON",
+        "ASYNCIFY": "ON",
+        "WASM_BIGINT": "ON",
+        "ALLOW_MEMORY_GROWTH": "ON",
+        "EMCC_DEBUG": "True",
+        "DEV_MODE": "ON"
+      }
+    }
+  ]
+}
