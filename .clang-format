@@ -1,0 +1,8 @@
+BasedOnStyle: Chromium
+Language: Cpp
+Standard: Cpp11
+ColumnLimit: 0
+NamespaceIndentation: All
+InsertBraces: true
+InsertNewlineAtEOF: true
+
