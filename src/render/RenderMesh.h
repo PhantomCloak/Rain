@@ -19,7 +19,9 @@ class RenderMesh {
   void SetRenderPass(WGPURenderPassEncoder renderPass);
   void SetVertexBuffer(WGPUDevice device, WGPUQueue queue, std::vector<VertexAttributes> vertexData);
   void SetVertexBuffer2(WGPUDevice device, WGPUQueue queue, std::vector<VertexE> vertexData);
+	void createIndexBuffer(WGPUDevice device, WGPUQueue queue, std::vector<unsigned int> indexData);
 
+  std::vector<unsigned int> indexData;
  private:
   WGPURenderPipeline m_pipe;
   WGPUTexture meshTexture;
@@ -27,7 +29,9 @@ class RenderMesh {
   WGPUBuffer uniformBuffer;
   WGPUBindGroup bindGroup;
   WGPUBuffer vertexBuffer;
+  WGPUBuffer indexBuffer;
   WGPUBufferDescriptor vertexBufferDesc;
+  WGPUBufferDescriptor indexBufferDesc;
   std::vector<VertexAttributes> meshVertexData;
 
   void createUniformBuffer(WGPUDevice device);

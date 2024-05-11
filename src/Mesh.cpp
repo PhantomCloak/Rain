@@ -3,7 +3,7 @@
 MeshE::MeshE(std::vector<VertexE> vertices, std::vector<unsigned int> indices, std::vector<Texture> textures) : Node()
 {
     this->vertices = vertices; 
-		//this->indices = indices;
+		this->indices = indices;
     //this->textures = textures;
 
     //glGenVertexArrays(1, &VAO);

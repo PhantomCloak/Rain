@@ -62,6 +62,7 @@ void SetupScene() {
   //meshBox->SetVertexBuffer(render->m_device, render->m_queue, boxMesh->vertices);
   meshBox->SetVertexBuffer2(render->m_device, render->m_queue, v);
 
+  meshBox->createIndexBuffer(render->m_device, render->m_queue, m->meshes[0]->indices);
   meshBox->uniform.color = {0.0f, 1.0f, 0.4f, 1.0f};
 
 
@@ -223,7 +224,9 @@ void Application::OnUpdate() {
   for (auto v : renderMeshes) {
 		render->SetPipeline(m_pipeline);
     v->SetRenderPass(render->renderPass);
-    wgpuRenderPassEncoderDraw(render->renderPass, v->meshVertexCount, 1, 0, 0);
+
+    //wgpuRenderPassEncoderDraw(render->renderPass, v->meshVertexCount, 1, 0, 0);
+	wgpuRenderPassEncoderDrawIndexed(render->renderPass, v->indexData.size(), 1, 0, 0, 0);
   }
 
   updateGui(render->renderPass);

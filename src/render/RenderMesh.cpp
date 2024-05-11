@@ -60,6 +60,22 @@ void RenderMesh::createVertexBuffer(WGPUDevice device, int size) {
     vertexBuffer = wgpuDeviceCreateBuffer(device, &vertexBufferDesc);
 }
 
+void RenderMesh::createIndexBuffer(WGPUDevice device, WGPUQueue queue, std::vector<unsigned int> indexData)
+{
+	this->indexData = indexData;
+	indexBufferDesc = {};
+
+	indexBufferDesc.size = indexData.size() * sizeof(unsigned int);
+	indexBufferDesc.size = (indexBufferDesc.size + 3) & ~3;
+
+	indexBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index;;
+	indexBufferDesc.mappedAtCreation = false;
+
+	indexBuffer = wgpuDeviceCreateBuffer(device, &indexBufferDesc);
+
+	wgpuQueueWriteBuffer(queue, indexBuffer, 0, indexData.data(), indexBufferDesc.size);
+}
+
 void RenderMesh::createBindGroup(WGPUDevice device, WGPUBindGroupLayout bindGroupLayout, WGPUTextureView textureView, WGPUSampler sampler) {
     static std::vector<WGPUBindGroupEntry> bindingsOne(3);
 
@@ -86,5 +102,6 @@ void RenderMesh::createBindGroup(WGPUDevice device, WGPUBindGroupLayout bindGrou
 
 void RenderMesh::SetRenderPass(WGPURenderPassEncoder renderPass) {
     wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexBuffer, 0, meshVertexCount * sizeof(VertexAttributes));
+		wgpuRenderPassEncoderSetIndexBuffer(renderPass, indexBuffer, WGPUIndexFormat_Uint32, 0, indexData.size() * sizeof(unsigned int));
     wgpuRenderPassEncoderSetBindGroup(renderPass, 0, bindGroup, 0, NULL);
 }
