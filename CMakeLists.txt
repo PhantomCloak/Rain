@@ -26,6 +26,7 @@ set_target_properties(MyApp PROPERTIES
 )
 
 add_subdirectory(vendor/spdlog)
+add_subdirectory(vendor/assimp)
 
 if(DEV_MODE)
   target_compile_definitions(MyApp PRIVATE RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources")
@@ -33,7 +34,7 @@ else()
   target_compile_definitions(MyApp PRIVATE RESOURCE_DIR="./Resources")
 endif()
 
-target_link_libraries(MyApp PRIVATE spdlog)
+target_link_libraries(MyApp PRIVATE spdlog assimp)
 
 if(EMSCRIPTEN)
   target_link_options(MyApp PRIVATE
