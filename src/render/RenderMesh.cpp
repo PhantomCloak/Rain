@@ -43,6 +43,15 @@ void RenderMesh::SetVertexBuffer(WGPUDevice device, WGPUQueue queue, std::vector
     meshVertexCount = vertexData.size();
 }
 
+void RenderMesh::SetVertexBuffer2(WGPUDevice device, WGPUQueue queue, std::vector<VertexE> vertexData) {
+    //meshVertexData = vertexData;
+
+    createVertexBuffer(device, vertexData.size());
+    wgpuQueueWriteBuffer(queue, vertexBuffer, 0, vertexData.data(), vertexBufferDesc.size);
+
+    meshVertexCount = vertexData.size();
+}
+
 void RenderMesh::createVertexBuffer(WGPUDevice device, int size) {
     vertexBufferDesc = {};
     vertexBufferDesc.size = size * sizeof(VertexAttributes);

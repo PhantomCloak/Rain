@@ -4,6 +4,7 @@
 
 #include <webgpu/webgpu.h>
 #include <string>
+#include <unordered_map>
 #include "render/primitives/mesh.h"
 #include "render/primitives/texture.h"
 

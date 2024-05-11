@@ -5,6 +5,7 @@
 #include <vector>
 #include "primitives/mesh.h"
 #include "primitives/RenderMeshUniform.h"
+#include "Mesh.h"
 
 class RenderMesh {
  public:
@@ -17,6 +18,7 @@ class RenderMesh {
   void updateBuffer(WGPUQueue queue);
   void SetRenderPass(WGPURenderPassEncoder renderPass);
   void SetVertexBuffer(WGPUDevice device, WGPUQueue queue, std::vector<VertexAttributes> vertexData);
+  void SetVertexBuffer2(WGPUDevice device, WGPUQueue queue, std::vector<VertexE> vertexData);
 
  private:
   WGPURenderPipeline m_pipe;

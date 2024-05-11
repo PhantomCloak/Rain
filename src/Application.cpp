@@ -3,6 +3,7 @@
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
 #include "Game.h"
+#include "Model.h"
 #include "render/Camera.h"
 #include "render/Render.h"
 #include "render/RenderMesh.h"
@@ -54,29 +55,27 @@ void SetupScene() {
   auto planeTexture = Rain::ResourceManager::GetTexture("T_Floor");
 
   auto meshBox = new RenderMesh(render->m_device, m_pipeline, boxTexture->Texture, boxTexture->View, render->m_sampler);
-  meshBox->SetVertexBuffer(render->m_device, render->m_queue, boxMesh->vertices);
+
+  Model* m = new Model(RESOURCE_DIR "/wood.obj");
+  std::vector<VertexE> v = m->meshes[0]->vertices;
+
+  //meshBox->SetVertexBuffer(render->m_device, render->m_queue, boxMesh->vertices);
+  meshBox->SetVertexBuffer2(render->m_device, render->m_queue, v);
+
   meshBox->uniform.color = {0.0f, 1.0f, 0.4f, 1.0f};
 
-  auto meshFloor = new RenderMesh(render->m_device, m_pipeline, planeTexture->Texture, planeTexture->View, render->m_sampler);
-  meshFloor->SetVertexBuffer(render->m_device, render->m_queue, planeMesh->vertices);
-  meshFloor->uniform.color = {1.0f, 1.0f, 1.4f, 1.0f};
 
   meshBox->uniform.modelMatrix = glm::mat4x4(1);
   meshBox->name = "box";
-  meshFloor->uniform.modelMatrix = glm::mat4x4(1);
-  meshFloor->name = "floor";
-
-  meshFloor->uniform.modelMatrix = glm::translate(meshFloor->uniform.modelMatrix, glm::vec3(0, 0, 0));
-  meshFloor->uniform.modelMatrix = glm::scale(meshFloor->uniform.modelMatrix, glm::vec3(1, 1, 1));
 
   meshBox->uniform.modelMatrix = glm::translate(meshBox->uniform.modelMatrix, glm::vec3(0, 0, 10));
   meshBox->uniform.modelMatrix = glm::scale(meshBox->uniform.modelMatrix, glm::vec3(1));
 
-  meshFloor->updateBuffer(render->m_queue);
+  //meshFloor->updateBuffer(render->m_queue);
   meshBox->updateBuffer(render->m_queue);
 
   renderMeshes.push_back(meshBox);
-  renderMeshes.push_back(meshFloor);
+  //renderMeshes.push_back(meshFloor);
 }
 
 WGPUSurface m_surface;
@@ -102,11 +101,11 @@ void Application::OnStart() {
 
   Rain::ResourceManager::LoadMesh("M_Floor", RESOURCE_DIR "/floor.obj");
   Rain::ResourceManager::LoadTexture("T_Floor", RESOURCE_DIR "/floor.png");
+  //Model* m = new Model(RESOURCE_DIR "/wood.obj");
 
   Rain::ResourceManager::LoadMesh("M_Box", RESOURCE_DIR "/wood.obj");
   Rain::ResourceManager::LoadTexture("T_Box", RESOURCE_DIR "/wood.png");
 
-  m_ShaderManager->LoadShader("SH_Default_Lit", RESOURCE_DIR "/shader.wgsl");
   m_ShaderManager->LoadShader("SH_Default", RESOURCE_DIR "/shader_default.wgsl");
 
   m_PipelineManager = std::make_unique<PipelineManager>(render->m_device, m_ShaderManager);
@@ -114,7 +113,6 @@ void Application::OnStart() {
   BufferLayout vertexLayout = {
       {ShaderDataType::Float3, "position"},
       {ShaderDataType::Float3, "normal"},
-      {ShaderDataType::Float3, "color"},
       {ShaderDataType::Float2, "uv"}};
 
   GroupLayout groupLayout = {

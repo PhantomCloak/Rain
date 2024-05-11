@@ -1,8 +1,7 @@
 struct VertexInput {
 	@location(0) position: vec3f,
 	@location(1) normal: vec3f, // Consider removing if normals are no longer used.
-	@location(2) color: vec3f,
-	@location(3) uv: vec2f,
+	@location(2) uv: vec2f,
 };
 
 struct VertexOutput {
@@ -36,7 +35,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 	var out: VertexOutput;
 	out.position = uCam.projectionMatrix * uCam.viewMatrix * uMyUniforms.modelMatrix * vec4f(in.position, 1.0);
     out.normal = (uMyUniforms.modelMatrix * vec4f(in.normal, 0.0)).xyz; // Consider removing if normals are no longer used.
-	out.color = in.color;
+	out.color = vec3f(1);
 	out.uv = in.uv;
 	return out;
 }
@@ -50,6 +49,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let finalColor = textureColor;
 
     // No gamma-correction applied, directly return the final color with alpha
-    return vec4f(finalColor, uMyUniforms.color.a);
+    //return vec4f(finalColor, uMyUniforms.color.a);
+    return vec4f(in.normal, 1.0);
 }
 

@@ -77,6 +77,7 @@ bool Render::Init(void* window, WGPUInstance instance, WGPUSurface surface) {
 
 	wgpuDeviceSetUncapturedErrorCallback(m_device, [](WGPUErrorType errorType, const char* message, void* userdata) {
     fprintf(stderr, "Dawn error: %s\n", message);
+		exit(0);
 }, nullptr);
 
   return true;
@@ -104,7 +105,10 @@ void Render::OnFrameStart() {
   renderPassDesc.colorAttachmentCount = 1;
   renderPassColorAttachment.resolveTarget = nullptr;
   renderPassColorAttachment.view = nextTexture;
+
+#if !__EMSCRIPTEN__
 	renderPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+#endif
   renderPassDesc.colorAttachments = &renderPassColorAttachment;
 
   WGPURenderPassDepthStencilAttachment depthStencilAttachment;

@@ -68,7 +68,7 @@
       "inherits": "base",
       "description": "Build for WebAssembly with Emscripten",
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "/opt/homebrew/Cellar/emscripten/3.1.48/libexec/cmake/Modules/Platform/Emscripten.cmake",
+        "CMAKE_TOOLCHAIN_FILE": "/opt/homebrew/Cellar/emscripten/3.1.51/libexec/cmake/Modules/Platform/Emscripten.cmake",
         "EMSCRIPTEN": "ON",
         "USE_GLFW": "3",
         "USE_WEBGPU": "ON",
