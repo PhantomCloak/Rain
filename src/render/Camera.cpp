@@ -8,8 +8,9 @@ Camera::Camera(WGPUDevice device, WGPURenderPipeline pipe, glm::mat4 projectionM
   float screenWidth = 1920;
   float screenHeight = 1080;
   float PI = 3.14159265358979323846f;
-  uniform.viewMatrix = glm::lookAt(glm::vec3(-2.0f, -3.0f, 2.0f), glm::vec3(0.0f), glm::vec3(0, 0, 1));
-  uniform.projectionMatrix = glm::perspective(45 * PI / 180, screenWidth / screenHeight, 0.01f, 1000.0f);
+  //uniform.viewMatrix = glm::lookAt(glm::vec3(-2.0f, -3.0f, 2.0f), glm::vec3(0.0f), glm::vec3(0, 0, 1));
+  uniform.viewMatrix = glm::mat4(1);
+  uniform.projectionMatrix = glm::perspective(45 * PI / 180, screenWidth / screenHeight, 0.01f, 4000.0f);
   m_pipe = pipe;
   WGPUBindGroupLayout layout = wgpuRenderPipelineGetBindGroupLayout(m_pipe, 1);
   createBindGroup(device, layout);

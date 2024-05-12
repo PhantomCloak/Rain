@@ -5,6 +5,7 @@
 
 class Render {
  public:
+	static Render* Instance;
   WGPUInstance CreateInstance();
   WGPUDevice RequestDevice();
   bool Init(void* window, WGPUInstance instance, WGPUSurface surface);
@@ -40,7 +41,8 @@ class Render {
   WGPURenderPassEncoder renderPass;
   WGPUCommandEncoder encoder;
   WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_Undefined;
-  WGPUTextureFormat m_depthTextureFormat = WGPUTextureFormat_Depth24Plus;
+  //WGPUTextureFormat m_depthTextureFormat = WGPUTextureFormat_Depth24Plus;
+  WGPUTextureFormat m_depthTextureFormat = WGPUTextureFormat_Depth32Float;
   WGPUSwapChainDescriptor m_swapChainDesc;
   std::unique_ptr<PipelineManager> m_PipelineManager;
   std::shared_ptr<ShaderManager> m_ShaderManager;

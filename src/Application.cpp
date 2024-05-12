@@ -43,7 +43,7 @@ std::unordered_map<int, bool> keyStates;
 std::vector<RenderMesh*> renderMeshes;
 
 void SetupScene() {
-  glm::mat4 projectionMatrix = glm::perspective(90 * PI / 180, screenWidth / screenHeight, 0.01f, 1000.0f);
+  glm::mat4 projectionMatrix = glm::perspective(90 * PI / 180, screenWidth / screenHeight, 0.01f, 10000.0f);
   glm::mat4 viewMatrix = glm::lookAt(glm::vec3(-2.0f, -3.0f, 2.0f), glm::vec3(0.0f), glm::vec3(0, 0, 1));
 
   Cam = new Camera(render->m_device, m_pipeline, projectionMatrix, viewMatrix);
@@ -54,29 +54,45 @@ void SetupScene() {
   auto planeMesh = Rain::ResourceManager::GetMesh("M_Floor");
   auto planeTexture = Rain::ResourceManager::GetTexture("T_Floor");
 
-  auto meshBox = new RenderMesh(render->m_device, m_pipeline, boxTexture->Texture, boxTexture->View, render->m_sampler);
 
-  Model* m = new Model(RESOURCE_DIR "/wood.obj");
-  std::vector<VertexE> v = m->meshes[0]->vertices;
+  Model* m = new Model(RESOURCE_DIR "/sponza.obj");
 
-  //meshBox->SetVertexBuffer(render->m_device, render->m_queue, boxMesh->vertices);
-  meshBox->SetVertexBuffer2(render->m_device, render->m_queue, v);
+	int ctxNull = 0;
+	int ctxNo = 0;
 
-  meshBox->createIndexBuffer(render->m_device, render->m_queue, m->meshes[0]->indices);
-  meshBox->uniform.color = {0.0f, 1.0f, 0.4f, 1.0f};
+	for(int i = 0; i < m->meshes.size(); i++)
+	{
+		auto tex = m->meshes[i]->textures.size() != 0 ? m->meshes[i]->textures[0] : nullptr;
 
+		if(tex == nullptr)
+		{
+			tex = std::make_shared<Texture>();
+			tex->Texture = nullptr;
+			ctxNull++;
+		}
 
-  meshBox->uniform.modelMatrix = glm::mat4x4(1);
-  meshBox->name = "box";
+		if(tex->View == nullptr || tex->Texture == nullptr)
+		{
+			tex->Texture = boxTexture->Texture;
+			tex->View = boxTexture->View;
+			ctxNo++;
+		}
 
-  meshBox->uniform.modelMatrix = glm::translate(meshBox->uniform.modelMatrix, glm::vec3(0, 0, 10));
-  meshBox->uniform.modelMatrix = glm::scale(meshBox->uniform.modelMatrix, glm::vec3(1));
+		auto meshBox = new RenderMesh(render->m_device, m_pipeline, tex->Texture, tex->View, render->m_sampler);
 
-  //meshFloor->updateBuffer(render->m_queue);
-  meshBox->updateBuffer(render->m_queue);
+		meshBox->SetVertexBuffer2(render->m_device, render->m_queue, m->meshes[i]->vertices);
+		meshBox->createIndexBuffer(render->m_device, render->m_queue, m->meshes[i]->indices);
 
-  renderMeshes.push_back(meshBox);
-  //renderMeshes.push_back(meshFloor);
+		meshBox->name = "box";
+		meshBox->uniform.modelMatrix = glm::rotate(glm::mat4x4(1), glm::radians(90.0f), glm::vec3(0, 1, 0));
+
+		meshBox->updateBuffer(render->m_queue);
+
+		renderMeshes.push_back(meshBox);
+	}
+
+	std::cout << "CN: " << ctxNull << std::endl;
+	std::cout << "CTNN: " << ctxNo << std::endl;
 }
 
 WGPUSurface m_surface;
@@ -159,7 +175,7 @@ void Application::OnResize(int height, int width) {
   float ratio = render->m_swapChainDesc.width / (float)render->m_swapChainDesc.height;
 
   Cam->uniform.projectionMatrix =
-      glm::perspective(90 * PI / 180, ratio, 0.01f, 100.0f);
+      glm::perspective(90 * PI / 180, ratio, 0.01f, 10000.0f);
   Cam->updateBuffer(render->m_queue);
 }
 
@@ -218,19 +234,92 @@ void Application::updateViewMatrix() {
 
 void Application::OnUpdate() {
   updateCameraPosition();
-  render->OnFrameStart();
+  glfwPollEvents();
 
-  Cam->Begin(render->renderPass);
-  for (auto v : renderMeshes) {
-		render->SetPipeline(m_pipeline);
-    v->SetRenderPass(render->renderPass);
+  render->nextTexture = wgpuSwapChainGetCurrentTextureView(render->m_swapChain);
+  if (!render->nextTexture) {
+    fprintf(stderr, "Cannot acquire next swap chain texture\n");
+    return;
+  }
 
-    //wgpuRenderPassEncoderDraw(render->renderPass, v->meshVertexCount, 1, 0, 0);
-	wgpuRenderPassEncoderDrawIndexed(render->renderPass, v->indexData.size(), 1, 0, 0, 0);
+  WGPUCommandEncoderDescriptor commandEncoderDesc = {
+		.label = "Command Encoder"
+	};
+  render->encoder = wgpuDeviceCreateCommandEncoder(render->m_device, &commandEncoderDesc);
+
+  WGPURenderPassDescriptor renderPassDesc{};
+
+  WGPURenderPassColorAttachment renderPassColorAttachment{};
+  renderPassColorAttachment.loadOp = WGPULoadOp_Clear;
+  renderPassColorAttachment.storeOp = WGPUStoreOp_Store;
+  renderPassColorAttachment.clearValue = render->m_Color;
+  renderPassDesc.colorAttachmentCount = 1;
+  renderPassColorAttachment.resolveTarget = nullptr;
+  renderPassColorAttachment.view = render->nextTexture;
+
+#if !__EMSCRIPTEN__
+	renderPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+#endif
+  renderPassDesc.colorAttachments = &renderPassColorAttachment;
+
+  WGPURenderPassDepthStencilAttachment depthStencilAttachment;
+  depthStencilAttachment.view = render->m_depthTextureView;
+  depthStencilAttachment.depthClearValue = 1.0f;
+  depthStencilAttachment.depthLoadOp = WGPULoadOp_Clear;
+  depthStencilAttachment.depthStoreOp = WGPUStoreOp_Store;
+  depthStencilAttachment.depthReadOnly = false;
+  depthStencilAttachment.stencilClearValue = 0;
+
+  depthStencilAttachment.stencilLoadOp = WGPULoadOp_Undefined;
+  depthStencilAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
+
+  depthStencilAttachment.stencilReadOnly = true;
+
+  renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
+
+  renderPassDesc.timestampWrites = 0;
+  renderPassDesc.timestampWrites = nullptr;
+
+  render->renderPass = wgpuCommandEncoderBeginRenderPass(render->encoder, &renderPassDesc);
+
+  wgpuRenderPassEncoderSetBindGroup(render->renderPass, 1, Cam->bindGroup, 0, NULL);
+
+  static auto m1 = glm::translate(glm::mat4(1), glm::vec3(5, 0, 0));
+  static auto m2 = glm::translate(glm::mat4(1), glm::vec3(-5,0, 0));
+
+  for (auto obj : renderMeshes) {
+		wgpuRenderPassEncoderSetPipeline(render->renderPass, m_pipeline);
+
+		wgpuRenderPassEncoderSetVertexBuffer(render->renderPass, 0, obj->vertexBuffer, 0, obj->meshVertexCount * sizeof(VertexAttributes));
+		wgpuRenderPassEncoderSetIndexBuffer(render->renderPass, obj->indexBuffer, WGPUIndexFormat_Uint32, 0, obj->indexData.size() * sizeof(unsigned int));
+		wgpuRenderPassEncoderSetBindGroup(render->renderPass, 0, obj->bindGroup, 0, NULL);
+
+
+		wgpuQueueWriteBuffer(render->m_queue, obj->uniformBuffer, 0, &obj->uniform, sizeof(RenderMeshUniform));
+
+
+	  wgpuRenderPassEncoderDrawIndexed(render->renderPass, obj->indexData.size(), 1, 0, 0, 0);
   }
 
   updateGui(render->renderPass);
-  render->OnFrameEnd();
+
+  wgpuRenderPassEncoderEnd(render->renderPass);
+  wgpuTextureViewRelease(render->nextTexture);
+
+  WGPUCommandBufferDescriptor cmdBufferDescriptor = {
+		.label = "Command Buffer"
+	};
+  WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(render->encoder, &cmdBufferDescriptor);
+
+  wgpuQueueSubmit(render->m_queue, 1, &commandBuffer);
+
+#ifndef __EMSCRIPTEN__
+  wgpuSwapChainPresent(render->m_swapChain);
+#endif
+
+#ifdef WEBGPU_BACKEND_DAWN
+  wgpuDeviceTick(m_device);
+#endif
 }
 
 void Application::OnKeyPressed(KeyCode key, KeyAction action) {
@@ -248,7 +337,7 @@ void Application::OnKeyPressed(KeyCode key, KeyAction action) {
 }
 
 void Application::updateCameraPosition() {
-  const float cameraSpeed = 0.05f;
+  const float cameraSpeed = 5.05f;
   glm::vec3 cameraRight = glm::normalize(glm::cross(cameraFront, Cam->cameraUp));  // Corrected order for cross product
 
   if (keyStates[GLFW_KEY_W]) {

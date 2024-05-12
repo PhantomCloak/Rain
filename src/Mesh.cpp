@@ -1,10 +1,10 @@
 #include "Mesh.h"
 
-MeshE::MeshE(std::vector<VertexE> vertices, std::vector<unsigned int> indices, std::vector<Texture> textures) : Node()
+MeshE::MeshE(std::vector<VertexE> vertices, std::vector<unsigned int> indices, std::vector<std::shared_ptr<Texture>> textures) : Node()
 {
     this->vertices = vertices; 
 		this->indices = indices;
-    //this->textures = textures;
+    this->textures = textures;
 
     //glGenVertexArrays(1, &VAO);
     //glGenBuffers(1, &VBO);

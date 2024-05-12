@@ -19,12 +19,12 @@ class Model : public Node
         // model data
         std::vector<Ref<MeshE>> meshes;
         std::string directory;
-				std::vector<Texture> textures_loaded;
+				std::vector<std::shared_ptr<Texture>> textures_loaded;
 
         void loadModel(std::string path);
         void processNode(aiNode *node, const aiScene *scene);
         Ref<MeshE> processMesh(aiMesh *mesh, const aiScene *scene);
-        std::vector<Texture> loadMaterialTextures(aiMaterial *mat, aiTextureType type, 
+        std::vector<std::shared_ptr<Texture>> loadMaterialTextures(aiMaterial *mat, aiTextureType type, 
                                              std::string typeName);
 			private:
 				std::string strPath;

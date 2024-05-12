@@ -124,7 +124,8 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
       CreateVertexBufferLayout(vertexLayout);
 
   WGPUTextureFormat swapChainFormat = WGPUTextureFormat_Undefined;
-  WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth24Plus;
+  //WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth24Plus;
+  WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth32Float;
 
 #if __EMSCRIPTEN__
   swapChainFormat = wgpuSurfaceGetPreferredFormat(surface, adapter);

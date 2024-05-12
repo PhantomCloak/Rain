@@ -22,12 +22,11 @@ class RenderMesh {
 	void createIndexBuffer(WGPUDevice device, WGPUQueue queue, std::vector<unsigned int> indexData);
 
   std::vector<unsigned int> indexData;
- private:
+  WGPUBindGroup bindGroup;
   WGPURenderPipeline m_pipe;
   WGPUTexture meshTexture;
   WGPUTextureView meshTextureView;
   WGPUBuffer uniformBuffer;
-  WGPUBindGroup bindGroup;
   WGPUBuffer vertexBuffer;
   WGPUBuffer indexBuffer;
   WGPUBufferDescriptor vertexBufferDesc;

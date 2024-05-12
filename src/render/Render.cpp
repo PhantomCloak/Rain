@@ -8,6 +8,8 @@
 #endif
 #include <iostream>
 
+Render* Render::Instance = nullptr;
+
 WGPUInstance Render::CreateInstance() {
   WGPUInstanceDescriptor desc = {};
   desc.nextInChain = nullptr;
@@ -21,6 +23,8 @@ WGPUInstance Render::CreateInstance() {
 }
 
 bool Render::Init(void* window, WGPUInstance instance, WGPUSurface surface) {
+	Instance = this;
+
   WGPURequestAdapterOptions adapterOpts{};
   adapterOpts.compatibleSurface = surface;
   m_adapter = requestAdapter(instance, &adapterOpts);
@@ -143,6 +147,7 @@ void Render::OnFrameEnd() {
   cmdBufferDescriptor.label = "Command buffer";
   WGPUCommandBuffer commandBuffer =
       wgpuCommandEncoderFinish(encoder, &cmdBufferDescriptor);
+
   wgpuQueueSubmit(m_queue, 1, &commandBuffer);
 
 #ifndef __EMSCRIPTEN__

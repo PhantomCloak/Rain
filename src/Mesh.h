@@ -17,9 +17,9 @@ class MeshE : public Node {
         // mesh data
         std::vector<VertexE>       vertices;
         std::vector<unsigned int> indices;
-        std::vector<Texture>      textures;
+        std::vector<std::shared_ptr<Texture>>      textures;
 
-        MeshE(std::vector<VertexE> vertices, std::vector<unsigned int> indices, std::vector<Texture> textures);
+        MeshE(std::vector<VertexE> vertices, std::vector<unsigned int> indices, std::vector<std::shared_ptr<Texture>> textures);
         //void Draw(Shader &shader);
     private:
         //  render data
