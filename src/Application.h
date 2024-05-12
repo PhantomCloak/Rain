@@ -30,9 +30,7 @@ class Application : public AppWindow {
   void OnUpdate() override;
   void OnStart() override;
  private:
-  void updateViewMatrix();
   void updateDragInertia();
-  void updateCameraPosition();
 
   void updateGui(WGPURenderPassEncoder renderPass);
 };

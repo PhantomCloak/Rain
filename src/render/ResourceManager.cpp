@@ -115,7 +115,8 @@ WGPUTexture loadTexture(const char* path, std::shared_ptr<WGPUDevice> m_device, 
   textureDesc.size.width = (uint32_t)width;
   textureDesc.size.height = (uint32_t)height;
   textureDesc.size.depthOrArrayLayers = 1;
-  textureDesc.mipLevelCount = bit_width(std::max(textureDesc.size.width, textureDesc.size.height));  // Implement bit_width
+  //textureDesc.mipLevelCount = bit_width(std::max(textureDesc.size.width, textureDesc.size.height));  // Implement bit_width
+  textureDesc.mipLevelCount = 1;  // Implement bit_width
   textureDesc.sampleCount = 1;
   textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
 

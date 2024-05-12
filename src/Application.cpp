@@ -3,6 +3,8 @@
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
 #include "Model.h"
+#include "io/cursor.h"
+#include "io/keyboard.h"
 #include "render/Camera.h"
 #include "render/Render.h"
 #include "render/ResourceManager.h"
@@ -30,6 +32,9 @@ float screenHeight = 1080;
 bool switchKey = false;
 GLFWwindow* m_window;
 Render* render = new Render();
+
+std::shared_ptr<PlayerCamera> Player;
+
 Camera* Cam;
 Model* sponza;
 
@@ -37,7 +42,6 @@ std::unique_ptr<PipelineManager> m_PipelineManager;
 std::shared_ptr<ShaderManager> m_ShaderManager;
 WGPURenderPipeline m_pipeline = nullptr;
 WGPURenderPipeline m_pipeline_lit = nullptr;
-std::unordered_map<int, bool> keyStates;
 
 WGPUSurface m_surface;
 
@@ -79,6 +83,8 @@ void Application::OnStart() {
   m_pipeline = m_PipelineManager->CreatePipeline("RP_Default", "SH_Default", vertexLayout, groupLayout, m_surface, render->m_adapter);
 
   render->SetClearColor(0.52, 0.80, 0.92, 1);
+	Cursor::Setup(m_window);
+	Keyboard::Setup(m_window);
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -86,21 +92,25 @@ void Application::OnStart() {
 
   ImGui_ImplGlfw_InitForOther(m_window, true);
 
-	ImGui_ImplWGPU_InitInfo initInfo;
-	initInfo.Device = render->m_device;
-	initInfo.RenderTargetFormat = render->m_swapChainFormat;
-	initInfo.DepthStencilFormat = render->m_depthTextureFormat;
+  ImGui_ImplWGPU_InitInfo initInfo;
+  initInfo.Device = render->m_device;
+  initInfo.RenderTargetFormat = render->m_swapChainFormat;
+  initInfo.DepthStencilFormat = render->m_depthTextureFormat;
 
   ImGui_ImplWGPU_Init(&initInfo);
 
-	glm::mat4 projectionMatrix = glm::perspective(90 * PI / 180, screenWidth / screenHeight, 0.01f, 10000.0f);
-  glm::mat4 viewMatrix = glm::lookAt(glm::vec3(-2.0f, -3.0f, 2.0f), glm::vec3(0.0f), glm::vec3(0, 0, 1));
+  glm::mat4 projectionMatrix = glm::perspective(75 * PI / 180, screenWidth / screenHeight, 0.1f, 2500.0f);
 
-  Cam = new Camera(render->m_device, m_pipeline, projectionMatrix, viewMatrix);
+  WGPUBindGroupLayout cameraLayout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 1);
+
+	Player = std::make_shared<PlayerCamera>();
+  Cam = new Camera(projectionMatrix, Player, render->m_device, cameraLayout);
   Cam->updateBuffer(render->m_queue);
 
-	WGPUBindGroupLayout  layout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 0);
-  sponza = new Model(RESOURCE_DIR "/sponza.obj", layout, render->m_device, render->m_queue, render->m_sampler);
+  WGPUBindGroupLayout objectLayout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 0);
+  sponza = new Model(RESOURCE_DIR "/sponza.obj", objectLayout, render->m_device, render->m_queue, render->m_sampler);
+
+	Cursor::CaptureMouse(true);
 }
 
 bool Application::isRunning() {
@@ -124,45 +134,15 @@ void Application::OnResize(int height, int width) {
   Cam->updateBuffer(render->m_queue);
 }
 
-bool firstMouse = true;
-float lastX = screenWidth / 2.0f;   // Set to the middle of the screen
-float lastY = screenHeight / 2.0f;  // Set to the middle of the screen
-const float sensitivity = 0.1f;     // Sensitivity of mouse movement
-float cameraYaw = -90.0;
-float cameraPitch = 0.0f;
-
 void Application::OnMouseMove(double xPos, double yPos) {
-  if (firstMouse) {
-    lastX = xPos;
-    lastY = yPos;
-    firstMouse = false;
-  }
+  static glm::vec2 prevCursorPos = glm::vec2(0);
 
-  float xoffset = lastX - xPos;
-  float yoffset = lastY - yPos;
-  lastX = xPos;
-  lastY = yPos;
+  glm::vec2 cursorPos = Cursor::GetCursorPosition();
 
-  xoffset *= sensitivity;
-  yoffset *= sensitivity;
+	Player->ProcessMouseMovement(cursorPos.x - prevCursorPos.x, cursorPos.y - prevCursorPos.y);
 
-  cameraYaw += xoffset;
-  cameraPitch += yoffset;
-
-  if (cameraPitch > 89.0f) {
-    cameraPitch = 89.0f;
-  }
-  if (cameraPitch < -89.0f) {
-    cameraPitch = -89.0f;
-  }
-
-  glm::vec3 front;
-  front.x = cos(glm::radians(cameraYaw)) * cos(glm::radians(cameraPitch));
-  front.y = sin(glm::radians(cameraYaw)) * cos(glm::radians(cameraPitch));
-  front.z = sin(glm::radians(cameraPitch));
-  cameraFront = glm::normalize(front);
-
-  updateViewMatrix();
+  prevCursorPos = cursorPos;
+	Cam->updateBuffer(render->m_queue);
 }
 
 void Application::OnMouseClick(Rain::MouseCode button) {
@@ -172,13 +152,41 @@ void Application::OnMouseClick(Rain::MouseCode button) {
   }
 }
 
-void Application::updateViewMatrix() {
-  Cam->LookAt(render->m_queue, cameraFront);
-  Cam->updateBuffer(render->m_queue);
+void MoveControls() {
+	float mul = 5.0f;
+	if(Keyboard::IsKeyPressing(Rain::Key::W))
+	{
+		Player->ProcessKeyboard(FORWARD, 1.0f * mul);
+    Cam->updateBuffer(render->m_queue);
+	}
+	else if(Keyboard::IsKeyPressing(Rain::Key::S))
+	{
+		Player->ProcessKeyboard(BACKWARD, 1.0f * mul);
+    Cam->updateBuffer(render->m_queue);
+	}
+	else if(Keyboard::IsKeyPressing(Rain::Key::A))
+	{
+		Player->ProcessKeyboard(LEFT, 1.0f * mul);
+    Cam->updateBuffer(render->m_queue);
+	}
+	else if(Keyboard::IsKeyPressing(Rain::Key::D))
+	{
+		Player->ProcessKeyboard(RIGHT, 1.0f * mul);
+    Cam->updateBuffer(render->m_queue);
+	}
+	else if(Keyboard::IsKeyPressing(Rain::Key::Space))
+	{
+		Player->ProcessKeyboard(UP, 1.0f * mul);
+    Cam->updateBuffer(render->m_queue);
+	}
+	else if(Keyboard::IsKeyPressing(Rain::Key::LeftShift))
+	{
+		Player->ProcessKeyboard(DOWN, 1.0f * mul);
+    Cam->updateBuffer(render->m_queue);
+	}
 }
 
 void Application::OnUpdate() {
-  updateCameraPosition();
   glfwPollEvents();
 
   render->nextTexture = wgpuSwapChainGetCurrentTextureView(render->m_swapChain);
@@ -188,8 +196,7 @@ void Application::OnUpdate() {
   }
 
   WGPUCommandEncoderDescriptor commandEncoderDesc = {
-		.label = "Command Encoder"
-	};
+      .label = "Command Encoder"};
   render->encoder = wgpuDeviceCreateCommandEncoder(render->m_device, &commandEncoderDesc);
 
   WGPURenderPassDescriptor renderPassDesc{};
@@ -203,7 +210,7 @@ void Application::OnUpdate() {
   renderPassColorAttachment.view = render->nextTexture;
 
 #if !__EMSCRIPTEN__
-	renderPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+  renderPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
 #endif
   renderPassDesc.colorAttachments = &renderPassColorAttachment;
 
@@ -229,10 +236,8 @@ void Application::OnUpdate() {
 
   wgpuRenderPassEncoderSetBindGroup(render->renderPass, 1, Cam->bindGroup, 0, NULL);
 
-  static auto m1 = glm::translate(glm::mat4(1), glm::vec3(5, 0, 0));
-  static auto m2 = glm::translate(glm::mat4(1), glm::vec3(-5,0, 0));
-
-	sponza->Draw(render->renderPass, m_pipeline);
+  sponza->Draw(render->renderPass, m_pipeline);
+	MoveControls();
 
   updateGui(render->renderPass);
 
@@ -240,8 +245,7 @@ void Application::OnUpdate() {
   wgpuTextureViewRelease(render->nextTexture);
 
   WGPUCommandBufferDescriptor cmdBufferDescriptor = {
-		.label = "Command Buffer"
-	};
+      .label = "Command Buffer"};
   WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(render->encoder, &cmdBufferDescriptor);
 
   wgpuQueueSubmit(render->m_queue, 1, &commandBuffer);
@@ -261,38 +265,6 @@ void Application::OnKeyPressed(KeyCode key, KeyAction action) {
       switchKey = true;
     }
   }
-
-  if (action == Rain::Key::RN_KEY_PRESS) {
-    keyStates[key] = true;
-  } else if (action == Rain::Key::RN_KEY_RELEASE) {
-    keyStates[key] = false;
-  }
-}
-
-void Application::updateCameraPosition() {
-  const float cameraSpeed = 5.05f;
-  glm::vec3 cameraRight = glm::normalize(glm::cross(cameraFront, Cam->cameraUp));  // Corrected order for cross product
-
-  if (keyStates[GLFW_KEY_W]) {
-    Cam->cameraPos += cameraSpeed * cameraFront;
-  }
-  if (keyStates[GLFW_KEY_S]) {
-    Cam->cameraPos -= cameraSpeed * cameraFront;
-  }
-  if (keyStates[GLFW_KEY_A]) {
-    Cam->cameraPos -= cameraSpeed * cameraRight;  // Corrected direction for left movement
-  }
-  if (keyStates[GLFW_KEY_D]) {
-    Cam->cameraPos += cameraSpeed * cameraRight;
-  }
-  if (keyStates[GLFW_KEY_SPACE]) {
-    Cam->cameraPos += cameraSpeed * Cam->cameraUp;
-  }
-  if (keyStates[GLFW_KEY_LEFT_SHIFT]) {
-    Cam->cameraPos -= cameraSpeed * Cam->cameraUp;
-  }
-
-  updateViewMatrix();
 }
 
 void Application::updateGui(WGPURenderPassEncoder renderPass) {

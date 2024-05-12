@@ -1,19 +1,16 @@
 #include "Camera.h"
 #include <glm/ext.hpp>
 #include <vector>
-#include "glm/ext/matrix_transform.hpp"
 
-Camera::Camera(WGPUDevice device, WGPURenderPipeline pipe, glm::mat4 projectionMatrix, glm::mat4 viewMatrix) {
+Camera::Camera(glm::mat4x4 projection, std::shared_ptr<PlayerCamera> camera, WGPUDevice device, WGPUBindGroupLayout& resourceLayout) {
   createUniformBuffer(device);
-  float screenWidth = 1920;
-  float screenHeight = 1080;
-  float PI = 3.14159265358979323846f;
-  //uniform.viewMatrix = glm::lookAt(glm::vec3(-2.0f, -3.0f, 2.0f), glm::vec3(0.0f), glm::vec3(0, 0, 1));
-  uniform.viewMatrix = glm::mat4(1);
-  uniform.projectionMatrix = glm::perspective(45 * PI / 180, screenWidth / screenHeight, 0.01f, 4000.0f);
-  m_pipe = pipe;
-  WGPUBindGroupLayout layout = wgpuRenderPipelineGetBindGroupLayout(m_pipe, 1);
-  createBindGroup(device, layout);
+
+  uniform.projectionMatrix = projection;
+  uniform.viewMatrix = camera->GetViewMatrix();
+
+  createBindGroup(device, resourceLayout);
+
+  cameraInstance = camera;
 }
 
 void Camera::createUniformBuffer(WGPUDevice device) {
@@ -30,13 +27,8 @@ void Camera::Begin(WGPURenderPassEncoder renderPass) {
 }
 
 void Camera::updateBuffer(WGPUQueue queue) {
+  uniform.viewMatrix = cameraInstance->GetViewMatrix();
   wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(CameraUniform));
-}
-
-void Camera::LookAt(WGPUQueue queue, glm::vec3 pos) {
-  glm::vec3 target = cameraPos + pos;
-  uniform.viewMatrix = glm::lookAt(cameraPos, target, cameraUp);
-  updateBuffer(queue);
 }
 
 void Camera::createBindGroup(WGPUDevice device, WGPUBindGroupLayout bindGroupLayout) {
