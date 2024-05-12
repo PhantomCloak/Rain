@@ -103,18 +103,15 @@ std::shared_ptr<Texture> Model::loadMaterialTexture(aiMaterial* mat, aiTextureTy
   int textureCount = mat->GetTextureCount(type);
   std::shared_ptr texture = std::make_shared<Texture>();
 
-	static auto jiTex = Rain::ResourceManager::LoadTexture("T_Box", RESOURCE_DIR "/wood.png");
+	// TODO: Remove this hack
+	static auto backupTex = Rain::ResourceManager::LoadTexture("T_Box", RESOURCE_DIR "/wood.png");
 
   aiString str;
   mat->GetTexture(type, 0, &str);
 
   if (textureCount <= 0) {
-		//std::cout << "Loading Texture Hacky: " << str.C_Str() << std::endl;
-		return jiTex;
+		return backupTex;
   }
-
-  //assert(!(textureCount > 1));
-
 
   for (unsigned int j = 0; j < textures_loaded.size(); j++) {
     if (std::strcmp(textures_loaded[j]->path.data(), str.C_Str()) == 0) {
@@ -137,4 +134,10 @@ void Model::Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline
   for (auto mesh : meshes) {
 		mesh->Draw(renderPass, pipeline);
   }
+}
+
+void Model::UpdateUniforms(WGPUQueue& queue) {
+  for (auto mesh : meshes) {
+		mesh->UpdateUniforms(queue);
+	}
 }

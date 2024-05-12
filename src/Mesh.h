@@ -35,6 +35,7 @@ class MeshE : public Node {
 				WGPUSampler& sampler);
 
   void Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline);
+	void UpdateUniforms(WGPUQueue& queue);
 
  private:
   WGPUBindGroup defaultResourcesBindGroup;

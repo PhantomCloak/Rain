@@ -11,4 +11,5 @@ public:
     static bool HasLeftCursorClicked();
     static bool HasRightCursorClicked();
 		static void CaptureMouse(bool shouldCapture);
+		static bool IsMouseCaptured();
 };

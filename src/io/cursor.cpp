@@ -6,6 +6,7 @@
 #endif
 
 static GLFWwindow* NativeWndPtr;
+static bool isMouseCapturing = false;
 
 void Cursor::Setup(void* window) {
     NativeWndPtr = (GLFWwindow*)window;
@@ -33,4 +34,11 @@ void Cursor::CaptureMouse(bool shouldCapture)
 		glfwSetInputMode((GLFWwindow*)NativeWndPtr, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	else
 		glfwSetInputMode((GLFWwindow*)NativeWndPtr, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+	isMouseCapturing = shouldCapture;
+}
+
+bool Cursor::IsMouseCaptured()
+{
+	return isMouseCapturing;
 }

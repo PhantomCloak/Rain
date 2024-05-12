@@ -24,12 +24,9 @@
 
 extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
 
-glm::vec3 cameraFront = glm::vec3(0.0f, -0.5f, 0);
-
 float screenWidth = 1920;
 float screenHeight = 1080;
 
-bool switchKey = false;
 GLFWwindow* m_window;
 Render* render = new Render();
 
@@ -40,8 +37,8 @@ Model* sponza;
 
 std::unique_ptr<PipelineManager> m_PipelineManager;
 std::shared_ptr<ShaderManager> m_ShaderManager;
+
 WGPURenderPipeline m_pipeline = nullptr;
-WGPURenderPipeline m_pipeline_lit = nullptr;
 
 WGPUSurface m_surface;
 
@@ -60,12 +57,11 @@ void Application::OnStart() {
   }
 
   render->Init(m_window, instance, m_surface);
-  m_ShaderManager = std::make_shared<ShaderManager>(render->m_device);
 
-  auto devicePtr = std::make_shared<WGPUDevice>(render->m_device);
-  Rain::ResourceManager::Init(devicePtr);
-
+  Rain::ResourceManager::Init(std::make_shared<WGPUDevice>(render->m_device));
   Rain::ResourceManager::LoadTexture("T_Box", RESOURCE_DIR "/wood.png");
+
+  m_ShaderManager = std::make_shared<ShaderManager>(render->m_device);
   m_ShaderManager->LoadShader("SH_Default", RESOURCE_DIR "/shader_default.wgsl");
   m_PipelineManager = std::make_unique<PipelineManager>(render->m_device, m_ShaderManager);
 
@@ -83,8 +79,8 @@ void Application::OnStart() {
   m_pipeline = m_PipelineManager->CreatePipeline("RP_Default", "SH_Default", vertexLayout, groupLayout, m_surface, render->m_adapter);
 
   render->SetClearColor(0.52, 0.80, 0.92, 1);
-	Cursor::Setup(m_window);
-	Keyboard::Setup(m_window);
+  Cursor::Setup(m_window);
+  Keyboard::Setup(m_window);
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -96,21 +92,21 @@ void Application::OnStart() {
   initInfo.Device = render->m_device;
   initInfo.RenderTargetFormat = render->m_swapChainFormat;
   initInfo.DepthStencilFormat = render->m_depthTextureFormat;
-
   ImGui_ImplWGPU_Init(&initInfo);
 
-  glm::mat4 projectionMatrix = glm::perspective(75 * PI / 180, screenWidth / screenHeight, 0.1f, 2500.0f);
-
   WGPUBindGroupLayout cameraLayout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 1);
-
-	Player = std::make_shared<PlayerCamera>();
+  WGPUBindGroupLayout objectLayout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 0);
+  glm::mat4 projectionMatrix = glm::perspective(75 * PI / 180, screenWidth / screenHeight, 0.1f, 1500.0f);
+  Player = std::make_shared<PlayerCamera>();
   Cam = new Camera(projectionMatrix, Player, render->m_device, cameraLayout);
+
   Cam->updateBuffer(render->m_queue);
 
-  WGPUBindGroupLayout objectLayout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 0);
   sponza = new Model(RESOURCE_DIR "/sponza.obj", objectLayout, render->m_device, render->m_queue, render->m_sampler);
+  sponza->Transform.scale = glm::vec3(0.5f);
+  sponza->UpdateUniforms(render->m_queue);
 
-	Cursor::CaptureMouse(true);
+  Cursor::CaptureMouse(true);
 }
 
 bool Application::isRunning() {
@@ -129,61 +125,33 @@ void Application::OnResize(int height, int width) {
       render->GetDepthBufferTextureView(render->m_depthTexture, render->m_depthTextureFormat);
   float ratio = render->m_swapChainDesc.width / (float)render->m_swapChainDesc.height;
 
-  Cam->uniform.projectionMatrix =
-      glm::perspective(90 * PI / 180, ratio, 0.01f, 10000.0f);
-  Cam->updateBuffer(render->m_queue);
-}
-
-void Application::OnMouseMove(double xPos, double yPos) {
-  static glm::vec2 prevCursorPos = glm::vec2(0);
-
-  glm::vec2 cursorPos = Cursor::GetCursorPosition();
-
-	Player->ProcessMouseMovement(cursorPos.x - prevCursorPos.x, cursorPos.y - prevCursorPos.y);
-
-  prevCursorPos = cursorPos;
-	Cam->updateBuffer(render->m_queue);
-}
-
-void Application::OnMouseClick(Rain::MouseCode button) {
-  ImGuiIO& io = ImGui::GetIO();
-  if (io.WantCaptureMouse) {
-    return;
-  }
+  // Cam->uniform.projectionMatrix =
+  //     glm::perspective(90 * PI / 180, ratio, 0.01f, 10000.0f);
+  // Cam->updateBuffer(render->m_queue);
 }
 
 void MoveControls() {
-	float mul = 5.0f;
-	if(Keyboard::IsKeyPressing(Rain::Key::W))
-	{
-		Player->ProcessKeyboard(FORWARD, 1.0f * mul);
+  float mul = 5.0f;
+
+  if (Keyboard::IsKeyPressing(Rain::Key::W)) {
+    Player->ProcessKeyboard(FORWARD, 1.0f * mul);
     Cam->updateBuffer(render->m_queue);
-	}
-	else if(Keyboard::IsKeyPressing(Rain::Key::S))
-	{
-		Player->ProcessKeyboard(BACKWARD, 1.0f * mul);
+  } else if (Keyboard::IsKeyPressing(Rain::Key::S)) {
+    Player->ProcessKeyboard(BACKWARD, 1.0f * mul);
     Cam->updateBuffer(render->m_queue);
-	}
-	else if(Keyboard::IsKeyPressing(Rain::Key::A))
-	{
-		Player->ProcessKeyboard(LEFT, 1.0f * mul);
+  } else if (Keyboard::IsKeyPressing(Rain::Key::A)) {
+    Player->ProcessKeyboard(LEFT, 1.0f * mul);
     Cam->updateBuffer(render->m_queue);
-	}
-	else if(Keyboard::IsKeyPressing(Rain::Key::D))
-	{
-		Player->ProcessKeyboard(RIGHT, 1.0f * mul);
+  } else if (Keyboard::IsKeyPressing(Rain::Key::D)) {
+    Player->ProcessKeyboard(RIGHT, 1.0f * mul);
     Cam->updateBuffer(render->m_queue);
-	}
-	else if(Keyboard::IsKeyPressing(Rain::Key::Space))
-	{
-		Player->ProcessKeyboard(UP, 1.0f * mul);
+  } else if (Keyboard::IsKeyPressing(Rain::Key::Space)) {
+    Player->ProcessKeyboard(UP, 1.0f * mul);
     Cam->updateBuffer(render->m_queue);
-	}
-	else if(Keyboard::IsKeyPressing(Rain::Key::LeftShift))
-	{
-		Player->ProcessKeyboard(DOWN, 1.0f * mul);
+  } else if (Keyboard::IsKeyPressing(Rain::Key::LeftShift)) {
+    Player->ProcessKeyboard(DOWN, 1.0f * mul);
     Cam->updateBuffer(render->m_queue);
-	}
+  }
 }
 
 void Application::OnUpdate() {
@@ -237,7 +205,7 @@ void Application::OnUpdate() {
   wgpuRenderPassEncoderSetBindGroup(render->renderPass, 1, Cam->bindGroup, 0, NULL);
 
   sponza->Draw(render->renderPass, m_pipeline);
-	MoveControls();
+  MoveControls();
 
   updateGui(render->renderPass);
 
@@ -259,11 +227,33 @@ void Application::OnUpdate() {
 #endif
 }
 
+void Application::OnMouseClick(Rain::MouseCode button) {
+  ImGuiIO& io = ImGui::GetIO();
+  if (io.WantCaptureMouse) {
+    return;
+  }
+
+  Cursor::CaptureMouse(true);
+}
+
+void Application::OnMouseMove(double xPos, double yPos) {
+  static glm::vec2 prevCursorPos = glm::vec2(0);
+
+  if (!Cursor::IsMouseCaptured()) {
+    return;
+  }
+
+  glm::vec2 cursorPos = Cursor::GetCursorPosition();
+
+  Player->ProcessMouseMovement(cursorPos.x - prevCursorPos.x, cursorPos.y - prevCursorPos.y);
+
+  prevCursorPos = cursorPos;
+  Cam->updateBuffer(render->m_queue);
+}
+
 void Application::OnKeyPressed(KeyCode key, KeyAction action) {
-  if (key == Rain::Key::F && action == Rain::Key::RN_KEY_RELEASE) {
-    if (!switchKey) {
-      switchKey = true;
-    }
+  if (key == Rain::Key::Escape && action == Rain::Key::RN_KEY_RELEASE) {
+    Cursor::CaptureMouse(false);
   }
 }
 

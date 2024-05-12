@@ -21,6 +21,7 @@ class Model : public Node {
   std::shared_ptr<Texture> loadMaterialTexture(aiMaterial* mat, aiTextureType type, std::string typeName);
 
   void Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline);
+	void UpdateUniforms(WGPUQueue& queue);
 
  private:
   std::string strPath;

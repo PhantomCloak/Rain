@@ -14,7 +14,11 @@ MeshE::MeshE(std::vector<VertexE> vertices,
   this->textureDiffuse = textureDiffuse;
 
   uniform = {};
-  uniform.modelMatrix = glm::mat4x4(1);
+  if (Parent != NULL) {
+    uniform.modelMatrix = Parent->GetModelMatrix() * GetModelMatrix();
+  } else {
+    uniform.modelMatrix = GetModelMatrix();
+  }
 
   static WGPUBufferDescriptor uniformBufferDesc = {};
   uniformBufferDesc.size = sizeof(RenderMeshUniform);
@@ -45,10 +49,8 @@ MeshE::MeshE(std::vector<VertexE> vertices,
   bindGroupOneDesc.entryCount = (uint32_t)bindingsOne.size();
   bindGroupOneDesc.entries = bindingsOne.data();
 
-  std::cout << "bind group creating.." << std::endl;
   defaultResourcesBindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupOneDesc);
 
-  std::cout << "vertex buffer creating.." << std::endl;
   WGPUBufferDescriptor vertexBufferDesc = {};
   vertexBufferDesc.size = vertices.size() * sizeof(VertexAttributes);
   vertexBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
@@ -61,11 +63,8 @@ MeshE::MeshE(std::vector<VertexE> vertices,
   indexBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index;
   indexBufferDesc.mappedAtCreation = false;
 
-  std::cout << "index buffer creating.." << std::endl;
   indexBuffer = wgpuDeviceCreateBuffer(device, &indexBufferDesc);
 
-
-  std::cout << "writing buffers.." << std::endl;
   wgpuQueueWriteBuffer(queue, vertexBuffer, 0, vertices.data(), vertexBufferDesc.size);
   wgpuQueueWriteBuffer(queue, indexBuffer, 0, indices.data(), indexBufferDesc.size);
   wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(RenderMeshUniform));
@@ -80,4 +79,13 @@ void MeshE::Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline
   wgpuRenderPassEncoderSetBindGroup(renderPass, 0, defaultResourcesBindGroup, 0, NULL);
 
   wgpuRenderPassEncoderDrawIndexed(renderPass, indices.size(), 1, 0, 0, 0);
+}
+
+void MeshE::UpdateUniforms(WGPUQueue& queue) {
+  if (Parent != NULL) {
+    uniform.modelMatrix = Parent->GetModelMatrix() * GetModelMatrix();
+  } else {
+    uniform.modelMatrix = GetModelMatrix();
+  }
+  wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(RenderMeshUniform));
 }
