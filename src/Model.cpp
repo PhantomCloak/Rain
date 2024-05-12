@@ -9,7 +9,13 @@
 #define STB_IMAGE_IMPLEMENTATION
 #endif
 
-void Model::loadModel(std::string path) {
+Model::Model(const char *path, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler){
+  Name = path;
+  loadModel(path, resourceLayout, device, queue, textureSampler);
+}
+
+void Model::loadModel(std::string path, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler){
+
   strPath = path;
 
   Assimp::Importer import;
@@ -21,19 +27,19 @@ void Model::loadModel(std::string path) {
   }
   directory = path.substr(0, path.find_last_of('/'));
 
-  processNode(scene->mRootNode, scene);
+  processNode(scene->mRootNode, scene, resourceLayout, device,queue, textureSampler);
 }
 
 bool f = false;
 aiMatrix4x4 foo;
 
-void Model::processNode(aiNode* node, const aiScene* scene) {
-  // process all the node's meshes (if any)
+void Model::processNode(aiNode* node, const aiScene* scene, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler){
 
+  // process all the node's meshes (if any)
   for (unsigned int i = 0; i < node->mNumMeshes; i++) {
     aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 
-    Ref<MeshE> modelMesh = processMesh(mesh, scene);
+    Ref<MeshE> modelMesh = processMesh(mesh, scene, resourceLayout, device,queue, textureSampler);
     modelMesh->Name = mesh->mName.C_Str();
     meshes.push_back(modelMesh);
     AddChild(modelMesh);
@@ -41,11 +47,12 @@ void Model::processNode(aiNode* node, const aiScene* scene) {
 
   // then do the same for each of its children
   for (unsigned int i = 0; i < node->mNumChildren; i++) {
-    processNode(node->mChildren[i], scene);
+    processNode(node->mChildren[i], scene, resourceLayout, device, queue, textureSampler);
   }
 }
 
-Ref<MeshE> Model::processMesh(aiMesh* mesh, const aiScene* scene) {
+Ref<MeshE> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler){
+
   std::vector<VertexE> vertices;
   std::vector<unsigned int> indices;
   std::vector<std::shared_ptr<Texture>> textures;
@@ -86,40 +93,43 @@ Ref<MeshE> Model::processMesh(aiMesh* mesh, const aiScene* scene) {
 
   aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
-  std::vector<std::shared_ptr<Texture>> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
-  textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
+  std::shared_ptr<Texture> diffuseTexture = loadMaterialTexture(material, aiTextureType_DIFFUSE, "texture_diffuse");
 
-  return CreateRef<MeshE>(vertices, indices, textures);
+	return CreateRef<MeshE>(vertices, indices, diffuseTexture, resourceLayout, device, queue, textureSampler);
 }
 
-std::vector<std::shared_ptr<Texture>> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type, std::string typeName) {
-  std::vector<std::shared_ptr<Texture>> textures;
+std::shared_ptr<Texture> Model::loadMaterialTexture(aiMaterial* mat, aiTextureType type, std::string typeName) {
+  int textureCount = mat->GetTextureCount(type);
+  std::shared_ptr texture = std::make_shared<Texture>();
 
-  for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) {
-    aiString str;
-    mat->GetTexture(type, i, &str);
+  if (textureCount <= 0) {
+		return Rain::ResourceManager::LoadTexture("T_Box", RESOURCE_DIR "/wood.png");
+  }
 
-    bool skip = false;
-    for (unsigned int j = 0; j < textures_loaded.size(); j++) {
-      if (std::strcmp(textures_loaded[j]->path.data(), str.C_Str()) == 0) {
-        textures.push_back(textures_loaded[j]);
-        skip = true;
-        break;
-      }
-    }
+  //assert(!(textureCount > 1));
 
-    if (!skip) {  // if texture hasn't been loaded already, load it
-      // Texture texture;
+  aiString str;
+  mat->GetTexture(type, 0, &str);
 
-      std::string fullPath = FileSys::GetParentDirectory(strPath) + "/" + str.C_Str();
-      std::shared_ptr<Texture> tex = Rain::ResourceManager::LoadTexture(std::to_string(i), fullPath);
-      tex->path = str.C_Str();
-
-      std::cout << "Loading Texture: " << str.C_Str() << std::endl;
-
-      textures.push_back(tex);
-      textures_loaded.push_back(tex);  // add to loaded textures
+  for (unsigned int j = 0; j < textures_loaded.size(); j++) {
+    if (std::strcmp(textures_loaded[j]->path.data(), str.C_Str()) == 0) {
+      return textures_loaded[j];
     }
   }
-  return textures;
+
+  std::string fullPath = FileSys::GetParentDirectory(strPath) + "/" + str.C_Str();
+  texture = Rain::ResourceManager::LoadTexture("diffuse", fullPath);
+  texture->path = str.C_Str();
+
+  std::cout << "Loading Texture: " << str.C_Str() << std::endl;
+
+  textures_loaded.push_back(texture);
+
+  return texture;
+}
+
+void Model::Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline) {
+  for (auto mesh : meshes) {
+		mesh->Draw(renderPass, pipeline);
+  }
 }

@@ -1,78 +1,79 @@
 #include "Mesh.h"
+#include "render/primitives/mesh.h"
 
-MeshE::MeshE(std::vector<VertexE> vertices, std::vector<unsigned int> indices, std::vector<std::shared_ptr<Texture>> textures) : Node()
-{
-    this->vertices = vertices; 
-		this->indices = indices;
-    this->textures = textures;
+MeshE::MeshE(std::vector<VertexE> vertices,
+             std::vector<unsigned int> indices,
+             std::shared_ptr<Texture> textureDiffuse,
+             WGPUBindGroupLayout resourceLayout,
+             WGPUDevice& device,
+             WGPUQueue& queue,
+             WGPUSampler& sampler)
+    : Node() {
+  this->vertices = vertices;
+  this->indices = indices;
+  this->textureDiffuse = textureDiffuse;
 
-    //glGenVertexArrays(1, &VAO);
-    //glGenBuffers(1, &VBO);
-    //glGenBuffers(1, &EBO);
-  
-    //glBindVertexArray(VAO);
-    //glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  uniform = {};
+  uniform.modelMatrix = glm::mat4x4(1);
 
-    //glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);  
+  static WGPUBufferDescriptor uniformBufferDesc = {};
+  uniformBufferDesc.size = sizeof(RenderMeshUniform);
+  uniformBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
+  uniformBufferDesc.mappedAtCreation = false;
 
-    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    //glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), 
-    //             &indices[0], GL_STATIC_DRAW);
+  uniformBuffer = wgpuDeviceCreateBuffer(device, &uniformBufferDesc);
 
-    //// vertex positions
-    //glEnableVertexAttribArray(0);	
-    //glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-    //// vertex normals
-    //glEnableVertexAttribArray(1);	
-    //glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, Normal));
-    //// vertex texture coords
-    //glEnableVertexAttribArray(2);	
-    //glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, TexCoords));
+  static std::vector<WGPUBindGroupEntry> bindingsOne(3);
 
-    //// vertex tangent coords
-		//glEnableVertexAttribArray(3);
-		//glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)offsetof(Vertex, Tangent));
+  bindingsOne[0].binding = 0;
+  bindingsOne[0].buffer = uniformBuffer;
+  bindingsOne[0].offset = 0;
+  bindingsOne[0].size = sizeof(RenderMeshUniform);
 
-		//// vertex bit tangent coords
-		//glEnableVertexAttribArray(4);
-		//glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)offsetof(Vertex, BitTangent));
+  bindingsOne[1].binding = 1;
+  bindingsOne[1].offset = 0;
+  bindingsOne[1].textureView = textureDiffuse->View;
+
+  bindingsOne[2].binding = 2;
+  bindingsOne[2].offset = 0;
+  bindingsOne[2].sampler = sampler;
+
+  WGPUBindGroupDescriptor bindGroupOneDesc = {};
+  bindGroupOneDesc.layout = resourceLayout;
+  bindGroupOneDesc.entryCount = (uint32_t)bindingsOne.size();
+  bindGroupOneDesc.entries = bindingsOne.data();
+
+  defaultResourcesBindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupOneDesc);
+
+  WGPUBufferDescriptor vertexBufferDesc = {};
+  vertexBufferDesc.size = vertices.size() * sizeof(VertexAttributes);
+  vertexBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
+  vertexBufferDesc.mappedAtCreation = false;
+  vertexBuffer = wgpuDeviceCreateBuffer(device, &vertexBufferDesc);
+
+  WGPUBufferDescriptor indexBufferDesc = {};
+
+  indexBufferDesc.size = indices.size() * sizeof(unsigned int);
+  indexBufferDesc.size = (indexBufferDesc.size + 3) & ~3;
+
+  indexBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index;
+  indexBufferDesc.mappedAtCreation = false;
+
+  indexBuffer = wgpuDeviceCreateBuffer(device, &indexBufferDesc);
 
 
-    //glBindVertexArray(0);
+  wgpuQueueWriteBuffer(queue, vertexBuffer, 0, vertices.data(), vertexBufferDesc.size);
+  wgpuQueueWriteBuffer(queue, indexBuffer, 0, indices.data(), indexBufferDesc.size);
+  wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(RenderMeshUniform));
 }
 
+void MeshE::Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline) {
+  wgpuRenderPassEncoderSetPipeline(renderPass, pipeline);
 
-//void Mesh::Draw(Shader &shader) 
-//{
-//    //unsigned int diffuseNr = 1;
-//    //unsigned int specularNr = 1;
-//    //unsigned int normalNr = 1;
-//
-//		//shader.setMat4("model", Parent->GetModelMatrix() * this->GetModelMatrix());
-//    //for(unsigned int i = 0; i < textures.size(); i++)
-//    //{
-//    //    // retrieve texture number (the N in diffuse_textureN)
-//    //    std::string number;
-//    //    std::string name = textures[i].type;
-//    //    if(name == "texture_diffuse")
-//    //        number = std::to_string(diffuseNr++);
-//    //    else if(name == "texture_specular")
-//    //        number = std::to_string(specularNr++);
-//    //    else if(name == "texture_height")
-//    //        number = std::to_string(normalNr++);
-//
-//    //    glActiveTexture(GL_TEXTURE1 + i); // activate proper texture unit before binding
-//
-//		//		//std::string debug(("material." + name + number).c_str());
-//		//		//std::cout << "dbg: " << debug << std::endl;
-//    //    shader.setInt(("material." + name + number).c_str(), i + 1);
-//    //    glBindTexture(GL_TEXTURE_2D, textures[i].id);
-//    //}
-//    ////glActiveTexture(GL_TEXTURE1);
-//
-//    //// draw mesh
-//    //glBindVertexArray(VAO);
-//    //glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-//    //glBindVertexArray(0);
-//}
+  wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexBuffer, 0, vertices.size() * sizeof(VertexAttributes));
+  wgpuRenderPassEncoderSetIndexBuffer(renderPass, indexBuffer, WGPUIndexFormat_Uint32, 0, indices.size() * sizeof(unsigned int));
 
+  wgpuRenderPassEncoderSetBindGroup(renderPass, 0, defaultResourcesBindGroup, 0, NULL);
+
+  wgpuRenderPassEncoderDrawIndexed(renderPass, indices.size(), 1, 0, 0, 0);
+}

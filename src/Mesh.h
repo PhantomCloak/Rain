@@ -1,27 +1,38 @@
 #pragma once
-#include "Node.h"
-#include "render/primitives/texture.h"
-#include <vector>
 #include <glm/glm.hpp>
+#include <vector>
+#include "Node.h"
+#include "render/primitives/RenderMeshUniform.h"
+#include "render/primitives/texture.h"
 
 struct VertexE {
-    glm::vec3 Position;
-    glm::vec3 Normal;
-    glm::vec2 TexCoords;
-    //glm::vec3 Tangent;
-    //glm::vec3 BitTangent;
+  glm::vec3 Position;
+  glm::vec3 Normal;
+  glm::vec2 TexCoords;
 };
 
 class MeshE : public Node {
-    public:
-        // mesh data
-        std::vector<VertexE>       vertices;
-        std::vector<unsigned int> indices;
-        std::vector<std::shared_ptr<Texture>>      textures;
+ public:
+  // mesh data
+  RenderMeshUniform uniform;
+  std::vector<VertexE> vertices;
+  std::vector<unsigned int> indices;
 
-        MeshE(std::vector<VertexE> vertices, std::vector<unsigned int> indices, std::vector<std::shared_ptr<Texture>> textures);
-        //void Draw(Shader &shader);
-    private:
-        //  render data
-        unsigned int VAO, VBO, EBO;
+  std::shared_ptr<Texture> textureDiffuse;
+
+  MeshE(std::vector<VertexE> vertices,
+        std::vector<unsigned int> indices,
+        std::shared_ptr<Texture> textureDiffuse,
+        WGPUBindGroupLayout resourceLayout,
+				WGPUDevice& device,
+				WGPUQueue& queue,
+				WGPUSampler& sampler);
+
+  void Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline);
+
+ private:
+  WGPUBindGroup defaultResourcesBindGroup;
+  WGPUBuffer uniformBuffer;
+  WGPUBuffer vertexBuffer;
+  WGPUBuffer indexBuffer;
 };

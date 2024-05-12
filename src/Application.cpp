@@ -33,6 +33,7 @@ bool switchKey = false;
 GLFWwindow* m_window;
 Render* render = new Render();
 Camera* Cam;
+Model* sponza;
 
 std::unique_ptr<PipelineManager> m_PipelineManager;
 std::shared_ptr<ShaderManager> m_ShaderManager;
@@ -48,51 +49,9 @@ void SetupScene() {
 
   Cam = new Camera(render->m_device, m_pipeline, projectionMatrix, viewMatrix);
   Cam->updateBuffer(render->m_queue);
-  auto boxMesh = Rain::ResourceManager::GetMesh("M_Box");
-  auto boxTexture = Rain::ResourceManager::GetTexture("T_Box");
 
-  auto planeMesh = Rain::ResourceManager::GetMesh("M_Floor");
-  auto planeTexture = Rain::ResourceManager::GetTexture("T_Floor");
-
-
-  Model* m = new Model(RESOURCE_DIR "/sponza.obj");
-
-	int ctxNull = 0;
-	int ctxNo = 0;
-
-	for(int i = 0; i < m->meshes.size(); i++)
-	{
-		auto tex = m->meshes[i]->textures.size() != 0 ? m->meshes[i]->textures[0] : nullptr;
-
-		if(tex == nullptr)
-		{
-			tex = std::make_shared<Texture>();
-			tex->Texture = nullptr;
-			ctxNull++;
-		}
-
-		if(tex->View == nullptr || tex->Texture == nullptr)
-		{
-			tex->Texture = boxTexture->Texture;
-			tex->View = boxTexture->View;
-			ctxNo++;
-		}
-
-		auto meshBox = new RenderMesh(render->m_device, m_pipeline, tex->Texture, tex->View, render->m_sampler);
-
-		meshBox->SetVertexBuffer2(render->m_device, render->m_queue, m->meshes[i]->vertices);
-		meshBox->createIndexBuffer(render->m_device, render->m_queue, m->meshes[i]->indices);
-
-		meshBox->name = "box";
-		meshBox->uniform.modelMatrix = glm::rotate(glm::mat4x4(1), glm::radians(90.0f), glm::vec3(0, 1, 0));
-
-		meshBox->updateBuffer(render->m_queue);
-
-		renderMeshes.push_back(meshBox);
-	}
-
-	std::cout << "CN: " << ctxNull << std::endl;
-	std::cout << "CTNN: " << ctxNo << std::endl;
+	WGPUBindGroupLayout  layout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 0);
+  sponza = new Model(RESOURCE_DIR "/sponza.obj", layout, render->m_device, render->m_queue, render->m_sampler);
 }
 
 WGPUSurface m_surface;
@@ -118,7 +77,6 @@ void Application::OnStart() {
 
   Rain::ResourceManager::LoadMesh("M_Floor", RESOURCE_DIR "/floor.obj");
   Rain::ResourceManager::LoadTexture("T_Floor", RESOURCE_DIR "/floor.png");
-  //Model* m = new Model(RESOURCE_DIR "/wood.obj");
 
   Rain::ResourceManager::LoadMesh("M_Box", RESOURCE_DIR "/wood.obj");
   Rain::ResourceManager::LoadTexture("T_Box", RESOURCE_DIR "/wood.png");
@@ -287,19 +245,7 @@ void Application::OnUpdate() {
   static auto m1 = glm::translate(glm::mat4(1), glm::vec3(5, 0, 0));
   static auto m2 = glm::translate(glm::mat4(1), glm::vec3(-5,0, 0));
 
-  for (auto obj : renderMeshes) {
-		wgpuRenderPassEncoderSetPipeline(render->renderPass, m_pipeline);
-
-		wgpuRenderPassEncoderSetVertexBuffer(render->renderPass, 0, obj->vertexBuffer, 0, obj->meshVertexCount * sizeof(VertexAttributes));
-		wgpuRenderPassEncoderSetIndexBuffer(render->renderPass, obj->indexBuffer, WGPUIndexFormat_Uint32, 0, obj->indexData.size() * sizeof(unsigned int));
-		wgpuRenderPassEncoderSetBindGroup(render->renderPass, 0, obj->bindGroup, 0, NULL);
-
-
-		wgpuQueueWriteBuffer(render->m_queue, obj->uniformBuffer, 0, &obj->uniform, sizeof(RenderMeshUniform));
-
-
-	  wgpuRenderPassEncoderDrawIndexed(render->renderPass, obj->indexData.size(), 1, 0, 0, 0);
-  }
+	sponza->Draw(render->renderPass, m_pipeline);
 
   updateGui(render->renderPass);
 
