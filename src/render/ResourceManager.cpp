@@ -2,12 +2,10 @@
 #include <fstream>
 #include <iostream>
 #include "../stb_image.h"
-#include "../tiny_obj_loader.h"
 
 std::shared_ptr<WGPUDevice> Rain::ResourceManager::m_device;
 
 std::unordered_map<std::string, std::shared_ptr<Texture>> Rain::ResourceManager::_loadedTextures;
-std::unordered_map<std::string, std::shared_ptr<Mesh>> Rain::ResourceManager::_loadedMeshes;
 std::unordered_map<std::string, std::shared_ptr<WGPUShaderModule>> Rain::ResourceManager::_loadedShaders;
 
 WGPUShaderModule loadShaderModule(const std::string& path, WGPUDevice m_device) {
@@ -90,64 +88,6 @@ void writeMipMaps(
   wgpuQueueRelease(m_queue);
 }
 
-bool loadGeometryFromObj(const std::filesystem::path& path, std::vector<VertexAttributes>& vertexData) {
-  std::ifstream file(path);
-  if (!file.is_open()) {
-    std::cerr << "Error opening file '" << path << "': ";
-    std::cerr << strerror(errno) << std::endl;
-    return false;
-  }
-  tinyobj::attrib_t attrib;
-  std::vector<tinyobj::shape_t> shapes;
-  std::vector<tinyobj::material_t> materials;
-
-  std::string warn;
-  std::string err;
-
-  // Call the core loading procedure of TinyOBJLoader
-  bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.string().c_str());
-
-  // Check errors
-  if (!warn.empty()) {
-    std::cout << warn << std::endl;
-  }
-
-  if (!err.empty()) {
-    std::cerr << err << std::endl;
-  }
-
-  if (!ret) {
-    return false;
-  }
-
-  // Filling in vertexData:
-  vertexData.clear();
-  for (const auto& shape : shapes) {
-    size_t offset = vertexData.size();
-    vertexData.resize(offset + shape.mesh.indices.size());
-
-    for (size_t i = 0; i < shape.mesh.indices.size(); ++i) {
-      const tinyobj::index_t& idx = shape.mesh.indices[i];
-
-      vertexData[offset + i].position = {
-          attrib.vertices[3 * idx.vertex_index + 0],
-          -attrib.vertices[3 * idx.vertex_index + 2],
-          attrib.vertices[3 * idx.vertex_index + 1]};
-
-      vertexData[offset + i].normal = {
-          attrib.normals[3 * idx.normal_index + 0],
-          -attrib.normals[3 * idx.normal_index + 2],
-          attrib.normals[3 * idx.normal_index + 1]};
-
-      vertexData[offset + i].uv = {
-          attrib.texcoords[2 * idx.texcoord_index + 0],
-          1 - attrib.texcoords[2 * idx.texcoord_index + 1]};
-    }
-  }
-
-  return true;
-}
-
 // Equivalent of std::bit_width that is available from C++20 onward
 static uint32_t bit_width(uint32_t m) {
   if (m == 0) {
@@ -209,20 +149,6 @@ void Rain::ResourceManager::Init(std::shared_ptr<WGPUDevice> device) {
   m_device = device;
 }
 
-std::shared_ptr<Mesh> Rain::ResourceManager::LoadMesh(std::string id, const std::string& path) {
-  std::vector<VertexAttributes> vertexData;
-  std::vector<unsigned int> indices;
-
-  if (loadGeometryFromObj(path, vertexData)) {
-    auto ptr = std::make_shared<Mesh>(vertexData, indices);
-    _loadedMeshes[id] = ptr;
-    return ptr;
-  } else {
-    std::cerr << "Failed to load mesh from path: " << path << std::endl;
-    return nullptr;
-  }
-}
-
 std::shared_ptr<Texture> Rain::ResourceManager::LoadTexture(std::string id, std::string path) {
   auto ptr = std::make_shared<Texture>();
   ptr->Texture = loadTexture(path.c_str(), m_device, &ptr->View);
@@ -246,20 +172,6 @@ std::shared_ptr<Texture> Rain::ResourceManager::GetTexture(std::string id) {
   return texture;
 }
 
-std::shared_ptr<Mesh> Rain::ResourceManager::GetMesh(std::string id) {
-  if (_loadedMeshes.find(id) == _loadedMeshes.end()) {
-    std::cout << "GetMes for id " << id << " does not exist" << std::endl;
-    return nullptr;
-  }
-
-  std::shared_ptr<Mesh>& mesh = _loadedMeshes[id];
-
-  if (!mesh) {
-    std::cout << "Mesh is invalid" << std::endl;
-  }
-
-  return mesh;
-}
 
 std::shared_ptr<WGPUShaderModule> Rain::ResourceManager::GetShader(std::string id) {
   if (_loadedShaders.find(id) != _loadedShaders.end()) {

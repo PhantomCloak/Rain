@@ -1,5 +1,5 @@
 #include "Mesh.h"
-#include "render/primitives/mesh.h"
+#include <iostream>
 
 MeshE::MeshE(std::vector<VertexE> vertices,
              std::vector<unsigned int> indices,
@@ -20,6 +20,8 @@ MeshE::MeshE(std::vector<VertexE> vertices,
   uniformBufferDesc.size = sizeof(RenderMeshUniform);
   uniformBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
   uniformBufferDesc.mappedAtCreation = false;
+
+  std::cout << "uniform buffer creating.." << std::endl;
 
   uniformBuffer = wgpuDeviceCreateBuffer(device, &uniformBufferDesc);
 
@@ -43,8 +45,10 @@ MeshE::MeshE(std::vector<VertexE> vertices,
   bindGroupOneDesc.entryCount = (uint32_t)bindingsOne.size();
   bindGroupOneDesc.entries = bindingsOne.data();
 
+  std::cout << "bind group creating.." << std::endl;
   defaultResourcesBindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupOneDesc);
 
+  std::cout << "vertex buffer creating.." << std::endl;
   WGPUBufferDescriptor vertexBufferDesc = {};
   vertexBufferDesc.size = vertices.size() * sizeof(VertexAttributes);
   vertexBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
@@ -52,16 +56,16 @@ MeshE::MeshE(std::vector<VertexE> vertices,
   vertexBuffer = wgpuDeviceCreateBuffer(device, &vertexBufferDesc);
 
   WGPUBufferDescriptor indexBufferDesc = {};
-
   indexBufferDesc.size = indices.size() * sizeof(unsigned int);
   indexBufferDesc.size = (indexBufferDesc.size + 3) & ~3;
-
   indexBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index;
   indexBufferDesc.mappedAtCreation = false;
 
+  std::cout << "index buffer creating.." << std::endl;
   indexBuffer = wgpuDeviceCreateBuffer(device, &indexBufferDesc);
 
 
+  std::cout << "writing buffers.." << std::endl;
   wgpuQueueWriteBuffer(queue, vertexBuffer, 0, vertices.data(), vertexBufferDesc.size);
   wgpuQueueWriteBuffer(queue, indexBuffer, 0, indices.data(), indexBufferDesc.size);
   wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(RenderMeshUniform));

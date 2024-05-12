@@ -11,6 +11,12 @@ struct VertexE {
   glm::vec2 TexCoords;
 };
 
+struct VertexAttributes {
+  glm::vec3 position;
+  glm::vec3 normal;
+  glm::vec2 uv;
+};
+
 class MeshE : public Node {
  public:
   // mesh data

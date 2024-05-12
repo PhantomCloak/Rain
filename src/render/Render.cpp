@@ -2,6 +2,7 @@
 #include "../io/filesystem.h"
 #include "GLFW/glfw3.h"
 #include "ResourceManager.h"
+#include "Mesh.h"
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>

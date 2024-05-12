@@ -99,17 +99,22 @@ Ref<MeshE> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupL
 }
 
 std::shared_ptr<Texture> Model::loadMaterialTexture(aiMaterial* mat, aiTextureType type, std::string typeName) {
+	std::cout << "Texture Processing for mesh" << std::endl;
   int textureCount = mat->GetTextureCount(type);
   std::shared_ptr texture = std::make_shared<Texture>();
 
+	static auto jiTex = Rain::ResourceManager::LoadTexture("T_Box", RESOURCE_DIR "/wood.png");
+
+  aiString str;
+  mat->GetTexture(type, 0, &str);
+
   if (textureCount <= 0) {
-		return Rain::ResourceManager::LoadTexture("T_Box", RESOURCE_DIR "/wood.png");
+		//std::cout << "Loading Texture Hacky: " << str.C_Str() << std::endl;
+		return jiTex;
   }
 
   //assert(!(textureCount > 1));
 
-  aiString str;
-  mat->GetTexture(type, 0, &str);
 
   for (unsigned int j = 0; j < textures_loaded.size(); j++) {
     if (std::strcmp(textures_loaded[j]->path.data(), str.C_Str()) == 0) {

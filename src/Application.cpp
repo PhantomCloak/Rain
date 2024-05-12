@@ -2,11 +2,9 @@
 #include <GLFW/glfw3.h>
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
-#include "Game.h"
 #include "Model.h"
 #include "render/Camera.h"
 #include "render/Render.h"
-#include "render/RenderMesh.h"
 #include "render/ResourceManager.h"
 
 #include "backends/imgui_impl_glfw.h"
@@ -41,20 +39,8 @@ WGPURenderPipeline m_pipeline = nullptr;
 WGPURenderPipeline m_pipeline_lit = nullptr;
 std::unordered_map<int, bool> keyStates;
 
-std::vector<RenderMesh*> renderMeshes;
-
-void SetupScene() {
-  glm::mat4 projectionMatrix = glm::perspective(90 * PI / 180, screenWidth / screenHeight, 0.01f, 10000.0f);
-  glm::mat4 viewMatrix = glm::lookAt(glm::vec3(-2.0f, -3.0f, 2.0f), glm::vec3(0.0f), glm::vec3(0, 0, 1));
-
-  Cam = new Camera(render->m_device, m_pipeline, projectionMatrix, viewMatrix);
-  Cam->updateBuffer(render->m_queue);
-
-	WGPUBindGroupLayout  layout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 0);
-  sponza = new Model(RESOURCE_DIR "/sponza.obj", layout, render->m_device, render->m_queue, render->m_sampler);
-}
-
 WGPUSurface m_surface;
+
 void Application::OnStart() {
   WGPUInstance instance = render->CreateInstance();
   m_window = static_cast<GLFWwindow*>(GetNativeWindow());
@@ -75,14 +61,8 @@ void Application::OnStart() {
   auto devicePtr = std::make_shared<WGPUDevice>(render->m_device);
   Rain::ResourceManager::Init(devicePtr);
 
-  Rain::ResourceManager::LoadMesh("M_Floor", RESOURCE_DIR "/floor.obj");
-  Rain::ResourceManager::LoadTexture("T_Floor", RESOURCE_DIR "/floor.png");
-
-  Rain::ResourceManager::LoadMesh("M_Box", RESOURCE_DIR "/wood.obj");
   Rain::ResourceManager::LoadTexture("T_Box", RESOURCE_DIR "/wood.png");
-
   m_ShaderManager->LoadShader("SH_Default", RESOURCE_DIR "/shader_default.wgsl");
-
   m_PipelineManager = std::make_unique<PipelineManager>(render->m_device, m_ShaderManager);
 
   BufferLayout vertexLayout = {
@@ -113,7 +93,14 @@ void Application::OnStart() {
 
   ImGui_ImplWGPU_Init(&initInfo);
 
-  SetupScene();
+	glm::mat4 projectionMatrix = glm::perspective(90 * PI / 180, screenWidth / screenHeight, 0.01f, 10000.0f);
+  glm::mat4 viewMatrix = glm::lookAt(glm::vec3(-2.0f, -3.0f, 2.0f), glm::vec3(0.0f), glm::vec3(0, 0, 1));
+
+  Cam = new Camera(render->m_device, m_pipeline, projectionMatrix, viewMatrix);
+  Cam->updateBuffer(render->m_queue);
+
+	WGPUBindGroupLayout  layout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 0);
+  sponza = new Model(RESOURCE_DIR "/sponza.obj", layout, render->m_device, render->m_queue, render->m_sampler);
 }
 
 bool Application::isRunning() {
