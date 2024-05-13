@@ -9,6 +9,7 @@
 #include "render/Render.h"
 #include "render/ResourceManager.h"
 
+#include "Constants.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_wgpu.h"
 #include "imgui.h"
@@ -39,6 +40,12 @@ std::unique_ptr<PipelineManager> m_PipelineManager;
 std::shared_ptr<ShaderManager> m_ShaderManager;
 
 WGPURenderPipeline m_pipeline = nullptr;
+WGPURenderPipeline m_pipeline_ppfx = nullptr;
+WGPUBindGroup m_bind_group_ppfx;
+WGPUBuffer vertexBufferPpfx;
+
+WGPUTexture intermediateTexture;
+WGPUTextureView intermediateTextureView;
 
 WGPUSurface m_surface;
 
@@ -62,7 +69,10 @@ void Application::OnStart() {
   Rain::ResourceManager::LoadTexture("T_Box", RESOURCE_DIR "/wood.png");
 
   m_ShaderManager = std::make_shared<ShaderManager>(render->m_device);
+
   m_ShaderManager->LoadShader("SH_Default", RESOURCE_DIR "/shader_default.wgsl");
+  m_ShaderManager->LoadShader("SH_PPFX", RESOURCE_DIR "/shader_ppfx.wgsl");
+
   m_PipelineManager = std::make_unique<PipelineManager>(render->m_device, m_ShaderManager);
 
   BufferLayout vertexLayout = {
@@ -77,6 +87,16 @@ void Application::OnStart() {
       {1, GroupLayoutVisibility::Both, GroupLayoutType::Default}};
 
   m_pipeline = m_PipelineManager->CreatePipeline("RP_Default", "SH_Default", vertexLayout, groupLayout, m_surface, render->m_adapter);
+
+  BufferLayout vertexLayoutPpfx = {
+      {ShaderDataType::Float3, "position"},
+      {ShaderDataType::Float2, "uv"}};
+
+  GroupLayout groupLayoutPpfx = {
+      {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
+      {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler}};
+
+  m_pipeline_ppfx = m_PipelineManager->CreatePipeline("RP_PPFX", "SH_PPFX", vertexLayoutPpfx, groupLayoutPpfx, m_surface, render->m_adapter);
 
   render->SetClearColor(0.52, 0.80, 0.92, 1);
   Cursor::Setup(m_window);
@@ -101,6 +121,41 @@ void Application::OnStart() {
   Cam = new Camera(projectionMatrix, Player, render->m_device, cameraLayout);
 
   Cam->updateBuffer(render->m_queue);
+  WGPUTextureDescriptor textureDesc = {
+      .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+      .size = {3840, 2160, 1},
+      .format = WGPUTextureFormat_BGRA8Unorm,
+	  .mipLevelCount = 1,
+	  .sampleCount = 1,
+  };
+
+  intermediateTexture = wgpuDeviceCreateTexture(render->m_device, &textureDesc);
+  intermediateTextureView = wgpuTextureCreateView(intermediateTexture, nullptr);
+
+  //static std::vector<WGPUBindGroupEntry> bindingsPpfx(2);
+
+  //bindingsPpfx[0].binding = 0;
+  //bindingsPpfx[0].textureView = intermediateTextureView;
+  //bindingsPpfx[0].offset = 0;
+
+  //bindingsPpfx[1].binding = 1;
+  //bindingsPpfx[1].sampler = render->m_sampler;
+  //bindingsPpfx[1].offset = 0;
+
+  //WGPUBindGroupDescriptor bindGroupDescPpfx = {};
+  //bindGroupDescPpfx.layout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline_ppfx, 0);
+  //bindGroupDescPpfx.entryCount = (uint32_t)bindingsPpfx.size();
+  //bindGroupDescPpfx.entries = bindingsPpfx.data();
+
+  //m_bind_group_ppfx = wgpuDeviceCreateBindGroup(render->m_device, &bindGroupDescPpfx);
+
+  //WGPUBufferDescriptor vertexBufferDesc = {};
+  //vertexBufferDesc.size = sizeof(quadVertices);
+  //vertexBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
+  //vertexBufferDesc.mappedAtCreation = false;
+  //vertexBufferPpfx = wgpuDeviceCreateBuffer(render->m_device, &vertexBufferDesc);
+
+  //wgpuQueueWriteBuffer(render->m_queue, vertexBufferPpfx, 0, quadVertices, vertexBufferDesc.size);
 
   sponza = new Model(RESOURCE_DIR "/sponza.obj", objectLayout, render->m_device, render->m_queue, render->m_sampler);
   sponza->Transform.scale = glm::vec3(0.5f);
@@ -156,6 +211,7 @@ void MoveControls() {
 
 void Application::OnUpdate() {
   glfwPollEvents();
+  MoveControls();
 
   render->nextTexture = wgpuSwapChainGetCurrentTextureView(render->m_swapChain);
   if (!render->nextTexture) {
@@ -163,57 +219,82 @@ void Application::OnUpdate() {
     return;
   }
 
-  WGPUCommandEncoderDescriptor commandEncoderDesc = {
-      .label = "Command Encoder"};
+  WGPUCommandEncoderDescriptor commandEncoderDesc = {.label = "Command Encoder"};
   render->encoder = wgpuDeviceCreateCommandEncoder(render->m_device, &commandEncoderDesc);
 
-  WGPURenderPassDescriptor renderPassDesc{};
-
-  WGPURenderPassColorAttachment renderPassColorAttachment{};
-  renderPassColorAttachment.loadOp = WGPULoadOp_Clear;
-  renderPassColorAttachment.storeOp = WGPUStoreOp_Store;
-  renderPassColorAttachment.clearValue = render->m_Color;
-  renderPassDesc.colorAttachmentCount = 1;
-  renderPassColorAttachment.resolveTarget = nullptr;
-  renderPassColorAttachment.view = render->nextTexture;
-
+  WGPURenderPassDescriptor firstPassDesc{};
+  WGPURenderPassColorAttachment firstPassColorAttachment{};
+  firstPassColorAttachment.loadOp = WGPULoadOp_Clear;
+  firstPassColorAttachment.storeOp = WGPUStoreOp_Store;
+  firstPassColorAttachment.clearValue = render->m_Color;
+  firstPassDesc.colorAttachmentCount = 1;
+  firstPassColorAttachment.resolveTarget = nullptr;
+  firstPassColorAttachment.view = intermediateTextureView;
+  //firstPassColorAttachment.view = render->nextTexture;
 #if !__EMSCRIPTEN__
-  renderPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+  firstPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
 #endif
-  renderPassDesc.colorAttachments = &renderPassColorAttachment;
+  firstPassDesc.colorAttachments = &firstPassColorAttachment;
 
-  WGPURenderPassDepthStencilAttachment depthStencilAttachment;
-  depthStencilAttachment.view = render->m_depthTextureView;
-  depthStencilAttachment.depthClearValue = 1.0f;
-  depthStencilAttachment.depthLoadOp = WGPULoadOp_Clear;
-  depthStencilAttachment.depthStoreOp = WGPUStoreOp_Store;
-  depthStencilAttachment.depthReadOnly = false;
-  depthStencilAttachment.stencilClearValue = 0;
+  WGPURenderPassDepthStencilAttachment firstDepthStencilAttachment;
+  firstDepthStencilAttachment.view = render->m_depthTextureView;
+  firstDepthStencilAttachment.depthClearValue = 1.0f;
+  firstDepthStencilAttachment.depthLoadOp = WGPULoadOp_Clear;
+  firstDepthStencilAttachment.depthStoreOp = WGPUStoreOp_Store;
+  firstDepthStencilAttachment.depthReadOnly = false;
+  firstDepthStencilAttachment.stencilClearValue = 0;
+  firstDepthStencilAttachment.stencilLoadOp = WGPULoadOp_Undefined;
+  firstDepthStencilAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
+  firstDepthStencilAttachment.stencilReadOnly = true;
 
-  depthStencilAttachment.stencilLoadOp = WGPULoadOp_Undefined;
-  depthStencilAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
+  firstPassDesc.depthStencilAttachment = &firstDepthStencilAttachment;
+  firstPassDesc.timestampWrites = 0;
+  firstPassDesc.timestampWrites = nullptr;
 
-  depthStencilAttachment.stencilReadOnly = true;
+  WGPURenderPassEncoder firstPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &firstPassDesc);
 
-  renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
+  wgpuRenderPassEncoderSetBindGroup(firstPassEncoder, 1, Cam->bindGroup, 0, NULL);
 
-  renderPassDesc.timestampWrites = 0;
-  renderPassDesc.timestampWrites = nullptr;
+  sponza->Draw(firstPassEncoder, m_pipeline);
 
-  render->renderPass = wgpuCommandEncoderBeginRenderPass(render->encoder, &renderPassDesc);
+  wgpuRenderPassEncoderEnd(firstPassEncoder);
 
-  wgpuRenderPassEncoderSetBindGroup(render->renderPass, 1, Cam->bindGroup, 0, NULL);
+  WGPURenderPassDescriptor secondPassDesc{};
+  WGPURenderPassColorAttachment secondPassColorAttachment = {};
+  secondPassColorAttachment.loadOp = WGPULoadOp_Clear;
+  secondPassColorAttachment.storeOp = WGPUStoreOp_Store;
+  secondPassColorAttachment.clearValue = {0.0, 0.0, 0.0, 1.0};  // Clear to black
+  secondPassColorAttachment.view = render->nextTexture;         // Output to the swap chain texture
+  secondPassDesc.colorAttachmentCount = 1;
 
-  sponza->Draw(render->renderPass, m_pipeline);
-  MoveControls();
+  secondPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+  secondPassDesc.colorAttachments = &secondPassColorAttachment;
+  secondPassDesc.timestampWrites = 0;
+  secondPassDesc.timestampWrites = nullptr;
 
-  updateGui(render->renderPass);
+  WGPURenderPassDepthStencilAttachment secondPassDepthAttachment;
+  secondPassDepthAttachment.view = render->m_depthTextureView2;
+  secondPassDepthAttachment.depthClearValue = 1.0f;
+  secondPassDepthAttachment.depthLoadOp = WGPULoadOp_Clear;
+  secondPassDepthAttachment.depthStoreOp = WGPUStoreOp_Store;
+  secondPassDepthAttachment.depthReadOnly = false;
+  secondPassDepthAttachment.stencilClearValue = 0;
+  secondPassDepthAttachment.stencilLoadOp = WGPULoadOp_Undefined;
+  secondPassDepthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
+  secondPassDepthAttachment.stencilReadOnly = true;
 
-  wgpuRenderPassEncoderEnd(render->renderPass);
+  secondPassDesc.depthStencilAttachment = &secondPassDepthAttachment;
+
+  WGPURenderPassEncoder secondPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &secondPassDesc);
+
+  wgpuRenderPassEncoderSetPipeline(secondPassEncoder, m_pipeline);
+  updateGui(secondPassEncoder);
+
+  wgpuRenderPassEncoderEnd(secondPassEncoder);
+
   wgpuTextureViewRelease(render->nextTexture);
 
-  WGPUCommandBufferDescriptor cmdBufferDescriptor = {
-      .label = "Command Buffer"};
+  WGPUCommandBufferDescriptor cmdBufferDescriptor = {.label = "Command Buffer"};
   WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(render->encoder, &cmdBufferDescriptor);
 
   wgpuQueueSubmit(render->m_queue, 1, &commandBuffer);
@@ -265,8 +346,12 @@ void Application::updateGui(WGPURenderPassEncoder renderPass) {
   ImGui::Begin("Hello, world!");
 
   ImGuiIO& io = ImGui::GetIO();
-  ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-              1000.0f / io.Framerate, io.Framerate);
+  //ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+  //            1000.0f / io.Framerate, io.Framerate);
+
+  ImVec2 size = ImGui::GetWindowSize();
+  ImGui::Image((ImTextureID)intermediateTextureView, ImVec2(size.x, size.y));
+
   ImGui::End();
 
   if (ImGui::BeginMainMenuBar()) {
