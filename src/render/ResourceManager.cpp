@@ -1,6 +1,7 @@
 #include "ResourceManager.h"
 #include <fstream>
 #include <iostream>
+#include <vector>
 #include "../stb_image.h"
 
 std::shared_ptr<WGPUDevice> Rain::ResourceManager::m_device;

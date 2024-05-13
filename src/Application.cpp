@@ -25,8 +25,8 @@
 
 extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
 
-float screenWidth = 1920;
-float screenHeight = 1080;
+int screenWidth;
+int screenHeight;
 
 GLFWwindow* m_window;
 Render* render = new Render();
@@ -117,14 +117,19 @@ void Application::OnStart() {
 
   WGPUBindGroupLayout cameraLayout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 1);
   WGPUBindGroupLayout objectLayout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 0);
-  glm::mat4 projectionMatrix = glm::perspective(75 * PI / 180, screenWidth / screenHeight, 0.1f, 1500.0f);
+
+  glfwGetFramebufferSize((GLFWwindow*)m_window, &screenWidth, &screenHeight);
+
+  glm::mat4 projectionMatrix = glm::perspective(75 * PI / 180, (float)1920 / 1080, 0.1f, 2000.0f);
   Player = std::make_shared<PlayerCamera>();
   Cam = new Camera(projectionMatrix, Player, render->m_device, cameraLayout);
 
   Cam->updateBuffer(render->m_queue);
+
   WGPUTextureDescriptor textureDesc = {
       .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
-      .size = {3840, 2160, 1},
+	  .dimension = WGPUTextureDimension_2D ,
+      .size = {static_cast<uint32_t>(screenWidth), static_cast<uint32_t>(screenHeight), 1},
       .format = WGPUTextureFormat_BGRA8Unorm,
 	  .mipLevelCount = 1,
 	  .sampleCount = 1,
@@ -149,7 +154,6 @@ void Application::OnStart() {
   bindGroupDescPpfx.entries = bindingsPpfx.data();
 
   m_bind_group_ppfx = wgpuDeviceCreateBindGroup(render->m_device, &bindGroupDescPpfx);
-  int a = sizeof(quadVertices);
 
   WGPUBufferDescriptor vertexBufferDesc = {};
   vertexBufferDesc.size = sizeof(quadVertices);
@@ -171,7 +175,7 @@ void Application::OnStart() {
 
 
   sponza = new Model(RESOURCE_DIR "/sponza.obj", objectLayout, render->m_device, render->m_queue, render->m_sampler);
-  sponza->Transform.scale = glm::vec3(0.5f);
+  //sponza->Transform.scale = glm::vec3(0.5f);
   sponza->UpdateUniforms(render->m_queue);
 
   Cursor::CaptureMouse(true);
@@ -182,8 +186,6 @@ bool Application::isRunning() {
 }
 
 void Application::OnResize(int height, int width) {
-  render->screenHeight = height;
-  render->screenWidth = width;
   render->m_swapChainDesc.height = height;
   render->m_swapChainDesc.width = width;
 
@@ -280,7 +282,9 @@ void Application::OnUpdate() {
   secondPassColorAttachment.view = render->nextTexture;         // Output to the swap chain texture
   secondPassDesc.colorAttachmentCount = 1;
 
+#if !__EMSCRIPTEN__
   secondPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+#endif
   secondPassDesc.colorAttachments = &secondPassColorAttachment;
   secondPassDesc.timestampWrites = 0;
   secondPassDesc.timestampWrites = nullptr;
@@ -306,9 +310,7 @@ void Application::OnUpdate() {
   wgpuRenderPassEncoderSetPipeline(secondPassEncoder, m_pipeline_ppfx);
   wgpuRenderPassEncoderSetBindGroup(secondPassEncoder, 0, m_bind_group_ppfx, 0, nullptr);
 
-  //wgpuRenderPassEncoderDraw(secondPassEncoder, 4, 1, 0, 0);
   wgpuRenderPassEncoderDrawIndexed(secondPassEncoder, 6, 1, 0, 0, 0);
-
   //updateGui(secondPassEncoder);
 
   wgpuRenderPassEncoderEnd(secondPassEncoder);

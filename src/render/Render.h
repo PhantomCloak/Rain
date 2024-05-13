@@ -14,8 +14,6 @@ class Render {
   void OnFrameStart();
   void OnFrameEnd();
 
-  float screenWidth = 1920;
-  float screenHeight = 1080;
   WGPUAdapter requestAdapter(WGPUInstance instance, WGPURequestAdapterOptions const* options);
   WGPUDevice requestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor);
   WGPUSwapChainDescriptor GetSwapchainDescriptor(int width, int height, WGPUTextureFormat swapChainFormat);
