@@ -49,7 +49,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let finalColor = textureColor;
 
     // No gamma-correction applied, directly return the final color with alpha
-    //return vec4f(finalColor, uMyUniforms.color.a);
-    return vec4f(in.normal, 1.0);
+    return vec4f(finalColor, 1.0);
+    //return vec4f(in.normal, 1.0);
 }
 

@@ -133,7 +133,14 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 #endif
 
-  static WGPURenderPipelineDescriptor pipelineDesc = {};
+  static std::map<std::string, WGPURenderPipelineDescriptor> pipelineDescList = {};
+
+	if(pipelineDescList.find(pipelineId) == pipelineDescList.end())
+	{
+		pipelineDescList[pipelineId] = {};
+	}
+
+  WGPURenderPipelineDescriptor& pipelineDesc = pipelineDescList[pipelineId];
 
   pipelineDesc.vertex.bufferCount = 1;
   pipelineDesc.vertex.buffers = &vertexBufferLayout;
@@ -226,6 +233,11 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
 
   pipelineDesc.depthStencil = &depthStencilState;
 
+	//if(strcmp(pipelineId.c_str(), "RP_PPFX") == 0)
+	//{
+	//	pipelineDesc.depthStencil = nullptr;
+	//}
+
   pipelineDesc.multisample.count = 1;
   pipelineDesc.multisample.mask = ~0u;
   pipelineDesc.multisample.alphaToCoverageEnabled = false;
@@ -243,6 +255,7 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   for (int i = 0; i < groupLayouts[pipelineId].size(); i++) {
 
     WGPUBindGroupLayoutDescriptor descriptor = {};
+		descriptor.label = std::string("bgl_" + pipelineId).c_str();
     descriptor.entryCount = groupLayouts[pipelineId][i].size();
     descriptor.entries = groupLayouts[pipelineId][i].data();
 
@@ -250,13 +263,24 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
     bindGroupLayouts.push_back(bindGroupLayout);
   }
 
-  static WGPUPipelineLayoutDescriptor layoutDesc;
-  layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
-  layoutDesc.bindGroupLayouts = bindGroupLayouts.data();
+  static std::map<std::string, WGPUPipelineLayoutDescriptor> layoutDesc;
 
-  static WGPUPipelineLayout pipelineLayout =
-      wgpuDeviceCreatePipelineLayout(_device, &layoutDesc);
-  pipelineDesc.layout = pipelineLayout;
+	if(layoutDesc.find(pipelineId) == layoutDesc.end())
+	{
+		layoutDesc[pipelineId] = {};
+	}
+
+  layoutDesc[pipelineId].bindGroupLayoutCount = bindGroupLayouts.size();
+  layoutDesc[pipelineId].bindGroupLayouts = bindGroupLayouts.data();
+
+  static std::map<std::string, WGPUPipelineLayout> pipelineLayout;
+
+	if(pipelineLayout.find(pipelineId) == pipelineLayout.end())
+	{
+		pipelineLayout[pipelineId] =  wgpuDeviceCreatePipelineLayout(_device, &layoutDesc[pipelineId]);
+	}
+
+  pipelineDesc.layout = pipelineLayout[pipelineId];
 
   WGPURenderPipeline pipe =
       wgpuDeviceCreateRenderPipeline(_device, &pipelineDesc);

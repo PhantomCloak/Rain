@@ -43,6 +43,7 @@ WGPURenderPipeline m_pipeline = nullptr;
 WGPURenderPipeline m_pipeline_ppfx = nullptr;
 WGPUBindGroup m_bind_group_ppfx;
 WGPUBuffer vertexBufferPpfx;
+WGPUBuffer indexBufferPpfx;
 
 WGPUTexture intermediateTexture;
 WGPUTextureView intermediateTextureView;
@@ -132,30 +133,42 @@ void Application::OnStart() {
   intermediateTexture = wgpuDeviceCreateTexture(render->m_device, &textureDesc);
   intermediateTextureView = wgpuTextureCreateView(intermediateTexture, nullptr);
 
-  //static std::vector<WGPUBindGroupEntry> bindingsPpfx(2);
+  static std::vector<WGPUBindGroupEntry> bindingsPpfx(2);
 
-  //bindingsPpfx[0].binding = 0;
-  //bindingsPpfx[0].textureView = intermediateTextureView;
-  //bindingsPpfx[0].offset = 0;
+  bindingsPpfx[0].binding = 0;
+  bindingsPpfx[0].textureView = intermediateTextureView;
+  bindingsPpfx[0].offset = 0;
 
-  //bindingsPpfx[1].binding = 1;
-  //bindingsPpfx[1].sampler = render->m_sampler;
-  //bindingsPpfx[1].offset = 0;
+  bindingsPpfx[1].binding = 1;
+  bindingsPpfx[1].sampler = render->m_sampler;
+  bindingsPpfx[1].offset = 0;
 
-  //WGPUBindGroupDescriptor bindGroupDescPpfx = {};
-  //bindGroupDescPpfx.layout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline_ppfx, 0);
-  //bindGroupDescPpfx.entryCount = (uint32_t)bindingsPpfx.size();
-  //bindGroupDescPpfx.entries = bindingsPpfx.data();
+  WGPUBindGroupDescriptor bindGroupDescPpfx = {};
+  bindGroupDescPpfx.layout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline_ppfx, 0);
+  bindGroupDescPpfx.entryCount = (uint32_t)bindingsPpfx.size();
+  bindGroupDescPpfx.entries = bindingsPpfx.data();
 
-  //m_bind_group_ppfx = wgpuDeviceCreateBindGroup(render->m_device, &bindGroupDescPpfx);
+  m_bind_group_ppfx = wgpuDeviceCreateBindGroup(render->m_device, &bindGroupDescPpfx);
+  int a = sizeof(quadVertices);
 
-  //WGPUBufferDescriptor vertexBufferDesc = {};
-  //vertexBufferDesc.size = sizeof(quadVertices);
-  //vertexBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
-  //vertexBufferDesc.mappedAtCreation = false;
-  //vertexBufferPpfx = wgpuDeviceCreateBuffer(render->m_device, &vertexBufferDesc);
+  WGPUBufferDescriptor vertexBufferDesc = {};
+  vertexBufferDesc.size = sizeof(quadVertices);
+  vertexBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
+  vertexBufferDesc.mappedAtCreation = false;
+  vertexBufferPpfx = wgpuDeviceCreateBuffer(render->m_device, &vertexBufferDesc);
 
-  //wgpuQueueWriteBuffer(render->m_queue, vertexBufferPpfx, 0, quadVertices, vertexBufferDesc.size);
+  wgpuQueueWriteBuffer(render->m_queue, vertexBufferPpfx, 0, quadVertices, vertexBufferDesc.size);
+
+
+  WGPUBufferDescriptor indexBufferDesc = {};
+  indexBufferDesc.size = sizeof(quadIndices);  // Total size in bytes of the index data.
+  indexBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index;
+  indexBufferDesc.mappedAtCreation = false;
+  indexBufferPpfx = wgpuDeviceCreateBuffer(render->m_device, &indexBufferDesc);
+
+  // Upload index data to the buffer
+  wgpuQueueWriteBuffer(render->m_queue, indexBufferPpfx, 0, quadIndices, sizeof(quadIndices));
+
 
   sponza = new Model(RESOURCE_DIR "/sponza.obj", objectLayout, render->m_device, render->m_queue, render->m_sampler);
   sponza->Transform.scale = glm::vec3(0.5f);
@@ -288,7 +301,15 @@ void Application::OnUpdate() {
   WGPURenderPassEncoder secondPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &secondPassDesc);
 
   wgpuRenderPassEncoderSetPipeline(secondPassEncoder, m_pipeline);
-  updateGui(secondPassEncoder);
+  wgpuRenderPassEncoderSetVertexBuffer(secondPassEncoder, 0, vertexBufferPpfx, 0, sizeof(quadVertices));
+  wgpuRenderPassEncoderSetIndexBuffer(secondPassEncoder, indexBufferPpfx, WGPUIndexFormat_Uint32, 0, sizeof(quadIndices));
+  wgpuRenderPassEncoderSetPipeline(secondPassEncoder, m_pipeline_ppfx);
+  wgpuRenderPassEncoderSetBindGroup(secondPassEncoder, 0, m_bind_group_ppfx, 0, nullptr);
+
+  //wgpuRenderPassEncoderDraw(secondPassEncoder, 4, 1, 0, 0);
+  wgpuRenderPassEncoderDrawIndexed(secondPassEncoder, 6, 1, 0, 0, 0);
+
+  //updateGui(secondPassEncoder);
 
   wgpuRenderPassEncoderEnd(secondPassEncoder);
 

@@ -77,6 +77,7 @@ bool Render::Init(void* window, WGPUInstance instance, WGPUSurface surface) {
   m_swapChain = buildSwapChain(m_swapChainDesc, m_device, surface);
   m_depthTexture = GetDepthBufferTexture(m_device, m_swapChainDesc);
   m_depthTextureView = GetDepthBufferTextureView(m_depthTexture, m_depthTextureFormat);
+  m_depthTextureView2 = GetDepthBufferTextureView(m_depthTexture, m_depthTextureFormat);
 
   m_sampler = AttachSampler(m_device);
 
@@ -86,78 +87,6 @@ bool Render::Init(void* window, WGPUInstance instance, WGPUSurface surface) {
 }, nullptr);
 
   return true;
-}
-
-void Render::OnFrameStart() {
-  glfwPollEvents();
-  nextTexture = wgpuSwapChainGetCurrentTextureView(m_swapChain);
-  if (!nextTexture) {
-    fprintf(stderr, "Cannot acquire next swap chain texture\n");
-    return;
-  }
-
-  WGPUCommandEncoderDescriptor commandEncoderDesc = {};
-  commandEncoderDesc.label = "Command Encoder";
-  encoder =
-      wgpuDeviceCreateCommandEncoder(m_device, &commandEncoderDesc);
-
-  WGPURenderPassDescriptor renderPassDesc{};
-
-  WGPURenderPassColorAttachment renderPassColorAttachment{};
-  renderPassColorAttachment.loadOp = WGPULoadOp_Clear;
-  renderPassColorAttachment.storeOp = WGPUStoreOp_Store;
-  renderPassColorAttachment.clearValue = m_Color;
-  renderPassDesc.colorAttachmentCount = 1;
-  renderPassColorAttachment.resolveTarget = nullptr;
-  renderPassColorAttachment.view = nextTexture;
-
-#if !__EMSCRIPTEN__
-	renderPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
-#endif
-  renderPassDesc.colorAttachments = &renderPassColorAttachment;
-
-  WGPURenderPassDepthStencilAttachment depthStencilAttachment;
-  depthStencilAttachment.view = m_depthTextureView;
-  depthStencilAttachment.depthClearValue = 1.0f;
-  depthStencilAttachment.depthLoadOp = WGPULoadOp_Clear;
-  depthStencilAttachment.depthStoreOp = WGPUStoreOp_Store;
-  depthStencilAttachment.depthReadOnly = false;
-  depthStencilAttachment.stencilClearValue = 0;
-
-  depthStencilAttachment.stencilLoadOp = WGPULoadOp_Undefined;
-  depthStencilAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
-
-  depthStencilAttachment.stencilReadOnly = true;
-
-  renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
-
-  renderPassDesc.timestampWrites = 0;
-  renderPassDesc.timestampWrites = nullptr;
-  renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &renderPassDesc);
-}
-
-void Render::SetPipeline(WGPURenderPipeline pipeline) {
-  wgpuRenderPassEncoderSetPipeline(renderPass, pipeline);
-}
-
-void Render::OnFrameEnd() {
-  wgpuRenderPassEncoderEnd(renderPass);
-  wgpuTextureViewRelease(nextTexture);
-
-  WGPUCommandBufferDescriptor cmdBufferDescriptor = {};
-  cmdBufferDescriptor.label = "Command buffer";
-  WGPUCommandBuffer commandBuffer =
-      wgpuCommandEncoderFinish(encoder, &cmdBufferDescriptor);
-
-  wgpuQueueSubmit(m_queue, 1, &commandBuffer);
-
-#ifndef __EMSCRIPTEN__
-  wgpuSwapChainPresent(m_swapChain);
-#endif
-
-#ifdef WEBGPU_BACKEND_DAWN
-  wgpuDeviceTick(m_device);
-#endif
 }
 
 WGPUAdapter Render::requestAdapter(WGPUInstance instance,

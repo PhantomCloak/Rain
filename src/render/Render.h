@@ -34,6 +34,7 @@ class Render {
   WGPUQueue m_queue = nullptr;
   WGPUTexture m_depthTexture = nullptr;
   WGPUTextureView m_depthTextureView = nullptr;
+  WGPUTextureView m_depthTextureView2 = nullptr;
   WGPUSwapChain m_swapChain = nullptr;
   WGPUSampler m_sampler = nullptr;
   WGPUColor m_Color;
