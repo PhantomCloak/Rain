@@ -95,7 +95,7 @@ void SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type) {
 
 std::map<int, std::vector<WGPUBindGroupLayoutEntry>>
 ParseGroupLayout(GroupLayout layout) {
-  static std::map<int, std::vector<WGPUBindGroupLayoutEntry>> groups;
+  std::map<int, std::vector<WGPUBindGroupLayoutEntry>> groups;
   std::map<int, int> groupsMemberCtx;
 
   // We may need to account for buffer.minBindingSize
@@ -230,20 +230,23 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   pipelineDesc.multisample.mask = ~0u;
   pipelineDesc.multisample.alphaToCoverageEnabled = false;
 
-  static std::map<int, std::vector<WGPUBindGroupLayoutEntry>> groupLayouts =
-      ParseGroupLayout(groupLayout);
+	// Interface to it's uniforms
+  static std::map<std::string, std::map<int, std::vector<WGPUBindGroupLayoutEntry>>> groupLayouts;
 
-  static std::vector<WGPUBindGroupLayout> bindGroupLayouts;
+	if(groupLayouts.find(pipelineId) == groupLayouts.end())
+	{
+		groupLayouts[pipelineId] = ParseGroupLayout(groupLayout);
+	}
 
-  for (int i = 0; i < groupLayouts.size(); i++) {
-    // TODO LEAK
+  std::vector<WGPUBindGroupLayout> bindGroupLayouts;
+
+  for (int i = 0; i < groupLayouts[pipelineId].size(); i++) {
+
     WGPUBindGroupLayoutDescriptor descriptor = {};
+    descriptor.entryCount = groupLayouts[pipelineId][i].size();
+    descriptor.entries = groupLayouts[pipelineId][i].data();
 
-    descriptor.entryCount = groupLayouts[i].size();
-    descriptor.entries = groupLayouts[i].data();
-
-    WGPUBindGroupLayout bindGroupLayout =
-        wgpuDeviceCreateBindGroupLayout(_device, &descriptor);
+    WGPUBindGroupLayout bindGroupLayout = wgpuDeviceCreateBindGroupLayout(_device, &descriptor);
     bindGroupLayouts.push_back(bindGroupLayout);
   }
 
