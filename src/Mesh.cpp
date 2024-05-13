@@ -25,8 +25,6 @@ MeshE::MeshE(std::vector<VertexE> vertices,
   uniformBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
   uniformBufferDesc.mappedAtCreation = false;
 
-  std::cout << "uniform buffer creating.." << std::endl;
-
   uniformBuffer = wgpuDeviceCreateBuffer(device, &uniformBufferDesc);
 
   static std::vector<WGPUBindGroupEntry> bindingsOne(3);

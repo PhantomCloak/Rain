@@ -99,7 +99,6 @@ Ref<MeshE> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupL
 }
 
 std::shared_ptr<Texture> Model::loadMaterialTexture(aiMaterial* mat, aiTextureType type, std::string typeName) {
-	std::cout << "Texture Processing for mesh" << std::endl;
   int textureCount = mat->GetTextureCount(type);
   std::shared_ptr texture = std::make_shared<Texture>();
 
