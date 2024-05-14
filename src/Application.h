@@ -32,5 +32,5 @@ class Application : public AppWindow {
  private:
   void updateDragInertia();
 
-  void updateGui(WGPURenderPassEncoder renderPass);
+  void drawImgui(WGPURenderPassEncoder renderPass);
 };

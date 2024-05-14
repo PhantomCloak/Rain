@@ -34,7 +34,7 @@ class Node {
 		int Id;
 		std::string Name;
 		NodeTransform Transform;
-		Node* Parent;
+		Node* Parent = nullptr;
 		std::vector<Ref<Node>> Childs;
 
 		bool IsActive = true;

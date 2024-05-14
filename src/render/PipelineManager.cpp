@@ -1,32 +1,5 @@
-#include "Example.h"
-#include "io/filesystem.h"
-#include <iostream>
+#include "PipelineManager.h"
 
-void ShaderManager::LoadShader(const std::string& shaderId,
-                               const std::string& shaderPath) {
-
-  std::string srcShader = FileSys::ReadFile(shaderPath);
-
-  WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
-  shaderCodeDesc.chain.next = nullptr;
-  shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-  shaderCodeDesc.code = srcShader.c_str();
-
-  WGPUShaderModuleDescriptor shaderDesc;
-  shaderDesc.nextInChain = &shaderCodeDesc.chain;
-
-  WGPUShaderModule module = wgpuDeviceCreateShaderModule(_device, &shaderDesc);
-  _shaders.emplace(shaderId, module);
-};
-
-WGPUShaderModule ShaderManager::GetShader(const std::string& shaderId) {
-  if (_shaders.find(shaderId) == _shaders.end()) {
-    std::cout << "cannot find the shader";
-    return nullptr;
-  }
-
-  return _shaders[shaderId];
-}
 
 WGPUVertexBufferLayout CreateVertexBufferLayout(BufferLayout layout) {
   // TODO: Introduce clear
@@ -117,6 +90,7 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
     const std::string& shaderId,
     BufferLayout vertexLayout,
     GroupLayout groupLayout,
+    WGPUTextureFormat depthFormat,
     WGPUSurface surface,
     WGPUAdapter adapter) {
   WGPUShaderModule shader = shaderManager_->GetShader(shaderId);
@@ -124,8 +98,6 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
       CreateVertexBufferLayout(vertexLayout);
 
   WGPUTextureFormat swapChainFormat = WGPUTextureFormat_Undefined;
-  //WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth24Plus;
-  WGPUTextureFormat depthTextureFormat = WGPUTextureFormat_Depth32Float;
 
 #if __EMSCRIPTEN__
   swapChainFormat = wgpuSurfaceGetPreferredFormat(surface, adapter);
@@ -135,12 +107,13 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
 
   static std::map<std::string, WGPURenderPipelineDescriptor> pipelineDescList = {};
 
-	if(pipelineDescList.find(pipelineId) == pipelineDescList.end())
-	{
-		pipelineDescList[pipelineId] = {};
-	}
+  if (pipelineDescList.find(pipelineId) == pipelineDescList.end()) {
+    pipelineDescList[pipelineId] = {};
+  }
 
   WGPURenderPipelineDescriptor& pipelineDesc = pipelineDescList[pipelineId];
+
+  pipelineDesc.label = pipelineId.c_str();
 
   pipelineDesc.vertex.bufferCount = 1;
   pipelineDesc.vertex.buffers = &vertexBufferLayout;
@@ -202,60 +175,56 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   // and stencil testing. Use cases:
   // - Depth Testing for 3D Scenes
   // - Stencil Operations such as Shadow-Mapping
-  WGPUDepthStencilState depthStencilState = {};
-  depthStencilState.format = WGPUTextureFormat_Undefined;
-  depthStencilState.stencilReadMask = 0xFFFFFFFF;
-  depthStencilState.stencilWriteMask = 0xFFFFFFFF;
 
-  depthStencilState.depthBias = 0;
-  depthStencilState.depthBiasSlopeScale = 0;
-  depthStencilState.depthBiasClamp = 0;
+  if (depthFormat == WGPUTextureFormat_Undefined) {
+    pipelineDesc.depthStencil = nullptr;
+  } else {
+    WGPUDepthStencilState depthStencilState = {};
+    depthStencilState.format = depthFormat;
+    depthStencilState.stencilReadMask = 0xFFFFFFFF;
+    depthStencilState.stencilWriteMask = 0xFFFFFFFF;
 
-  depthStencilState.stencilFront.compare = WGPUCompareFunction_Always;
-  depthStencilState.stencilFront.failOp = WGPUStencilOperation_Keep;
-  depthStencilState.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
-  depthStencilState.stencilFront.passOp = WGPUStencilOperation_Keep;
+    depthStencilState.depthBias = 0;
+    depthStencilState.depthBiasSlopeScale = 0;
+    depthStencilState.depthBiasClamp = 0;
 
-  depthStencilState.stencilBack.compare = WGPUCompareFunction_Always;
-  depthStencilState.stencilBack.failOp = WGPUStencilOperation_Keep;
-  depthStencilState.stencilBack.depthFailOp = WGPUStencilOperation_Keep;
-  depthStencilState.stencilBack.passOp = WGPUStencilOperation_Keep;
+    depthStencilState.stencilFront.compare = WGPUCompareFunction_Always;
+    depthStencilState.stencilFront.failOp = WGPUStencilOperation_Keep;
+    depthStencilState.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
+    depthStencilState.stencilFront.passOp = WGPUStencilOperation_Keep;
 
-  depthStencilState.depthCompare = WGPUCompareFunction_Less;
-  depthStencilState.depthWriteEnabled = true;
+    depthStencilState.stencilBack.compare = WGPUCompareFunction_Always;
+    depthStencilState.stencilBack.failOp = WGPUStencilOperation_Keep;
+    depthStencilState.stencilBack.depthFailOp = WGPUStencilOperation_Keep;
+    depthStencilState.stencilBack.passOp = WGPUStencilOperation_Keep;
 
-  depthStencilState.format = depthTextureFormat;
+    depthStencilState.depthCompare = WGPUCompareFunction_Less;
+    depthStencilState.depthWriteEnabled = true;
 
-  // Resetting stencil masks to 0, which might be a mistake. Usually, you would
-  // leave these as 0xFFFFFFFF unless you have a specific reason to change them.
-  depthStencilState.stencilReadMask = 0xFFFFFFFF;
-  depthStencilState.stencilWriteMask = 0xFFFFFFFF;
+    // Resetting stencil masks to 0, which might be a mistake. Usually, you would
+    // leave these as 0xFFFFFFFF unless you have a specific reason to change them.
+    depthStencilState.stencilReadMask = 0xFFFFFFFF;
+    depthStencilState.stencilWriteMask = 0xFFFFFFFF;
 
-  pipelineDesc.depthStencil = &depthStencilState;
-
-	//if(strcmp(pipelineId.c_str(), "RP_PPFX") == 0)
-	//{
-	//	pipelineDesc.depthStencil = nullptr;
-	//}
+    pipelineDesc.depthStencil = &depthStencilState;
+  }
 
   pipelineDesc.multisample.count = 1;
   pipelineDesc.multisample.mask = ~0u;
   pipelineDesc.multisample.alphaToCoverageEnabled = false;
 
-	// Interface to it's uniforms
+  // Interface to it's uniforms
   static std::map<std::string, std::map<int, std::vector<WGPUBindGroupLayoutEntry>>> groupLayouts;
 
-	if(groupLayouts.find(pipelineId) == groupLayouts.end())
-	{
-		groupLayouts[pipelineId] = ParseGroupLayout(groupLayout);
-	}
+  if (groupLayouts.find(pipelineId) == groupLayouts.end()) {
+    groupLayouts[pipelineId] = ParseGroupLayout(groupLayout);
+  }
 
   std::vector<WGPUBindGroupLayout> bindGroupLayouts;
 
   for (int i = 0; i < groupLayouts[pipelineId].size(); i++) {
-
     WGPUBindGroupLayoutDescriptor descriptor = {};
-		descriptor.label = std::string("bgl_" + pipelineId).c_str();
+    descriptor.label = std::string("bgl_" + pipelineId).c_str();
     descriptor.entryCount = groupLayouts[pipelineId][i].size();
     descriptor.entries = groupLayouts[pipelineId][i].data();
 
@@ -265,20 +234,18 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
 
   static std::map<std::string, WGPUPipelineLayoutDescriptor> layoutDesc;
 
-	if(layoutDesc.find(pipelineId) == layoutDesc.end())
-	{
-		layoutDesc[pipelineId] = {};
-	}
+  if (layoutDesc.find(pipelineId) == layoutDesc.end()) {
+    layoutDesc[pipelineId] = {};
+  }
 
   layoutDesc[pipelineId].bindGroupLayoutCount = bindGroupLayouts.size();
   layoutDesc[pipelineId].bindGroupLayouts = bindGroupLayouts.data();
 
   static std::map<std::string, WGPUPipelineLayout> pipelineLayout;
 
-	if(pipelineLayout.find(pipelineId) == pipelineLayout.end())
-	{
-		pipelineLayout[pipelineId] =  wgpuDeviceCreatePipelineLayout(_device, &layoutDesc[pipelineId]);
-	}
+  if (pipelineLayout.find(pipelineId) == pipelineLayout.end()) {
+    pipelineLayout[pipelineId] = wgpuDeviceCreatePipelineLayout(_device, &layoutDesc[pipelineId]);
+  }
 
   pipelineDesc.layout = pipelineLayout[pipelineId];
 

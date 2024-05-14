@@ -2,8 +2,7 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include "Node.h"
-#include "render/primitives/RenderMeshUniform.h"
-#include "render/primitives/texture.h"
+#include "render/Texture.h"
 
 struct VertexE {
   glm::vec3 Position;
@@ -17,7 +16,12 @@ struct VertexAttributes {
   glm::vec2 uv;
 };
 
-class MeshE : public Node {
+struct RenderMeshUniform {
+  glm::mat4x4 modelMatrix;
+  glm::vec4 color;
+};
+
+class Mesh : public Node {
  public:
   // mesh data
   RenderMeshUniform uniform;
@@ -26,7 +30,7 @@ class MeshE : public Node {
 
   std::shared_ptr<Texture> textureDiffuse;
 
-  MeshE(std::vector<VertexE> vertices,
+  Mesh(std::vector<VertexE> vertices,
         std::vector<unsigned int> indices,
         std::shared_ptr<Texture> textureDiffuse,
         WGPUBindGroupLayout resourceLayout,

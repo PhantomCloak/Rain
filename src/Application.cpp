@@ -2,20 +2,22 @@
 #include <GLFW/glfw3.h>
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
-#include "Model.h"
-#include "io/cursor.h"
-#include "io/keyboard.h"
-#include "render/Camera.h"
-#include "render/Render.h"
-#include "render/ResourceManager.h"
 
-#include "Constants.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_wgpu.h"
 #include "imgui.h"
-#include "scene/Scene.h"
 
-#include <iostream>
+#include "Constants.h"
+
+#include "Model.h"
+#include "core/Log.h"
+#include "io/cursor.h"
+#include "io/keyboard.h"
+#include "render/Camera.h"
+#include "render/PipelineManager.h"
+#include "render/Render.h"
+#include "render/ResourceManager.h"
+
 #if __EMSCRIPTEN__
 #include <emscripten.h>
 #include "platform/web/web_window.h"
@@ -25,15 +27,15 @@
 
 extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
 
-int screenWidth;
-int screenHeight;
+#define FOV 75.0f
+#define PERSPECTIVE_NEAR 0.10f
+#define PERSPECTIVE_FAR 1500.0f
 
-GLFWwindow* m_window;
-Render* render = new Render();
+std::unique_ptr<Render> render;
 
 std::shared_ptr<PlayerCamera> Player;
+std::shared_ptr<Camera> Cam;
 
-Camera* Cam;
 Model* sponza;
 
 std::unique_ptr<PipelineManager> m_PipelineManager;
@@ -42,32 +44,30 @@ std::shared_ptr<ShaderManager> m_ShaderManager;
 WGPURenderPipeline m_pipeline = nullptr;
 WGPURenderPipeline m_pipeline_ppfx = nullptr;
 WGPUBindGroup m_bind_group_ppfx;
+
 WGPUBuffer vertexBufferPpfx;
 WGPUBuffer indexBufferPpfx;
 
-WGPUTexture intermediateTexture;
-WGPUTextureView intermediateTextureView;
-
+WGPUTextureView offrenderTextureView;
 WGPUSurface m_surface;
 
-void createBinginds() {
-  glfwGetFramebufferSize((GLFWwindow*)m_window, &screenWidth, &screenHeight);
+void ppfxCreateBindings(int width, int height) {
   WGPUTextureDescriptor textureDesc = {
       .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
       .dimension = WGPUTextureDimension_2D,
-      .size = {static_cast<uint32_t>(screenWidth), static_cast<uint32_t>(screenHeight), 1},
+      .size = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
       .format = WGPUTextureFormat_BGRA8Unorm,
       .mipLevelCount = 1,
       .sampleCount = 1,
   };
 
-  intermediateTexture = wgpuDeviceCreateTexture(render->m_device, &textureDesc);
-  intermediateTextureView = wgpuTextureCreateView(intermediateTexture, nullptr);
+  WGPUTexture intermediateTexture = wgpuDeviceCreateTexture(render->m_device, &textureDesc);
+  offrenderTextureView = wgpuTextureCreateView(intermediateTexture, nullptr);
 
   static std::vector<WGPUBindGroupEntry> bindingsPpfx(2);
 
   bindingsPpfx[0].binding = 0;
-  bindingsPpfx[0].textureView = intermediateTextureView;
+  bindingsPpfx[0].textureView = offrenderTextureView;
   bindingsPpfx[0].offset = 0;
 
   bindingsPpfx[1].binding = 1;
@@ -83,30 +83,36 @@ void createBinginds() {
 }
 
 void Application::OnStart() {
+  render = std::make_unique<Render>();
+
   WGPUInstance instance = render->CreateInstance();
-  m_window = static_cast<GLFWwindow*>(GetNativeWindow());
+  render->m_window = static_cast<GLFWwindow*>(GetNativeWindow());
 
 #if __EMSCRIPTEN__
   m_surface = htmlGetCanvasSurface(instance, "canvas");
 #else
-  m_surface = glfwGetWGPUSurface(instance, m_window);
+  m_surface = glfwGetWGPUSurface(instance, render->m_window);
 #endif
 
   if (m_surface == nullptr) {
-    std::cout << "An error occured surface is null" << std::endl;
+    RN_ERROR("Failed to create a rendering surface. The surface returned is null.");
+    exit(-1);
   }
 
-  render->Init(m_window, instance, m_surface);
+  render->Init(render->m_window, instance, m_surface);
 
   Rain::ResourceManager::Init(std::make_shared<WGPUDevice>(render->m_device));
-  Rain::ResourceManager::LoadTexture("T_Box", RESOURCE_DIR "/wood.png");
+  Rain::ResourceManager::LoadTexture("T_Default", RESOURCE_DIR "/wood.png");
 
   m_ShaderManager = std::make_shared<ShaderManager>(render->m_device);
-
   m_ShaderManager->LoadShader("SH_Default", RESOURCE_DIR "/shader_default.wgsl");
   m_ShaderManager->LoadShader("SH_PPFX", RESOURCE_DIR "/shader_ppfx.wgsl");
 
   m_PipelineManager = std::make_unique<PipelineManager>(render->m_device, m_ShaderManager);
+
+
+  // Prep. Offscreen Render Resources
+  // =======================================================
 
   BufferLayout vertexLayout = {
       {ShaderDataType::Float3, "position"},
@@ -119,7 +125,19 @@ void Application::OnStart() {
       {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler},
       {1, GroupLayoutVisibility::Both, GroupLayoutType::Default}};
 
-  m_pipeline = m_PipelineManager->CreatePipeline("RP_Default", "SH_Default", vertexLayout, groupLayout, m_surface, render->m_adapter);
+  m_pipeline = m_PipelineManager->CreatePipeline("RP_Default", "SH_Default", vertexLayout, groupLayout, render->m_depthTextureFormat, m_surface, render->m_adapter);
+
+  WGPUBindGroupLayout cameraLayout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 1);
+  WGPUBindGroupLayout objectLayout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 0);
+
+  glm::mat4 projectionMatrix = glm::perspective(glm::radians(FOV), (float)render->m_swapChainDesc.width / render->m_swapChainDesc.height, PERSPECTIVE_NEAR, PERSPECTIVE_FAR);
+
+  Player = std::make_shared<PlayerCamera>();
+  Cam = std::make_shared<Camera>(projectionMatrix, Player, render->m_device, cameraLayout);
+  Cam->updateBuffer(render->m_queue);
+
+  // Prep. PPFX Resources
+  // =======================================================
 
   BufferLayout vertexLayoutPpfx = {
       {ShaderDataType::Float3, "position"},
@@ -129,36 +147,11 @@ void Application::OnStart() {
       {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
       {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler}};
 
-  m_pipeline_ppfx = m_PipelineManager->CreatePipeline("RP_PPFX", "SH_PPFX", vertexLayoutPpfx, groupLayoutPpfx, m_surface, render->m_adapter);
+  m_pipeline_ppfx = m_PipelineManager->CreatePipeline("RP_PPFX", "SH_PPFX", vertexLayoutPpfx, groupLayoutPpfx, render->m_depthTextureFormat, m_surface, render->m_adapter);
 
-  render->SetClearColor(0.52, 0.80, 0.92, 1);
-  Cursor::Setup(m_window);
-  Keyboard::Setup(m_window);
-
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGui::GetIO();
-
-  ImGui_ImplGlfw_InitForOther(m_window, true);
-
-  ImGui_ImplWGPU_InitInfo initInfo;
-  initInfo.Device = render->m_device;
-  initInfo.RenderTargetFormat = render->m_swapChainFormat;
-  initInfo.DepthStencilFormat = render->m_depthTextureFormat;
-  ImGui_ImplWGPU_Init(&initInfo);
-
-  WGPUBindGroupLayout cameraLayout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 1);
-  WGPUBindGroupLayout objectLayout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline, 0);
-
-  glfwGetFramebufferSize((GLFWwindow*)m_window, &screenWidth, &screenHeight);
-
-  glm::mat4 projectionMatrix = glm::perspective(75 * PI / 180, (float)1920 / 1080, 0.1f, 2000.0f);
-  Player = std::make_shared<PlayerCamera>();
-  Cam = new Camera(projectionMatrix, Player, render->m_device, cameraLayout);
-
-  Cam->updateBuffer(render->m_queue);
-
-  createBinginds();
+  int screenWidth, screenHeight;
+  glfwGetFramebufferSize((GLFWwindow*)render->m_window, &screenWidth, &screenHeight);
+  ppfxCreateBindings(screenWidth, screenHeight);
 
   WGPUBufferDescriptor vertexBufferDesc = {};
   vertexBufferDesc.size = sizeof(quadVertices);
@@ -174,18 +167,34 @@ void Application::OnStart() {
   indexBufferDesc.mappedAtCreation = false;
   indexBufferPpfx = wgpuDeviceCreateBuffer(render->m_device, &indexBufferDesc);
 
-  // Upload index data to the buffer
   wgpuQueueWriteBuffer(render->m_queue, indexBufferPpfx, 0, quadIndices, sizeof(quadIndices));
+  
+  // Prep. ImgGui
+  // =======================================================
+  
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGui::GetIO();
+
+  ImGui_ImplGlfw_InitForOther(render->m_window, true);
+
+  ImGui_ImplWGPU_InitInfo initInfo;
+  initInfo.Device = render->m_device;
+  initInfo.RenderTargetFormat = render->m_swapChainFormat;
+  initInfo.DepthStencilFormat = render->m_depthTextureFormat;
+  ImGui_ImplWGPU_Init(&initInfo);
+
+  // Prep. Scene & Systems
+  // =======================================================
 
   sponza = new Model(RESOURCE_DIR "/sponza.obj", objectLayout, render->m_device, render->m_queue, render->m_sampler);
   sponza->Transform.scale = glm::vec3(0.5f);
   sponza->UpdateUniforms(render->m_queue);
 
-  Cursor::CaptureMouse(true);
-}
+  Cursor::Setup(render->m_window);
+  Keyboard::Setup(render->m_window);
 
-bool Application::isRunning() {
-  return !glfwWindowShouldClose(m_window);
+  Cursor::CaptureMouse(true);
 }
 
 void Application::OnResize(int height, int width) {
@@ -194,40 +203,33 @@ void Application::OnResize(int height, int width) {
 
   render->m_swapChain = render->buildSwapChain(render->m_swapChainDesc, render->m_device, m_surface);
   render->m_depthTexture = render->GetDepthBufferTexture(render->m_device, render->m_swapChainDesc);
-
   render->m_depthTextureView = render->GetDepthBufferTextureView(render->m_depthTexture, render->m_depthTextureFormat);
-  render->m_depthTextureView2 = render->GetDepthBufferTextureView(render->m_depthTexture, render->m_depthTextureFormat);
 
-  float ratio = render->m_swapChainDesc.width / (float)render->m_swapChainDesc.height;
-  createBinginds();
+  ppfxCreateBindings(width, height);
 
-  // Cam->uniform.projectionMatrix =
-  //     glm::perspective(90 * PI / 180, ratio, 0.01f, 10000.0f);
-  // Cam->updateBuffer(render->m_queue);
+  Cam->uniform.projectionMatrix = glm::perspective(glm::radians(FOV), (float)render->m_swapChainDesc.width / render->m_swapChainDesc.height, PERSPECTIVE_NEAR, PERSPECTIVE_FAR);
+  Cam->updateBuffer(render->m_queue);
 }
 
 void MoveControls() {
-  float mul = 5.0f;
+  float speed = 5.0f;
 
   if (Keyboard::IsKeyPressing(Rain::Key::W)) {
-    Player->ProcessKeyboard(FORWARD, 1.0f * mul);
-    Cam->updateBuffer(render->m_queue);
+    Player->ProcessKeyboard(FORWARD, speed);
   } else if (Keyboard::IsKeyPressing(Rain::Key::S)) {
-    Player->ProcessKeyboard(BACKWARD, 1.0f * mul);
-    Cam->updateBuffer(render->m_queue);
+    Player->ProcessKeyboard(BACKWARD, speed);
   } else if (Keyboard::IsKeyPressing(Rain::Key::A)) {
-    Player->ProcessKeyboard(LEFT, 1.0f * mul);
-    Cam->updateBuffer(render->m_queue);
+    Player->ProcessKeyboard(LEFT, speed);
   } else if (Keyboard::IsKeyPressing(Rain::Key::D)) {
-    Player->ProcessKeyboard(RIGHT, 1.0f * mul);
-    Cam->updateBuffer(render->m_queue);
+    Player->ProcessKeyboard(RIGHT, speed);
   } else if (Keyboard::IsKeyPressing(Rain::Key::Space)) {
-    Player->ProcessKeyboard(UP, 1.0f * mul);
-    Cam->updateBuffer(render->m_queue);
+    Player->ProcessKeyboard(UP, speed);
   } else if (Keyboard::IsKeyPressing(Rain::Key::LeftShift)) {
-    Player->ProcessKeyboard(DOWN, 1.0f * mul);
-    Cam->updateBuffer(render->m_queue);
+    Player->ProcessKeyboard(DOWN, speed);
+  } else {
+    return;
   }
+  Cam->updateBuffer(render->m_queue);
 }
 
 void Application::OnUpdate() {
@@ -235,23 +237,23 @@ void Application::OnUpdate() {
   MoveControls();
 
   render->nextTexture = wgpuSwapChainGetCurrentTextureView(render->m_swapChain);
+
   if (!render->nextTexture) {
-    fprintf(stderr, "Cannot acquire next swap chain texture\n");
+    RN_ERROR("Failed to acquire next swapchain texture.");
     return;
   }
 
   WGPUCommandEncoderDescriptor commandEncoderDesc = {.label = "Command Encoder"};
   render->encoder = wgpuDeviceCreateCommandEncoder(render->m_device, &commandEncoderDesc);
 
-  WGPURenderPassDescriptor firstPassDesc{};
+  WGPURenderPassDescriptor firstPassDesc{.label = "first_pass"};
   WGPURenderPassColorAttachment firstPassColorAttachment{};
   firstPassColorAttachment.loadOp = WGPULoadOp_Clear;
   firstPassColorAttachment.storeOp = WGPUStoreOp_Store;
-  firstPassColorAttachment.clearValue = render->m_Color;
+  firstPassColorAttachment.clearValue = WGPUColor{0.52, 0.80, 0.92, 1};
   firstPassDesc.colorAttachmentCount = 1;
   firstPassColorAttachment.resolveTarget = nullptr;
-  firstPassColorAttachment.view = intermediateTextureView;
-  // firstPassColorAttachment.view = render->nextTexture;
+  firstPassColorAttachment.view = offrenderTextureView;
 #if !__EMSCRIPTEN__
   firstPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
 #endif
@@ -280,12 +282,12 @@ void Application::OnUpdate() {
 
   wgpuRenderPassEncoderEnd(firstPassEncoder);
 
-  WGPURenderPassDescriptor secondPassDesc{};
+  WGPURenderPassDescriptor secondPassDesc{.label = "second_pass"};
   WGPURenderPassColorAttachment secondPassColorAttachment = {};
   secondPassColorAttachment.loadOp = WGPULoadOp_Clear;
   secondPassColorAttachment.storeOp = WGPUStoreOp_Store;
-  secondPassColorAttachment.clearValue = {0.0, 0.0, 0.0, 1.0};  // Clear to black
-  secondPassColorAttachment.view = render->nextTexture;         // Output to the swap chain texture
+  secondPassColorAttachment.clearValue = {0.0, 0.0, 0.0, 1.0};
+  secondPassColorAttachment.view = render->nextTexture;
   secondPassDesc.colorAttachmentCount = 1;
 
 #if !__EMSCRIPTEN__
@@ -294,30 +296,17 @@ void Application::OnUpdate() {
   secondPassDesc.colorAttachments = &secondPassColorAttachment;
   secondPassDesc.timestampWrites = 0;
   secondPassDesc.timestampWrites = nullptr;
-
-  WGPURenderPassDepthStencilAttachment secondPassDepthAttachment;
-  secondPassDepthAttachment.view = render->m_depthTextureView2;
-  secondPassDepthAttachment.depthClearValue = 1.0f;
-  secondPassDepthAttachment.depthLoadOp = WGPULoadOp_Clear;
-  secondPassDepthAttachment.depthStoreOp = WGPUStoreOp_Store;
-  secondPassDepthAttachment.depthReadOnly = false;
-  secondPassDepthAttachment.stencilClearValue = 0;
-  secondPassDepthAttachment.stencilLoadOp = WGPULoadOp_Undefined;
-  secondPassDepthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
-  secondPassDepthAttachment.stencilReadOnly = true;
-
-  secondPassDesc.depthStencilAttachment = &secondPassDepthAttachment;
+  secondPassDesc.depthStencilAttachment = &firstDepthStencilAttachment;
 
   WGPURenderPassEncoder secondPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &secondPassDesc);
 
-  wgpuRenderPassEncoderSetPipeline(secondPassEncoder, m_pipeline);
+  wgpuRenderPassEncoderSetPipeline(secondPassEncoder, m_pipeline_ppfx);
   wgpuRenderPassEncoderSetVertexBuffer(secondPassEncoder, 0, vertexBufferPpfx, 0, sizeof(quadVertices));
   wgpuRenderPassEncoderSetIndexBuffer(secondPassEncoder, indexBufferPpfx, WGPUIndexFormat_Uint32, 0, sizeof(quadIndices));
-  wgpuRenderPassEncoderSetPipeline(secondPassEncoder, m_pipeline_ppfx);
   wgpuRenderPassEncoderSetBindGroup(secondPassEncoder, 0, m_bind_group_ppfx, 0, nullptr);
 
   wgpuRenderPassEncoderDrawIndexed(secondPassEncoder, 6, 1, 0, 0, 0);
-  // updateGui(secondPassEncoder);
+  drawImgui(secondPassEncoder);
 
   wgpuRenderPassEncoderEnd(secondPassEncoder);
 
@@ -331,7 +320,6 @@ void Application::OnUpdate() {
 #ifndef __EMSCRIPTEN__
   wgpuSwapChainPresent(render->m_swapChain);
 #endif
-
 #ifdef WEBGPU_BACKEND_DAWN
   wgpuDeviceTick(m_device);
 #endif
@@ -346,8 +334,7 @@ void Application::OnMouseClick(Rain::MouseCode button) {
   Cursor::CaptureMouse(true);
 }
 
-void Application::OnMouseMove(double xPos, double yPos) {
-  static glm::vec2 prevCursorPos = glm::vec2(0);
+void Application::OnMouseMove(double xPos, double yPos) { static glm::vec2 prevCursorPos = glm::vec2(0);
 
   if (!Cursor::IsMouseCaptured()) {
     return;
@@ -367,7 +354,7 @@ void Application::OnKeyPressed(KeyCode key, KeyAction action) {
   }
 }
 
-void Application::updateGui(WGPURenderPassEncoder renderPass) {
+void Application::drawImgui(WGPURenderPassEncoder renderPass) {
   ImGui_ImplWGPU_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
@@ -375,11 +362,11 @@ void Application::updateGui(WGPURenderPassEncoder renderPass) {
   ImGui::Begin("Hello, world!");
 
   ImGuiIO& io = ImGui::GetIO();
-  // ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-  //             1000.0f / io.Framerate, io.Framerate);
+  ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+              1000.0f / io.Framerate, io.Framerate);
 
   ImVec2 size = ImGui::GetWindowSize();
-  ImGui::Image((ImTextureID)intermediateTextureView, ImVec2(size.x, size.y));
+  // ImGui::Image((ImTextureID)intermediateTextureView, ImVec2(size.x, size.y));
 
   ImGui::End();
 
@@ -397,4 +384,8 @@ void Application::updateGui(WGPURenderPassEncoder renderPass) {
   ImGui::EndFrame();
   ImGui::Render();
   ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass);
+}
+
+bool Application::isRunning() {
+  return !glfwWindowShouldClose(render->m_window);
 }

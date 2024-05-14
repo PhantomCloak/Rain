@@ -1,7 +1,7 @@
 #include "Mesh.h"
 #include <iostream>
 
-MeshE::MeshE(std::vector<VertexE> vertices,
+Mesh::Mesh(std::vector<VertexE> vertices,
              std::vector<unsigned int> indices,
              std::shared_ptr<Texture> textureDiffuse,
              WGPUBindGroupLayout resourceLayout,
@@ -14,7 +14,7 @@ MeshE::MeshE(std::vector<VertexE> vertices,
   this->textureDiffuse = textureDiffuse;
 
   uniform = {};
-  if (Parent != NULL) {
+  if (Parent != nullptr) {
     uniform.modelMatrix = Parent->GetModelMatrix() * GetModelMatrix();
   } else {
     uniform.modelMatrix = GetModelMatrix();
@@ -68,7 +68,7 @@ MeshE::MeshE(std::vector<VertexE> vertices,
   wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(RenderMeshUniform));
 }
 
-void MeshE::Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline) {
+void Mesh::Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline) {
   wgpuRenderPassEncoderSetPipeline(renderPass, pipeline);
 
   wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexBuffer, 0, vertices.size() * sizeof(VertexAttributes));
@@ -79,8 +79,8 @@ void MeshE::Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline
   wgpuRenderPassEncoderDrawIndexed(renderPass, indices.size(), 1, 0, 0, 0);
 }
 
-void MeshE::UpdateUniforms(WGPUQueue& queue) {
-  if (Parent != NULL) {
+void Mesh::UpdateUniforms(WGPUQueue& queue) {
+  if (Parent != nullptr) {
     uniform.modelMatrix = Parent->GetModelMatrix() * GetModelMatrix();
   } else {
     uniform.modelMatrix = GetModelMatrix();

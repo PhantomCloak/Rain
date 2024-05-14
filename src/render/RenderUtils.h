@@ -1,11 +1,8 @@
 #pragma once
-#include <webgpu/webgpu.h>
-#include <map>
-#include <set>
-#include <string>
-#include "glm/fwd.hpp"
 
-// Helpers
+#include <cstdint>
+#include <string>
+#include <set>
 
 enum class GroupLayoutVisibility {
   Vertex,
@@ -221,32 +218,4 @@ class GroupLayout {
   std::vector<LayoutElement> m_Elements;
 };
 
-class ShaderManager {
- public:
-  ShaderManager(WGPUDevice& device)
-      : _device(device) {
-  }
 
-  void LoadShader(const std::string& shaderId, const std::string& shaderPath);
-  WGPUShaderModule GetShader(const std::string& shaderId);
-
- private:
-  WGPUDevice& _device;
-  std::map<std::string, WGPUShaderModule> _shaders;
-};
-
-class PipelineManager {
- public:
-  PipelineManager(WGPUDevice& device, std::shared_ptr<ShaderManager> shaderManager)
-      : _device(device), shaderManager_(shaderManager){};
-
-  // Create a pipeline with a given shader
-  WGPURenderPipeline CreatePipeline(const std::string& pipelineId, const std::string& shaderId, BufferLayout vertexLayout, GroupLayout groupLayout, WGPUSurface surface, WGPUAdapter adapter);
-  // Get a pipeline by ID
-  WGPURenderPipeline GetPipeline(const std::string& pipelineId);
-
- private:
-  WGPUDevice& _device;
-  std::shared_ptr<ShaderManager> shaderManager_;
-  std::map<std::string, WGPURenderPipeline> pipelines_;
-};

@@ -5,7 +5,7 @@
 #include <webgpu/webgpu.h>
 #include <string>
 #include <unordered_map>
-#include "render/primitives/texture.h"
+#include "render/Texture.h"
 
 namespace Rain {
   class ResourceManager {

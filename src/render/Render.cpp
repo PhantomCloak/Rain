@@ -1,7 +1,4 @@
 #include "Render.h"
-#include "../io/filesystem.h"
-#include "GLFW/glfw3.h"
-#include "ResourceManager.h"
 #include "Mesh.h"
 
 #if __EMSCRIPTEN__
@@ -74,11 +71,9 @@ bool Render::Init(void* window, WGPUInstance instance, WGPUSurface surface) {
     wgpuSwapChainRelease(m_swapChain);
   }
 
-   //m_swapChain = wgpuDeviceCreateSwapChain(m_device, surface, &m_swapChainDesc);
   m_swapChain = buildSwapChain(m_swapChainDesc, m_device, surface);
   m_depthTexture = GetDepthBufferTexture(m_device, m_swapChainDesc);
   m_depthTextureView = GetDepthBufferTextureView(m_depthTexture, m_depthTextureFormat);
-  m_depthTextureView2 = GetDepthBufferTextureView(m_depthTexture, m_depthTextureFormat);
 
   m_sampler = AttachSampler(m_device);
 
@@ -247,9 +242,7 @@ WGPUTextureView Render::GetDepthBufferTextureView(WGPUTexture& depthTexture, WGP
   return depthTextureView;
 }
 
-void Render::SetClearColor(float r, float g, float b, float a) {
-  m_Color = WGPUColor{r, g, b, a};
-}
+
 WGPUSampler Render::AttachSampler(WGPUDevice device) {
   WGPUSamplerDescriptor samplerDesc = {};  // Zero-initialize the struct
 

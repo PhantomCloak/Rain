@@ -22,10 +22,6 @@ void Camera::createUniformBuffer(WGPUDevice device) {
   uniformBuffer = wgpuDeviceCreateBuffer(device, &uniformBufferDesc);
 }
 
-void Camera::Begin(WGPURenderPassEncoder renderPass) {
-  wgpuRenderPassEncoderSetBindGroup(renderPass, 1, bindGroup, 0, NULL);
-}
-
 void Camera::updateBuffer(WGPUQueue queue) {
   uniform.viewMatrix = cameraInstance->GetViewMatrix();
   wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(CameraUniform));

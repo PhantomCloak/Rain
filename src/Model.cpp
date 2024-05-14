@@ -1,6 +1,8 @@
 #include "Model.h"
 #include <iostream>
 #include <ostream>
+#include "core/Assert.h"
+#include "core/Log.h"
 #include "io/filesystem.h"
 #include "render/ResourceManager.h"
 
@@ -39,7 +41,7 @@ void Model::processNode(aiNode* node, const aiScene* scene, WGPUBindGroupLayout&
   for (unsigned int i = 0; i < node->mNumMeshes; i++) {
     aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 
-    Ref<MeshE> modelMesh = processMesh(mesh, scene, resourceLayout, device,queue, textureSampler);
+    Ref<Mesh> modelMesh = processMesh(mesh, scene, resourceLayout, device,queue, textureSampler);
     modelMesh->Name = mesh->mName.C_Str();
     meshes.push_back(modelMesh);
     AddChild(modelMesh);
@@ -51,7 +53,7 @@ void Model::processNode(aiNode* node, const aiScene* scene, WGPUBindGroupLayout&
   }
 }
 
-Ref<MeshE> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler){
+Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler){
 
   std::vector<VertexE> vertices;
   std::vector<unsigned int> indices;
@@ -95,21 +97,20 @@ Ref<MeshE> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupL
 
   std::shared_ptr<Texture> diffuseTexture = loadMaterialTexture(material, aiTextureType_DIFFUSE, "texture_diffuse");
 
-	return CreateRef<MeshE>(vertices, indices, diffuseTexture, resourceLayout, device, queue, textureSampler);
+	return CreateRef<Mesh>(vertices, indices, diffuseTexture, resourceLayout, device, queue, textureSampler);
 }
 
 std::shared_ptr<Texture> Model::loadMaterialTexture(aiMaterial* mat, aiTextureType type, std::string typeName) {
-  int textureCount = mat->GetTextureCount(type);
-  std::shared_ptr texture = std::make_shared<Texture>();
+	static auto defaultTexture = Rain::ResourceManager::GetTexture("T_Default");
 
-	// TODO: Remove this hack
-	static auto backupTex = Rain::ResourceManager::LoadTexture("T_Box", RESOURCE_DIR "/wood.png");
+	RN_CORE_ASSERT(defaultTexture != nullptr, "Default texture for model couldn't initialised.");
 
   aiString str;
+  int textureCount = mat->GetTextureCount(type);
   mat->GetTexture(type, 0, &str);
 
   if (textureCount <= 0) {
-		return backupTex;
+		return defaultTexture;
   }
 
   for (unsigned int j = 0; j < textures_loaded.size(); j++) {
@@ -119,6 +120,7 @@ std::shared_ptr<Texture> Model::loadMaterialTexture(aiMaterial* mat, aiTextureTy
   }
 
   std::string fullPath = FileSys::GetParentDirectory(strPath) + "/" + str.C_Str();
+  std::shared_ptr texture = std::make_shared<Texture>();
   texture = Rain::ResourceManager::LoadTexture("diffuse", fullPath);
   texture->path = str.C_Str();
 

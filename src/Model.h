@@ -11,13 +11,13 @@ class Model : public Node {
  public:
   Model(const char* path, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device,WGPUQueue& queue, WGPUSampler& textureSampler);
 
-  std::vector<Ref<MeshE>> meshes;
+  std::vector<Ref<Mesh>> meshes;
   std::string directory;
   std::vector<std::shared_ptr<Texture>> textures_loaded;
 
   void loadModel(std::string path, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler);
   void processNode(aiNode* node, const aiScene* scene, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler);
-  Ref<MeshE> processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue,  WGPUSampler& textureSampler);
+  Ref<Mesh> processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue,  WGPUSampler& textureSampler);
   std::shared_ptr<Texture> loadMaterialTexture(aiMaterial* mat, aiTextureType type, std::string typeName);
 
   void Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline);
