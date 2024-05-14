@@ -50,6 +50,38 @@ WGPUTextureView intermediateTextureView;
 
 WGPUSurface m_surface;
 
+void createBinginds() {
+  glfwGetFramebufferSize((GLFWwindow*)m_window, &screenWidth, &screenHeight);
+  WGPUTextureDescriptor textureDesc = {
+      .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+      .dimension = WGPUTextureDimension_2D,
+      .size = {static_cast<uint32_t>(screenWidth), static_cast<uint32_t>(screenHeight), 1},
+      .format = WGPUTextureFormat_BGRA8Unorm,
+      .mipLevelCount = 1,
+      .sampleCount = 1,
+  };
+
+  intermediateTexture = wgpuDeviceCreateTexture(render->m_device, &textureDesc);
+  intermediateTextureView = wgpuTextureCreateView(intermediateTexture, nullptr);
+
+  static std::vector<WGPUBindGroupEntry> bindingsPpfx(2);
+
+  bindingsPpfx[0].binding = 0;
+  bindingsPpfx[0].textureView = intermediateTextureView;
+  bindingsPpfx[0].offset = 0;
+
+  bindingsPpfx[1].binding = 1;
+  bindingsPpfx[1].sampler = render->m_sampler;
+  bindingsPpfx[1].offset = 0;
+
+  WGPUBindGroupDescriptor bindGroupDescPpfx = {};
+  bindGroupDescPpfx.layout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline_ppfx, 0);
+  bindGroupDescPpfx.entryCount = (uint32_t)bindingsPpfx.size();
+  bindGroupDescPpfx.entries = bindingsPpfx.data();
+
+  m_bind_group_ppfx = wgpuDeviceCreateBindGroup(render->m_device, &bindGroupDescPpfx);
+}
+
 void Application::OnStart() {
   WGPUInstance instance = render->CreateInstance();
   m_window = static_cast<GLFWwindow*>(GetNativeWindow());
@@ -126,34 +158,7 @@ void Application::OnStart() {
 
   Cam->updateBuffer(render->m_queue);
 
-  WGPUTextureDescriptor textureDesc = {
-      .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
-	  .dimension = WGPUTextureDimension_2D ,
-      .size = {static_cast<uint32_t>(screenWidth), static_cast<uint32_t>(screenHeight), 1},
-      .format = WGPUTextureFormat_BGRA8Unorm,
-	  .mipLevelCount = 1,
-	  .sampleCount = 1,
-  };
-
-  intermediateTexture = wgpuDeviceCreateTexture(render->m_device, &textureDesc);
-  intermediateTextureView = wgpuTextureCreateView(intermediateTexture, nullptr);
-
-  static std::vector<WGPUBindGroupEntry> bindingsPpfx(2);
-
-  bindingsPpfx[0].binding = 0;
-  bindingsPpfx[0].textureView = intermediateTextureView;
-  bindingsPpfx[0].offset = 0;
-
-  bindingsPpfx[1].binding = 1;
-  bindingsPpfx[1].sampler = render->m_sampler;
-  bindingsPpfx[1].offset = 0;
-
-  WGPUBindGroupDescriptor bindGroupDescPpfx = {};
-  bindGroupDescPpfx.layout = wgpuRenderPipelineGetBindGroupLayout(m_pipeline_ppfx, 0);
-  bindGroupDescPpfx.entryCount = (uint32_t)bindingsPpfx.size();
-  bindGroupDescPpfx.entries = bindingsPpfx.data();
-
-  m_bind_group_ppfx = wgpuDeviceCreateBindGroup(render->m_device, &bindGroupDescPpfx);
+  createBinginds();
 
   WGPUBufferDescriptor vertexBufferDesc = {};
   vertexBufferDesc.size = sizeof(quadVertices);
@@ -162,7 +167,6 @@ void Application::OnStart() {
   vertexBufferPpfx = wgpuDeviceCreateBuffer(render->m_device, &vertexBufferDesc);
 
   wgpuQueueWriteBuffer(render->m_queue, vertexBufferPpfx, 0, quadVertices, vertexBufferDesc.size);
-
 
   WGPUBufferDescriptor indexBufferDesc = {};
   indexBufferDesc.size = sizeof(quadIndices);  // Total size in bytes of the index data.
@@ -173,9 +177,8 @@ void Application::OnStart() {
   // Upload index data to the buffer
   wgpuQueueWriteBuffer(render->m_queue, indexBufferPpfx, 0, quadIndices, sizeof(quadIndices));
 
-
   sponza = new Model(RESOURCE_DIR "/sponza.obj", objectLayout, render->m_device, render->m_queue, render->m_sampler);
-  //sponza->Transform.scale = glm::vec3(0.5f);
+  sponza->Transform.scale = glm::vec3(0.5f);
   sponza->UpdateUniforms(render->m_queue);
 
   Cursor::CaptureMouse(true);
@@ -191,9 +194,12 @@ void Application::OnResize(int height, int width) {
 
   render->m_swapChain = render->buildSwapChain(render->m_swapChainDesc, render->m_device, m_surface);
   render->m_depthTexture = render->GetDepthBufferTexture(render->m_device, render->m_swapChainDesc);
-  render->m_depthTextureView =
-      render->GetDepthBufferTextureView(render->m_depthTexture, render->m_depthTextureFormat);
+
+  render->m_depthTextureView = render->GetDepthBufferTextureView(render->m_depthTexture, render->m_depthTextureFormat);
+  render->m_depthTextureView2 = render->GetDepthBufferTextureView(render->m_depthTexture, render->m_depthTextureFormat);
+
   float ratio = render->m_swapChainDesc.width / (float)render->m_swapChainDesc.height;
+  createBinginds();
 
   // Cam->uniform.projectionMatrix =
   //     glm::perspective(90 * PI / 180, ratio, 0.01f, 10000.0f);
@@ -245,7 +251,7 @@ void Application::OnUpdate() {
   firstPassDesc.colorAttachmentCount = 1;
   firstPassColorAttachment.resolveTarget = nullptr;
   firstPassColorAttachment.view = intermediateTextureView;
-  //firstPassColorAttachment.view = render->nextTexture;
+  // firstPassColorAttachment.view = render->nextTexture;
 #if !__EMSCRIPTEN__
   firstPassColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
 #endif
@@ -311,7 +317,7 @@ void Application::OnUpdate() {
   wgpuRenderPassEncoderSetBindGroup(secondPassEncoder, 0, m_bind_group_ppfx, 0, nullptr);
 
   wgpuRenderPassEncoderDrawIndexed(secondPassEncoder, 6, 1, 0, 0, 0);
-  //updateGui(secondPassEncoder);
+  // updateGui(secondPassEncoder);
 
   wgpuRenderPassEncoderEnd(secondPassEncoder);
 
@@ -369,8 +375,8 @@ void Application::updateGui(WGPURenderPassEncoder renderPass) {
   ImGui::Begin("Hello, world!");
 
   ImGuiIO& io = ImGui::GetIO();
-  //ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-  //            1000.0f / io.Framerate, io.Framerate);
+  // ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+  //             1000.0f / io.Framerate, io.Framerate);
 
   ImVec2 size = ImGui::GetWindowSize();
   ImGui::Image((ImTextureID)intermediateTextureView, ImVec2(size.x, size.y));

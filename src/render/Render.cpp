@@ -52,6 +52,7 @@ bool Render::Init(void* window, WGPUInstance instance, WGPUSurface surface) {
 
   int width, height;
   glfwGetFramebufferSize((GLFWwindow*)window, &width, &height);
+	std::cout << "FBO SIZE! (w,h): " << width << ", " << height << std::endl;
 
 #if __EMSCRIPTEN__
   WGPUTextureFormat swapChainFormat = wgpuSurfaceGetPreferredFormat(surface, m_adapter);
