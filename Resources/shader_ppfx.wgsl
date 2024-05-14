@@ -20,18 +20,28 @@ fn vs_main(input : VertexInput) -> VertexOutput {
     return output;
 }
 
+fn acesFilm(x: vec3<f32>) -> vec3<f32> {
+    let a = 2.51;
+    let b = 0.03;
+    let c = 2.43;
+    let d = 0.59;
+    let e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(1.0, 1.0, 1.0));
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // Get data from the texture using our sampler
+    // Sample the texture
     let textureColor = textureSample(renderTexture, textureSampler, in.uv).rgb;
 
-    // Calculate luminance of the texture color
-    let luminance = 0.2126 * textureColor.r + 0.7152 * textureColor.g + 0.0722 * textureColor.b;
+    // ACES Tone Mapping
+    let acesInput = textureColor * 0.5;  // Scale the HDR color
+    let aces = acesFilm(acesInput);
 
-    // Create a grayscale color by setting RGB components to luminance
-    let grayscaleColor = vec3<f32>(luminance, luminance, luminance);
+    // Gamma correction
+    let gammaCorrected = pow(aces, vec3<f32>(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2));
 
-    // Return the final color with alpha
-    return vec4<f32>(grayscaleColor, 1.0);
+    // Output the final color with alpha set to 1.0
+    return vec4<f32>(gammaCorrected, 1.0);
 }
 
