@@ -13,7 +13,9 @@ enum class GroupLayoutVisibility {
 enum class GroupLayoutType {
   Default,
   Sampler,
-  Texture
+  SamplerCompare,
+  Texture,
+	TextureDepth
 };
 
 enum class ShaderDataType {

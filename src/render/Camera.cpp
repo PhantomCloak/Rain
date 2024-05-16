@@ -13,6 +13,15 @@ Camera::Camera(glm::mat4x4 projection, std::shared_ptr<PlayerCamera> camera, WGP
   cameraInstance = camera;
 }
 
+Camera::Camera(glm::mat4x4 projection, glm::mat4x4 view, WGPUDevice device, WGPUBindGroupLayout& resourceLayout) {
+  createUniformBuffer(device);
+
+  uniform.projectionMatrix = projection;
+  uniform.viewMatrix = view;
+
+  createBindGroup(device, resourceLayout);
+}
+
 void Camera::createUniformBuffer(WGPUDevice device) {
   WGPUBufferDescriptor uniformBufferDesc = {};
   uniformBufferDesc.size = sizeof(CameraUniform);
@@ -20,6 +29,10 @@ void Camera::createUniformBuffer(WGPUDevice device) {
   uniformBufferDesc.mappedAtCreation = false;
 
   uniformBuffer = wgpuDeviceCreateBuffer(device, &uniformBufferDesc);
+}
+
+void Camera::updateBufferStandalone(WGPUQueue queue) {
+  wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(CameraUniform));
 }
 
 void Camera::updateBuffer(WGPUQueue queue) {

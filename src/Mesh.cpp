@@ -42,7 +42,7 @@ Mesh::Mesh(std::vector<VertexE> vertices,
   bindingsOne[2].offset = 0;
   bindingsOne[2].sampler = sampler;
 
-  WGPUBindGroupDescriptor bindGroupOneDesc = {};
+	WGPUBindGroupDescriptor bindGroupOneDesc = { .label = "bg_mesh"};
   bindGroupOneDesc.layout = resourceLayout;
   bindGroupOneDesc.entryCount = (uint32_t)bindingsOne.size();
   bindGroupOneDesc.entries = bindingsOne.data();

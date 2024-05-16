@@ -1,6 +1,5 @@
 #include "PipelineManager.h"
 
-
 WGPUVertexBufferLayout CreateVertexBufferLayout(BufferLayout layout) {
   // TODO: Introduce clear
   static std::vector<std::vector<WGPUVertexAttribute>> vertexAttribStore;
@@ -60,8 +59,15 @@ void SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type) {
       entry.texture.sampleType = WGPUTextureSampleType_Float;
       entry.texture.viewDimension = WGPUTextureViewDimension_2D;
       break;
+    case GroupLayoutType::TextureDepth:
+      entry.texture.sampleType = WGPUTextureSampleType_Depth;
+      entry.texture.viewDimension = WGPUTextureViewDimension_2D;
+      break;
     case GroupLayoutType::Sampler:
       entry.sampler.type = WGPUSamplerBindingType_Filtering;
+      break;
+    case GroupLayoutType::SamplerCompare:
+      entry.sampler.type = WGPUSamplerBindingType_Comparison;
       break;
   }
 }
@@ -91,6 +97,7 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
     BufferLayout vertexLayout,
     GroupLayout groupLayout,
     WGPUTextureFormat depthFormat,
+    WGPUTextureFormat colorFormat,
     WGPUSurface surface,
     WGPUAdapter adapter) {
   WGPUShaderModule shader = shaderManager_->GetShader(shaderId);
@@ -141,33 +148,25 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   fragmentState.constantCount = 0;
   fragmentState.constants = NULL;
 
-  // The Blend State defines how colors from the fragment shader are blended
-  // with the existing color in the framebuffer.
-  //  Use cases
-  //  - Particle Systems
-  //  - Overlaying UI Elements
+  if (colorFormat != WGPUTextureFormat_Undefined) {
+    WGPUBlendState blendState = {};
+    blendState.color.srcFactor = WGPUBlendFactor_SrcAlpha;
+    blendState.color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+    blendState.color.operation = WGPUBlendOperation_Add;
+    blendState.alpha.srcFactor = WGPUBlendFactor_Zero;
+    blendState.alpha.dstFactor = WGPUBlendFactor_One;
+    blendState.alpha.operation = WGPUBlendOperation_Add;
 
-  WGPUBlendState blendState = {};
-  blendState.color.srcFactor = WGPUBlendFactor_SrcAlpha;
-  blendState.color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
-  blendState.color.operation = WGPUBlendOperation_Add;
-  blendState.alpha.srcFactor = WGPUBlendFactor_Zero;
-  blendState.alpha.dstFactor = WGPUBlendFactor_One;
-  blendState.alpha.operation = WGPUBlendOperation_Add;
+    WGPUColorTargetState colorTarget = {};
+    colorTarget.format = swapChainFormat;
+    colorTarget.blend = &blendState;
+    colorTarget.writeMask = WGPUColorWriteMask_All;
 
-  // It specifies the format of the color attachment and how colors are written
-  // to it.
-  //  Use cases
-  //  - Multisampling for Anti-Aliasing:
-  //  - HDDR
-
-  WGPUColorTargetState colorTarget = {};
-  colorTarget.format = swapChainFormat;
-  colorTarget.blend = &blendState;
-  colorTarget.writeMask = WGPUColorWriteMask_All;
-
-  fragmentState.targetCount = 1;
-  fragmentState.targets = &colorTarget;
+    fragmentState.targetCount = 1;
+    fragmentState.targets = &colorTarget;
+  } else {
+    fragmentState.targetCount = 0;
+  }
 
   pipelineDesc.fragment = &fragmentState;
 

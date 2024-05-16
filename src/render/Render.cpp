@@ -1,5 +1,6 @@
 #include "Render.h"
 #include "Mesh.h"
+#include <map>
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -72,8 +73,8 @@ bool Render::Init(void* window, WGPUInstance instance, WGPUSurface surface) {
   }
 
   m_swapChain = buildSwapChain(m_swapChainDesc, m_device, surface);
-  m_depthTexture = GetDepthBufferTexture(m_device, m_swapChainDesc);
-  m_depthTextureView = GetDepthBufferTextureView(m_depthTexture, m_depthTextureFormat);
+	m_depthTexture = GetDepthBufferTexture(m_device,m_depthTextureFormat, m_swapChainDesc.width, m_swapChainDesc.height);
+  m_depthTextureView = GetDepthBufferTextureView("T_Depth_Default", m_depthTexture, m_depthTextureFormat);
 
   m_sampler = AttachSampler(m_device);
 
@@ -197,24 +198,29 @@ WGPUSwapChain Render::buildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDev
   return wgpuDeviceCreateSwapChain(m_device, surface, &m_swapChainDesc);
 }
 
-WGPUTexture Render::GetDepthBufferTexture(WGPUDevice device, WGPUSwapChainDescriptor descriptor) {
+WGPUTexture Render::GetDepthBufferTexture(WGPUDevice device, WGPUTextureFormat format, int width, int height, bool dbg) {
   // Destroy previously allocated texture
-  if (m_depthTexture != NULL) {
-    wgpuTextureViewRelease(m_depthTextureView);
-    wgpuTextureDestroy(m_depthTexture);
-    wgpuTextureRelease(m_depthTexture);
-  }
+  //if (m_depthTexture != NULL) {
+  //  wgpuTextureViewRelease(m_depthTextureView);
+  //  wgpuTextureDestroy(m_depthTexture);
+  //  wgpuTextureRelease(m_depthTexture);
+  //}
 
   // Create the depth texture
   WGPUTextureDescriptor depthTextureDesc = {};
   depthTextureDesc.dimension = WGPUTextureDimension_2D;
-  depthTextureDesc.format = m_depthTextureFormat;
+  depthTextureDesc.format = format;
   depthTextureDesc.mipLevelCount = 1;
   depthTextureDesc.sampleCount = 1;
-  depthTextureDesc.size.width = descriptor.width;
-  depthTextureDesc.size.height = descriptor.height;
+  depthTextureDesc.size.width = width;
+  depthTextureDesc.size.height = height;
   depthTextureDesc.size.depthOrArrayLayers = 1;
-  depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment;
+
+	if(dbg)
+		depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment |  WGPUTextureUsage_TextureBinding;
+	else
+		depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment;
+
   depthTextureDesc.viewFormatCount = 1;
   depthTextureDesc.viewFormats = &m_depthTextureFormat;
 
@@ -224,8 +230,17 @@ WGPUTexture Render::GetDepthBufferTexture(WGPUDevice device, WGPUSwapChainDescri
   return depthTexture;
 }
 
-WGPUTextureView Render::GetDepthBufferTextureView(WGPUTexture& depthTexture, WGPUTextureFormat depthTextureFormat) {
-  WGPUTextureViewDescriptor depthTextureViewDesc = {};  // Zero-initialize with C++ uniform initialization
+WGPUTextureView Render::GetDepthBufferTextureView(std::string label, WGPUTexture& depthTexture, WGPUTextureFormat depthTextureFormat) {
+
+	static std::map<std::string, WGPUTextureViewDescriptor> depthTextureDesc;
+
+	if(depthTextureDesc.find(label) == depthTextureDesc.end())
+	{
+		depthTextureDesc[label] = {};
+	}
+
+  WGPUTextureViewDescriptor& depthTextureViewDesc = depthTextureDesc[label];
+	depthTextureViewDesc.label = label.c_str();
   depthTextureViewDesc.aspect = WGPUTextureAspect_DepthOnly;
   depthTextureViewDesc.baseArrayLayer = 0;
   depthTextureViewDesc.arrayLayerCount = 1;

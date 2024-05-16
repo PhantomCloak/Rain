@@ -17,8 +17,8 @@ class Render {
   WGPUSwapChainDescriptor GetSwapchainDescriptor(int width, int height, WGPUTextureFormat swapChainFormat);
   WGPURequiredLimits GetRequiredLimits(WGPUAdapter adapter);
   WGPUSwapChain buildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface);
-  WGPUTexture GetDepthBufferTexture(WGPUDevice device, WGPUSwapChainDescriptor descriptor);
-  WGPUTextureView GetDepthBufferTextureView(WGPUTexture& depthTexture, WGPUTextureFormat depthTextureFormat);
+  WGPUTexture GetDepthBufferTexture(WGPUDevice device, WGPUTextureFormat format, int width, int height, bool dbg = false);
+  WGPUTextureView GetDepthBufferTextureView(std::string label, WGPUTexture& depthTexture, WGPUTextureFormat depthTextureFormat);
   WGPUVertexBufferLayout GetVertexBufferLayout();
   void AttachFragmentStateToPipeline(WGPURenderPipelineDescriptor* pipe, WGPUShaderModule& shaderModule, WGPUTextureFormat swapChainFormat);
   void AttachDepthStencilStateToPipeline(WGPURenderPipelineDescriptor& pipe, WGPUTextureFormat depthTextureFormat);
