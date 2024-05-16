@@ -1,7 +1,7 @@
 #include "Mesh.h"
 #include <iostream>
 
-Mesh::Mesh(std::vector<VertexE> vertices,
+Mesh::Mesh(std::vector<VertexAttribute> vertices,
              std::vector<unsigned int> indices,
              std::shared_ptr<Texture> textureDiffuse,
              WGPUBindGroupLayout resourceLayout,
@@ -50,7 +50,7 @@ Mesh::Mesh(std::vector<VertexE> vertices,
   defaultResourcesBindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupOneDesc);
 
   WGPUBufferDescriptor vertexBufferDesc = {};
-  vertexBufferDesc.size = vertices.size() * sizeof(VertexAttributes);
+  vertexBufferDesc.size = vertices.size() * sizeof(VertexAttribute);
   vertexBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex;
   vertexBufferDesc.mappedAtCreation = false;
   vertexBuffer = wgpuDeviceCreateBuffer(device, &vertexBufferDesc);
@@ -71,7 +71,7 @@ Mesh::Mesh(std::vector<VertexE> vertices,
 void Mesh::Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline) {
   wgpuRenderPassEncoderSetPipeline(renderPass, pipeline);
 
-  wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexBuffer, 0, vertices.size() * sizeof(VertexAttributes));
+  wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexBuffer, 0, vertices.size() * sizeof(VertexAttribute));
   wgpuRenderPassEncoderSetIndexBuffer(renderPass, indexBuffer, WGPUIndexFormat_Uint32, 0, indices.size() * sizeof(unsigned int));
 
   wgpuRenderPassEncoderSetBindGroup(renderPass, 0, defaultResourcesBindGroup, 0, NULL);

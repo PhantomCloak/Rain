@@ -194,11 +194,47 @@ void Application::OnStart() {
 
   // Shared
   // =======================================================
+	static std::vector<WGPUVertexAttribute> vertexAttribsScene(3);
 
-  BufferLayout vertexLayoutDefault = {
-      {ShaderDataType::Float3, "position"},
-      {ShaderDataType::Float3, "normal"},
-      {ShaderDataType::Float2, "uv"}};
+	vertexAttribsScene[0] = {};
+	vertexAttribsScene[0].shaderLocation = 0;
+	vertexAttribsScene[0].offset = 0;
+	vertexAttribsScene[0].format = WGPUVertexFormat_Float32x3;
+
+	vertexAttribsScene[1] = {};
+	vertexAttribsScene[1].shaderLocation = 1;
+	vertexAttribsScene[1].offset = 16;
+	vertexAttribsScene[1].format = WGPUVertexFormat_Float32x3;
+
+	vertexAttribsScene[2] = {};
+	vertexAttribsScene[2].shaderLocation = 2;
+	vertexAttribsScene[2].offset = 32;
+	vertexAttribsScene[2].format = WGPUVertexFormat_Float32x2;
+
+  WGPUVertexBufferLayout avertexLayoutDefault = {};
+  avertexLayoutDefault.attributeCount = 3;
+  avertexLayoutDefault.attributes = vertexAttribsScene.data();
+  avertexLayoutDefault.arrayStride = 48;
+  avertexLayoutDefault.stepMode = WGPUVertexStepMode_Vertex;
+
+	static std::vector<WGPUVertexAttribute> vertexAttribsQuad(3);
+
+	vertexAttribsQuad[0] = {};
+	vertexAttribsQuad[0].shaderLocation = 0;
+	vertexAttribsQuad[0].offset = 0;
+	vertexAttribsQuad[0].format = WGPUVertexFormat_Float32x3;
+
+	vertexAttribsQuad[1] = {};
+	vertexAttribsQuad[1].shaderLocation = 1;
+	vertexAttribsQuad[1].offset = 16;
+	vertexAttribsQuad[1].format = WGPUVertexFormat_Float32x3;
+
+  WGPUVertexBufferLayout vertexLayoutQuad = {};
+  vertexLayoutQuad.attributeCount = 2;
+  vertexLayoutQuad.attributes = vertexAttribsQuad.data();
+  vertexLayoutQuad.arrayStride = 32;
+  vertexLayoutQuad.stepMode = WGPUVertexStepMode_Vertex;
+
 
   // Prep. Shadow Resources
   // =======================================================
@@ -214,7 +250,7 @@ void Application::OnStart() {
 
   pipelineShadow = pipelineManager->CreatePipeline("RP_Shadow",
                                                    "SH_Shadow",
-                                                   vertexLayoutDefault,
+                                                   avertexLayoutDefault,
                                                    groupLayoutShadow,
                                                    render->m_depthTextureFormat,
                                                    WGPUTextureFormat_Undefined,
@@ -247,11 +283,11 @@ void Application::OnStart() {
 
   pipelineDefault = pipelineManager->CreatePipeline("RP_Default",
                                                     "SH_Default",
-                                                    vertexLayoutDefault,
+                                                    avertexLayoutDefault,
                                                     groupLayoutDefault,
                                                     render->m_depthTextureFormat,
                                                     render->m_swapChainFormat,
-																										WGPUCullMode_Undefined,
+																										WGPUCullMode_None,
                                                     render->m_surface,
                                                     render->m_adapter);
 
@@ -357,11 +393,11 @@ void Application::OnStart() {
 
   pipelineDebug = pipelineManager->CreatePipeline("RP_Debug",
                                                   "SH_Debug",
-                                                  vertexLayoutDebug,
+                                                  vertexLayoutQuad,
                                                   groupLayoutDebug,
                                                   WGPUTextureFormat_Undefined,
                                                   render->m_swapChainFormat,
-																									WGPUCullMode_Undefined,
+																									WGPUCullMode_None,
                                                   render->m_surface,
                                                   render->m_adapter);
 
@@ -397,11 +433,11 @@ void Application::OnStart() {
 
   m_pipeline_ppfx = pipelineManager->CreatePipeline("RP_PPFX",
                                                     "SH_PPFX",
-                                                    vertexLayoutPpfx,
+                                                    vertexLayoutQuad,
                                                     groupLayoutPpfx,
                                                     render->m_depthTextureFormat,
                                                     render->m_swapChainFormat,
-																										WGPUCullMode_Undefined,
+																										WGPUCullMode_None,
                                                     render->m_surface,
                                                     render->m_adapter);
 

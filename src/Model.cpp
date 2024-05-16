@@ -55,12 +55,12 @@ void Model::processNode(aiNode* node, const aiScene* scene, WGPUBindGroupLayout&
 
 Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler){
 
-  std::vector<VertexE> vertices;
+  std::vector<VertexAttribute> vertices;
   std::vector<unsigned int> indices;
   std::vector<std::shared_ptr<Texture>> textures;
 
   for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
-    VertexE vertex;
+    VertexAttribute vertex;
     glm::vec3 vector;
     vector.x = mesh->mVertices[i].x;
     vector.y = mesh->mVertices[i].y;
@@ -83,6 +83,10 @@ Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLa
       vertex.TexCoords = glm::vec2(0.0f, 0.0f);
     }
 
+		vertex._pad0 = 0;
+		vertex._pad1 = 0;
+		vertex._pad2[0] = 0;
+		vertex._pad2[1] = 0;
     vertices.push_back(vertex);
   }
 

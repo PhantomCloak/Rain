@@ -94,7 +94,7 @@ ParseGroupLayout(GroupLayout layout) {
 WGPURenderPipeline PipelineManager::CreatePipeline(
     const std::string& pipelineId,
     const std::string& shaderId,
-    BufferLayout vertexLayout,
+    WGPUVertexBufferLayout vertexLayout,
     GroupLayout groupLayout,
     WGPUTextureFormat depthFormat,
     WGPUTextureFormat colorFormat,
@@ -102,8 +102,6 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
     WGPUSurface surface,
     WGPUAdapter adapter) {
   WGPUShaderModule shader = shaderManager_->GetShader(shaderId);
-  WGPUVertexBufferLayout vertexBufferLayout =
-      CreateVertexBufferLayout(vertexLayout);
 
   WGPUTextureFormat swapChainFormat = WGPUTextureFormat_Undefined;
 
@@ -124,7 +122,7 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   pipelineDesc.label = pipelineId.c_str();
 
   pipelineDesc.vertex.bufferCount = 1;
-  pipelineDesc.vertex.buffers = &vertexBufferLayout;
+  pipelineDesc.vertex.buffers = &vertexLayout;
 
   pipelineDesc.vertex.module = shader;
   pipelineDesc.vertex.entryPoint = "vs_main";  // let be constant for now
@@ -255,7 +253,6 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   pipelines_.emplace(pipelineId, pipe);
   return pipe;
 }
-
 WGPURenderPipeline PipelineManager::GetPipeline(const std::string& pipelineId) {
   return pipelines_[pipelineId];
 }

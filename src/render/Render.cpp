@@ -1,6 +1,6 @@
 #include "Render.h"
-#include "Mesh.h"
 #include <map>
+#include "Mesh.h"
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -22,7 +22,7 @@ WGPUInstance Render::CreateInstance() {
 }
 
 bool Render::Init(void* window, WGPUInstance instance) {
-	Instance = this;
+  Instance = this;
 
   WGPURequestAdapterOptions adapterOpts{};
   adapterOpts.compatibleSurface = m_surface;
@@ -50,10 +50,10 @@ bool Render::Init(void* window, WGPUInstance instance) {
 
   int width, height;
   glfwGetFramebufferSize((GLFWwindow*)window, &width, &height);
-	std::cout << "FBO SIZE! (w,h): " << width << ", " << height << std::endl;
+  std::cout << "FBO SIZE! (w,h): " << width << ", " << height << std::endl;
 
 #if __EMSCRIPTEN__
-  WGPUTextureFormat swapChainFormat = wgpuSurfaceGetPreferredFormat(surface, m_adapter);
+  WGPUTextureFormat swapChainFormat = wgpuSurfaceGetPreferredFormat(m_surface, m_adapter);
 #else
   WGPUTextureFormat swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 #endif
@@ -73,15 +73,17 @@ bool Render::Init(void* window, WGPUInstance instance) {
   }
 
   m_swapChain = buildSwapChain(m_swapChainDesc, m_device, m_surface);
-	m_depthTexture = GetDepthBufferTexture(m_device,m_depthTextureFormat, m_swapChainDesc.width, m_swapChainDesc.height);
+  m_depthTexture = GetDepthBufferTexture(m_device, m_depthTextureFormat, m_swapChainDesc.width, m_swapChainDesc.height);
   m_depthTextureView = GetDepthBufferTextureView("T_Depth_Default", m_depthTexture, m_depthTextureFormat);
 
   m_sampler = AttachSampler(m_device);
 
-	wgpuDeviceSetUncapturedErrorCallback(m_device, [](WGPUErrorType errorType, const char* message, void* userdata) {
-    fprintf(stderr, "Dawn error: %s\n", message);
-		exit(0);
-}, nullptr);
+  wgpuDeviceSetUncapturedErrorCallback(
+      m_device, [](WGPUErrorType errorType, const char* message, void* userdata) {
+        fprintf(stderr, "Dawn error: %s\n", message);
+        exit(0);
+      },
+      nullptr);
 
   return true;
 }
@@ -168,8 +170,8 @@ WGPURequiredLimits Render::GetRequiredLimits(WGPUAdapter adapter) {
   static WGPURequiredLimits requiredLimits = {};  // Assuming this is how the default is defined
   requiredLimits.limits.maxVertexAttributes = 4;
   requiredLimits.limits.maxVertexBuffers = 8;
-  requiredLimits.limits.maxBufferSize = 150000 * sizeof(VertexAttributes);
-  requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttributes);
+  requiredLimits.limits.maxBufferSize = 150000 * sizeof(VertexAttribute);
+  requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);
   requiredLimits.limits.minStorageBufferOffsetAlignment =
       supportedLimits.limits.minStorageBufferOffsetAlignment;
   requiredLimits.limits.minUniformBufferOffsetAlignment =
@@ -199,13 +201,6 @@ WGPUSwapChain Render::buildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDev
 }
 
 WGPUTexture Render::GetDepthBufferTexture(WGPUDevice device, WGPUTextureFormat format, int width, int height, bool dbg) {
-  // Destroy previously allocated texture
-  //if (m_depthTexture != NULL) {
-  //  wgpuTextureViewRelease(m_depthTextureView);
-  //  wgpuTextureDestroy(m_depthTexture);
-  //  wgpuTextureRelease(m_depthTexture);
-  //}
-
   // Create the depth texture
   WGPUTextureDescriptor depthTextureDesc = {};
   depthTextureDesc.dimension = WGPUTextureDimension_2D;
@@ -216,10 +211,11 @@ WGPUTexture Render::GetDepthBufferTexture(WGPUDevice device, WGPUTextureFormat f
   depthTextureDesc.size.height = height;
   depthTextureDesc.size.depthOrArrayLayers = 1;
 
-	if(dbg)
-		depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment |  WGPUTextureUsage_TextureBinding;
-	else
-		depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment;
+  if (dbg) {
+    depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding;
+  } else {
+    depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment;
+  }
 
   depthTextureDesc.viewFormatCount = 1;
   depthTextureDesc.viewFormats = &m_depthTextureFormat;
@@ -231,16 +227,14 @@ WGPUTexture Render::GetDepthBufferTexture(WGPUDevice device, WGPUTextureFormat f
 }
 
 WGPUTextureView Render::GetDepthBufferTextureView(std::string label, WGPUTexture& depthTexture, WGPUTextureFormat depthTextureFormat) {
+  static std::map<std::string, WGPUTextureViewDescriptor> depthTextureDesc;
 
-	static std::map<std::string, WGPUTextureViewDescriptor> depthTextureDesc;
-
-	if(depthTextureDesc.find(label) == depthTextureDesc.end())
-	{
-		depthTextureDesc[label] = {};
-	}
+  if (depthTextureDesc.find(label) == depthTextureDesc.end()) {
+    depthTextureDesc[label] = {};
+  }
 
   WGPUTextureViewDescriptor& depthTextureViewDesc = depthTextureDesc[label];
-	depthTextureViewDesc.label = label.c_str();
+  depthTextureViewDesc.label = label.c_str();
   depthTextureViewDesc.aspect = WGPUTextureAspect_DepthOnly;
   depthTextureViewDesc.baseArrayLayer = 0;
   depthTextureViewDesc.arrayLayerCount = 1;
@@ -256,7 +250,6 @@ WGPUTextureView Render::GetDepthBufferTextureView(std::string label, WGPUTexture
 
   return depthTextureView;
 }
-
 
 WGPUSampler Render::AttachSampler(WGPUDevice device) {
   WGPUSamplerDescriptor samplerDesc = {};  // Zero-initialize the struct

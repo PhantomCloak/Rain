@@ -4,16 +4,13 @@
 #include "Node.h"
 #include "render/Texture.h"
 
-struct VertexE {
+struct VertexAttribute {
   glm::vec3 Position;
+	float _pad0;
   glm::vec3 Normal;
+	float _pad1;
   glm::vec2 TexCoords;
-};
-
-struct VertexAttributes {
-  glm::vec3 position;
-  glm::vec3 normal;
-  glm::vec2 uv;
+	float _pad2[2];
 };
 
 struct RenderMeshUniform {
@@ -25,12 +22,12 @@ class Mesh : public Node {
  public:
   // mesh data
   RenderMeshUniform uniform;
-  std::vector<VertexE> vertices;
+  std::vector<VertexAttribute> vertices;
   std::vector<unsigned int> indices;
 
   std::shared_ptr<Texture> textureDiffuse;
 
-  Mesh(std::vector<VertexE> vertices,
+  Mesh(std::vector<VertexAttribute> vertices,
         std::vector<unsigned int> indices,
         std::shared_ptr<Texture> textureDiffuse,
         WGPUBindGroupLayout resourceLayout,
