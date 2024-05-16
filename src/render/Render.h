@@ -8,7 +8,7 @@ class Render {
 	static Render* Instance;
   WGPUInstance CreateInstance();
   WGPUDevice RequestDevice();
-  bool Init(void* window, WGPUInstance instance, WGPUSurface surface);
+  bool Init(void* window, WGPUInstance instance);
   void OnFrameStart();
   void OnFrameEnd();
 
@@ -25,6 +25,7 @@ class Render {
   WGPUBindGroupLayout* SetupBindingLayouts(WGPURenderPipelineDescriptor* pipe, WGPUDevice device);
   WGPUSampler AttachSampler(WGPUDevice device);
 
+	WGPUSurface m_surface = nullptr;
 	GLFWwindow* m_window = nullptr;
   WGPUAdapter m_adapter = nullptr;
   WGPUDevice m_device = nullptr;

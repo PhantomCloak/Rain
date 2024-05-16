@@ -21,11 +21,11 @@ WGPUInstance Render::CreateInstance() {
   return instance;
 }
 
-bool Render::Init(void* window, WGPUInstance instance, WGPUSurface surface) {
+bool Render::Init(void* window, WGPUInstance instance) {
 	Instance = this;
 
   WGPURequestAdapterOptions adapterOpts{};
-  adapterOpts.compatibleSurface = surface;
+  adapterOpts.compatibleSurface = m_surface;
   m_adapter = requestAdapter(instance, &adapterOpts);
 
   WGPURequiredLimits requiredLimits = GetRequiredLimits(m_adapter);
@@ -72,7 +72,7 @@ bool Render::Init(void* window, WGPUInstance instance, WGPUSurface surface) {
     wgpuSwapChainRelease(m_swapChain);
   }
 
-  m_swapChain = buildSwapChain(m_swapChainDesc, m_device, surface);
+  m_swapChain = buildSwapChain(m_swapChainDesc, m_device, m_surface);
 	m_depthTexture = GetDepthBufferTexture(m_device,m_depthTextureFormat, m_swapChainDesc.width, m_swapChainDesc.height);
   m_depthTextureView = GetDepthBufferTextureView("T_Depth_Default", m_depthTexture, m_depthTextureFormat);
 
