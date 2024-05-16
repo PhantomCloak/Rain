@@ -11,7 +11,16 @@ class PipelineManager {
       : _device(device), shaderManager_(shaderManager){};
 
   // Create a pipeline with a given shader
-  WGPURenderPipeline CreatePipeline(const std::string& pipelineId, const std::string& shaderId, BufferLayout vertexLayout, GroupLayout groupLayout, WGPUTextureFormat depthFormat,WGPUTextureFormat colorFormat, WGPUSurface surface, WGPUAdapter adapter);
+  WGPURenderPipeline CreatePipeline(const std::string& pipelineId,
+			const std::string& shaderId,
+			BufferLayout vertexLayout,
+			GroupLayout groupLayout,
+			WGPUTextureFormat depthFormat,
+			WGPUTextureFormat colorFormat,
+			WGPUCullMode cullingMode,
+			WGPUSurface surface,
+			WGPUAdapter adapter);
+
   // Get a pipeline by ID
   WGPURenderPipeline GetPipeline(const std::string& pipelineId);
 

@@ -98,6 +98,7 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
     GroupLayout groupLayout,
     WGPUTextureFormat depthFormat,
     WGPUTextureFormat colorFormat,
+		WGPUCullMode cullingMode,
     WGPUSurface surface,
     WGPUAdapter adapter) {
   WGPUShaderModule shader = shaderManager_->GetShader(shaderId);
@@ -134,7 +135,7 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
   pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
   pipelineDesc.primitive.frontFace = WGPUFrontFace_CCW;
-  pipelineDesc.primitive.cullMode = WGPUCullMode_None;
+  pipelineDesc.primitive.cullMode = cullingMode;
 
   // The Fragment State controls how fragment shaders process pixel data,
   // including color blending and format.

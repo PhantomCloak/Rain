@@ -33,8 +33,8 @@ extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* win
 #define PERSPECTIVE_NEAR 0.10f
 #define PERSPECTIVE_FAR 2500.0f
 
-#define SHADOW_WIDTH 4098.0f
-#define SHADOW_HEIGHT 4098.0f
+#define SHADOW_WIDTH 4096.0f
+#define SHADOW_HEIGHT 4096.0f
 
 #define SHADOW_NEAR 0.10f
 #define SHADOW_FAR 2500.0f
@@ -218,11 +218,13 @@ void Application::OnStart() {
                                                    groupLayoutShadow,
                                                    render->m_depthTextureFormat,
                                                    WGPUTextureFormat_Undefined,
+																									 WGPUCullMode_Back,
                                                    render->m_surface,
                                                    render->m_adapter);
 
   shadowPos = glm::vec3(-282, 2346, -65);
   shadowRot = glm::vec3(-66, 28, 0);
+  //shadowRot = glm::vec3(-85, 28, 0);
 
   shadowView = GetViewMatrix(shadowPos, shadowRot);
   shadowProjection = glm::ortho(-SHADOW_WIDTH / 2, SHADOW_WIDTH / 2, -SHADOW_HEIGHT / 2, SHADOW_HEIGHT / 2,
@@ -249,6 +251,7 @@ void Application::OnStart() {
                                                     groupLayoutDefault,
                                                     render->m_depthTextureFormat,
                                                     render->m_swapChainFormat,
+																										WGPUCullMode_Undefined,
                                                     render->m_surface,
                                                     render->m_adapter);
 
@@ -358,6 +361,7 @@ void Application::OnStart() {
                                                   groupLayoutDebug,
                                                   WGPUTextureFormat_Undefined,
                                                   render->m_swapChainFormat,
+																									WGPUCullMode_Undefined,
                                                   render->m_surface,
                                                   render->m_adapter);
 
@@ -397,6 +401,7 @@ void Application::OnStart() {
                                                     groupLayoutPpfx,
                                                     render->m_depthTextureFormat,
                                                     render->m_swapChainFormat,
+																										WGPUCullMode_Undefined,
                                                     render->m_surface,
                                                     render->m_adapter);
 
