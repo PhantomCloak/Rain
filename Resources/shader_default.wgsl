@@ -21,7 +21,7 @@ struct Camera {
     viewMatrix: mat4x4f,
 };
 
-struct MyUniforms {
+struct SceneUniform {
     modelMatrix: mat4x4f,
     color: vec4f,
 };
@@ -32,7 +32,7 @@ struct ShadowUniform {
     lightPos: vec3<f32>,
 };
 
-@group(0) @binding(0) var<uniform> uMyUniforms: MyUniforms;
+@group(0) @binding(0) var<uniform> uScene: SceneUniform;
 @group(0) @binding(1) var gradientTexture: texture_2d<f32>;
 @group(0) @binding(2) var textureSampler: sampler;
 
@@ -46,10 +46,10 @@ struct ShadowUniform {
 fn vs_main(in: VertexInput) -> VertexOutput {
 	var out: VertexOutput;
 
-	let fragPos = (uMyUniforms.modelMatrix * vec4f(in.position, 1.0)).xyz;
+	let fragPos = (uScene.modelMatrix * vec4f(in.position, 1.0)).xyz;
 
-	out.position = uCam.projectionMatrix * uCam.viewMatrix * uMyUniforms.modelMatrix * vec4f(in.position, 1.0);
-	out.Normal =   (uCam.viewMatrix * uMyUniforms.modelMatrix * vec4f(in.normal, 0.0)).xyz;
+	out.position = uCam.projectionMatrix * uCam.viewMatrix * uScene.modelMatrix * vec4f(in.position, 1.0);
+	out.Normal =   (uCam.viewMatrix * uScene.modelMatrix * vec4f(in.normal, 0.0)).xyz;
 	out.uv = in.uv;
 
 	out.LightPos = (uCam.viewMatrix * vec4f(shadowUniform.lightPos, 1.0)).xyz;
