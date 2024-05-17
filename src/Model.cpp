@@ -21,7 +21,8 @@ void Model::loadModel(std::string path, WGPUBindGroupLayout& resourceLayout, WGP
   strPath = path;
 
   Assimp::Importer import;
-  const aiScene* scene = import.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
+  const aiScene* scene = import.ReadFile(path,
+			aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices);
 
   if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
     std::cout << "ERROR::ASSIMP::" << import.GetErrorString() << std::endl;
@@ -74,6 +75,18 @@ Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLa
       vertex.Normal = vector;
     }
 
+    if (mesh->HasTangentsAndBitangents()) {
+      vector.x = mesh->mTangents[i].x;
+      vector.y = mesh->mTangents[i].y;
+      vector.z = mesh->mTangents[i].z;
+      vertex.Tangent = vector;
+
+      vector.x = mesh->mBitangents[i].x;
+      vector.y = mesh->mBitangents[i].y;
+      vector.z = mesh->mBitangents[i].z;
+      vertex.BitTangent = vector;
+    }
+
     if (mesh->mTextureCoords[0]) {
       glm::vec2 vec;
       vec.x = mesh->mTextureCoords[0][i].x;
@@ -83,10 +96,6 @@ Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLa
       vertex.TexCoords = glm::vec2(0.0f, 0.0f);
     }
 
-		vertex._pad0 = 0;
-		vertex._pad1 = 0;
-		vertex._pad2[0] = 0;
-		vertex._pad2[1] = 0;
     vertices.push_back(vertex);
   }
 
@@ -100,8 +109,9 @@ Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLa
   aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
   std::shared_ptr<Texture> diffuseTexture = loadMaterialTexture(material, aiTextureType_DIFFUSE, "texture_diffuse");
+  std::shared_ptr<Texture> heightTexture = loadMaterialTexture(material, aiTextureType_DISPLACEMENT, "texture_height");
 
-	return CreateRef<Mesh>(vertices, indices, diffuseTexture, resourceLayout, device, queue, textureSampler);
+	return CreateRef<Mesh>(vertices, indices, diffuseTexture, heightTexture, resourceLayout, device, queue, textureSampler);
 }
 
 std::shared_ptr<Texture> Model::loadMaterialTexture(aiMaterial* mat, aiTextureType type, std::string typeName) {

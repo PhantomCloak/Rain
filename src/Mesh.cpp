@@ -4,6 +4,7 @@
 Mesh::Mesh(std::vector<VertexAttribute> vertices,
              std::vector<unsigned int> indices,
              std::shared_ptr<Texture> textureDiffuse,
+						 std::shared_ptr<Texture> textureHeight,
              WGPUBindGroupLayout resourceLayout,
              WGPUDevice& device,
              WGPUQueue& queue,
@@ -27,7 +28,7 @@ Mesh::Mesh(std::vector<VertexAttribute> vertices,
 
   uniformBuffer = wgpuDeviceCreateBuffer(device, &uniformBufferDesc);
 
-  static std::vector<WGPUBindGroupEntry> bindingsOne(3);
+  static std::vector<WGPUBindGroupEntry> bindingsOne(4);
 
   bindingsOne[0].binding = 0;
   bindingsOne[0].buffer = uniformBuffer;
@@ -41,6 +42,10 @@ Mesh::Mesh(std::vector<VertexAttribute> vertices,
   bindingsOne[2].binding = 2;
   bindingsOne[2].offset = 0;
   bindingsOne[2].sampler = sampler;
+
+  bindingsOne[3].binding = 3;
+  bindingsOne[3].offset = 0;
+  bindingsOne[3].textureView = textureHeight->View;
 
 	WGPUBindGroupDescriptor bindGroupOneDesc = { .label = "bg_mesh"};
   bindGroupOneDesc.layout = resourceLayout;

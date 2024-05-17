@@ -33,8 +33,8 @@ extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* win
 #define PERSPECTIVE_NEAR 0.10f
 #define PERSPECTIVE_FAR 2500.0f
 
-#define SHADOW_WIDTH 4096.0f
-#define SHADOW_HEIGHT 4096.0f
+#define SHADOW_WIDTH 2048.0f
+#define SHADOW_HEIGHT 2048.0f
 
 #define SHADOW_NEAR 0.10f
 #define SHADOW_FAR 2500.0f
@@ -194,7 +194,7 @@ void Application::OnStart() {
 
   // Shared
   // =======================================================
-	static std::vector<WGPUVertexAttribute> vertexAttribsScene(3);
+	static std::vector<WGPUVertexAttribute> vertexAttribsScene(5);
 
 	vertexAttribsScene[0] = {};
 	vertexAttribsScene[0].shaderLocation = 0;
@@ -211,10 +211,21 @@ void Application::OnStart() {
 	vertexAttribsScene[2].offset = 32;
 	vertexAttribsScene[2].format = WGPUVertexFormat_Float32x2;
 
+	vertexAttribsScene[3] = {};
+	vertexAttribsScene[3].shaderLocation = 3;
+	vertexAttribsScene[3].offset = 48;
+	vertexAttribsScene[3].format = WGPUVertexFormat_Float32x3;
+
+	vertexAttribsScene[4] = {};
+	vertexAttribsScene[4].shaderLocation = 4;
+	vertexAttribsScene[4].offset = 64;
+	vertexAttribsScene[4].format = WGPUVertexFormat_Float32x3;
+
+
   WGPUVertexBufferLayout avertexLayoutDefault = {};
-  avertexLayoutDefault.attributeCount = 3;
+	avertexLayoutDefault.attributeCount = vertexAttribsScene.size();
   avertexLayoutDefault.attributes = vertexAttribsScene.data();
-  avertexLayoutDefault.arrayStride = 48;
+  avertexLayoutDefault.arrayStride = 80;
   avertexLayoutDefault.stepMode = WGPUVertexStepMode_Vertex;
 
 	static std::vector<WGPUVertexAttribute> vertexAttribsQuad(3);
@@ -243,6 +254,7 @@ void Application::OnStart() {
       {0, GroupLayoutVisibility::Both, GroupLayoutType::Default},
       {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
       {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler},
+      {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
       {1, GroupLayoutVisibility::Both, GroupLayoutType::Default}};
 
   WGPUTexture shadowDepthTexture = render->GetDepthBufferTexture(render->m_device, render->m_depthTextureFormat, SHADOW_WIDTH, SHADOW_HEIGHT, true);
@@ -276,6 +288,7 @@ void Application::OnStart() {
       {0, GroupLayoutVisibility::Both, GroupLayoutType::Default},
       {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
       {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler},
+      {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
       {1, GroupLayoutVisibility::Both, GroupLayoutType::Default},
       {2, GroupLayoutVisibility::Both, GroupLayoutType::TextureDepth},
       {2, GroupLayoutVisibility::Both, GroupLayoutType::SamplerCompare},
@@ -519,7 +532,7 @@ void Application::OnStart() {
   // =======================================================
 
   sponza = new Model(RESOURCE_DIR "/sponza.obj", bglScene, render->m_device, render->m_queue, render->m_sampler);
-  sponza->Transform.scale = glm::vec3(0.5f);
+  sponza->Transform.scale = glm::vec3(0.2f);
   sponza->UpdateUniforms(render->m_queue);
 
   Cursor::Setup(render->m_window);

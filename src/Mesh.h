@@ -11,6 +11,10 @@ struct VertexAttribute {
 	float _pad1;
   glm::vec2 TexCoords;
 	float _pad2[2];
+	glm::vec3 Tangent;
+	float _pad3;
+	glm::vec3 BitTangent;
+	float _pad4;
 };
 
 struct RenderMeshUniform {
@@ -30,6 +34,7 @@ class Mesh : public Node {
   Mesh(std::vector<VertexAttribute> vertices,
         std::vector<unsigned int> indices,
         std::shared_ptr<Texture> textureDiffuse,
+        std::shared_ptr<Texture> textureHeight,
         WGPUBindGroupLayout resourceLayout,
 				WGPUDevice& device,
 				WGPUQueue& queue,
