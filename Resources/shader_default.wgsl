@@ -59,8 +59,8 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 	out.FragPos =  (uCam.viewMatrix * vec4f(fragPos, 1.0)).xyz;
 	out.FragPosLightSpace = (shadowUniform.lightProjection * shadowUniform.lightView) * vec4f(fragPos, 1.0);
 
-	out.T = normalize(((uScene.modelMatrix) * vec4f(in.tangent, 0.0)).xyz);
-	out.N = normalize(((uScene.modelMatrix) * vec4f(in.normal, 0.0)).xyz);
+	out.T = normalize(((uCam.viewMatrix * uScene.modelMatrix) * vec4f(in.tangent, 0.0)).xyz);
+	out.N = normalize(((uCam.viewMatrix * uScene.modelMatrix) * vec4f(in.normal, 0.0)).xyz);
 	out.T = normalize(out.T - dot(out.T, out.N) * out.N);
 	out.B = cross(out.N, out.T);
 
