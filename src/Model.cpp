@@ -77,11 +77,6 @@ Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLa
       vector.y = mesh->mTangents[i].y;
       vector.z = mesh->mTangents[i].z;
       vertex.Tangent = vector;
-
-      vector.x = mesh->mBitangents[i].x;
-      vector.y = mesh->mBitangents[i].y;
-      vector.z = mesh->mBitangents[i].z;
-      vertex.BitTangent = vector;
     }
 
     if (mesh->mTextureCoords[0]) {

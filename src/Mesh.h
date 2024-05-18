@@ -13,8 +13,6 @@ struct VertexAttribute {
 	float _pad2[2];
 	glm::vec3 Tangent;
 	float _pad3;
-	glm::vec3 BitTangent;
-	float _pad4;
 };
 
 struct SceneUniform {
