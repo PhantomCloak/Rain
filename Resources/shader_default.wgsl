@@ -3,16 +3,14 @@ struct VertexInput {
 	@location(1) normal: vec3f,
 	@location(2) uv: vec2f,
 	@location(3) tangent: vec3f,
-	@location(4) bittangent: vec3f,
 };
 
 struct VertexOutput {
-	@builtin(position) position: vec4f,
-	@location(2) Normal: vec3f,
-	@location(3) uv: vec2f,
-	@location(4) LightPos: vec3f,
-	@location(5) FragPos: vec3f,
-	@location(6) FragPosLightSpace: vec4f,
+    @builtin(position) position: vec4f, 
+    @location(1) uv: vec2f,              
+    @location(2) TangentLightPos: vec3f,   
+    @location(3) TangentFragPos: vec3f,     
+    @location(4) FragPosLightSpace: vec4f,
 }
 
 struct Camera {
@@ -29,7 +27,7 @@ struct MaterialUniform {
     ambientColor: vec3f,
     diffuseColor: vec3f,
     specularColor: vec3f,
-		shininess: f32
+	shininess: f32
 };
 
 struct ShadowUniform {
@@ -57,21 +55,26 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 	let fragPos = (uScene.modelMatrix * vec4f(in.position, 1.0)).xyz;
 
 	out.position = uCam.projectionMatrix * uCam.viewMatrix * uScene.modelMatrix * vec4f(in.position, 1.0);
-	out.Normal =   (uCam.viewMatrix * uScene.modelMatrix * vec4f(in.normal, 0.0)).xyz;
 	out.uv = in.uv;
 
-	out.LightPos = (uCam.viewMatrix * vec4f(shadowUniform.lightPos, 1.0)).xyz;
-	out.FragPos =  (uCam.viewMatrix * vec4f(fragPos, 1.0)).xyz;
-	out.FragPosLightSpace = (shadowUniform.lightProjection * shadowUniform.lightView) * vec4f(fragPos, 1.0);
+	let fragPos2 =  (uCam.viewMatrix * vec4f(fragPos, 1.0)).xyz;
 
-	//out.T = normalize(((uCam.viewMatrix * uScene.modelMatrix) * vec4f(in.tangent, 0.0)).xyz);
-	//out.N = normalize(((uCam.viewMatrix * uScene.modelMatrix) * vec4f(in.normal, 0.0)).xyz);
-	//out.T = normalize(out.T - dot(out.T, out.N) * out.N);
-	//out.B = cross(out.N, out.T);
+	let normalMatrix = uCam.viewMatrix * uScene.modelMatrix;
+
+	var T = normalize((normalMatrix * vec4f(in.tangent, 0.0)).xyz);
+	let N = normalize((normalMatrix * vec4f(in.normal, 0.0)).xyz);
+
+	T = normalize(T - dot(T, N) * N);
+	let B = cross(N, T);
+
+	let TBN: mat3x3f = transpose(mat3x3f(T, B, N));
+	
+	out.TangentLightPos = TBN * (uCam.viewMatrix * vec4f(shadowUniform.lightPos, 1.0)).xyz;
+	out.TangentFragPos = TBN * fragPos2;
+	out.FragPosLightSpace = (shadowUniform.lightProjection * shadowUniform.lightView) * vec4f(fragPos, 1.0);
 
 	return out;
 }
-
 
 fn ShadowCalculation(
     fragPosLightSpace: vec4<f32>,
@@ -86,8 +89,8 @@ fn ShadowCalculation(
 
     var shadow: f32 = 0.0;
 
-    let texelSize: vec2<f32> = vec2(1.0 / 1024.0);
-    let halfKernelWidth: i32 = 3;
+    let texelSize: vec2<f32> = vec2(1.0 / 2048.0);
+    const halfKernelWidth: i32 = 1;
 
     for (var x: i32 = -halfKernelWidth; x <= halfKernelWidth; x++) {
         for (var y: i32 = -halfKernelWidth; y <= halfKernelWidth; y++) {
@@ -101,33 +104,30 @@ fn ShadowCalculation(
     return shadow;
 }
 
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	// Get data from the texture using our sampler
+
 	let textureColor = textureSample(gradientTexture, textureSampler, in.uv).rgba;
-
-	//let TBN = mat3x3f(in.T, in.B, in.N);
-
-	var normal: vec3f;
-	//normal = textureSample(heightTexture, textureSampler, in.uv).rgb;
-	//normal = normal * 2.0 - 1.0;
-	//normal = normalize(TBN * normal);
-	normal = normalize(in.Normal);
+	var normal = textureSample(heightTexture, textureSampler, in.uv).rgb;
+	normal =  normalize(normal * 2.0 - 1.0);
 
 	// Ambient
 	var ambient = uMaterial.ambientColor;
 
 	// Diffuse
-	let lightDir = normalize(in.LightPos - in.FragPos);
+	let lightDir = normalize(in.TangentLightPos - in.TangentFragPos);
 	var diffuse = max(dot(normal, lightDir), 0.0) * uMaterial.diffuseColor;
 
 	// Specular
-	let viewDir = normalize(-in.FragPos);
+	let viewDir = normalize(-in.TangentFragPos);
 	let halfwayDir = normalize(lightDir + viewDir);
 	var specular = pow(max(dot(normal, halfwayDir), 0.0), uMaterial.shininess) * uMaterial.specularColor;
 
-	var shadow = ShadowCalculation(in.FragPosLightSpace, normal, lightDir);
-	let finalColor = (ambient + (shadow) * (diffuse + specular)) * textureColor.rgb;
+	//var shadow = ShadowCalculation(in.FragPosLightSpace);
+	var shadow = ShadowCalculation(in.FragPosLightSpace, normal , lightDir);
+	let finalColor = (ambient + (shadow)  * (diffuse + specular)) * textureColor.rgb;
 
 	return vec4f(finalColor, 1.0);
 }
