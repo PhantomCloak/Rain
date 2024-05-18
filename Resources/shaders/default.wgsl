@@ -107,8 +107,6 @@ fn ShadowCalculation(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-	// Get data from the texture using our sampler
-
 	let textureColor = textureSample(gradientTexture, textureSampler, in.uv).rgba;
 	var normal = textureSample(heightTexture, textureSampler, in.uv).rgb;
 	normal =  normalize(normal * 2.0 - 1.0);
@@ -125,7 +123,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	let halfwayDir = normalize(lightDir + viewDir);
 	var specular = pow(max(dot(normal, halfwayDir), 0.0), uMaterial.shininess) * uMaterial.specularColor;
 
-	//var shadow = ShadowCalculation(in.FragPosLightSpace);
 	var shadow = ShadowCalculation(in.FragPosLightSpace, normal , lightDir);
 	let finalColor = (ambient + (shadow)  * (diffuse + specular)) * textureColor.rgb;
 

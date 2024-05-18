@@ -41,19 +41,3 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     return vec4<f32>(gammaCorrected, 1.0);
 }
-
-//fn LinearizeDepth(depth: f32, near_plane: f32, far_plane: f32) -> f32 {
-//    let z: f32 = depth * 2.0 - 1.0; // Convert from [0,1] range to [-1,1] range (NDC space)
-//    return (2.0 * near_plane * far_plane) / (far_plane + near_plane - z * (far_plane - near_plane));
-//}
-
-//@fragment
-//fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-//	let depthValue = textureSample(renderTexture, textureSampler, in.uv); // Assuming depth is stored in the 'r' channel
-//	let linearDepth = LinearizeDepth(depthValue, 0.1, 1500.0); // Adjust zNear and zFar based on your camera setup
-//
-//	// Normalize the linear depth for better visualization
-//	let normalizedDepth = linearDepth / 1500.0; // Normalize based on the far plane
-//
-//	return vec4<f32>(vec3<f32>(normalizedDepth, normalizedDepth, normalizedDepth), 1.0);
-//}

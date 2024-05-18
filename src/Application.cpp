@@ -37,7 +37,7 @@ extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* win
 #define SHADOW_HEIGHT 2048.0f
 
 #define SHADOW_NEAR 0.10f
-#define SHADOW_FAR 2500.0f
+#define SHADOW_FAR 300.0f
 
 struct CameraUniform {
   glm::mat4x4 projectionMatrix;
@@ -60,6 +60,7 @@ std::unique_ptr<Render> render;
 
 std::shared_ptr<PlayerCamera> Player;
 
+Model* floorCube;
 Model* sponza;
 
 std::unique_ptr<PipelineManager> pipelineManager;
@@ -178,14 +179,15 @@ void Application::OnStart() {
   render->Init(render->m_window, instance);
 
   Rain::ResourceManager::Init(std::make_shared<WGPUDevice>(render->m_device));
-  Rain::ResourceManager::LoadTexture("T_Default", RESOURCE_DIR "/wood.png");
+  Rain::ResourceManager::LoadTexture("T_Default", RESOURCE_DIR "/textures/placeholder.jpeg");
 
   shaderManager = std::make_shared<ShaderManager>(render->m_device);
 
-  shaderManager->LoadShader("SH_Default", RESOURCE_DIR "/shader_default.wgsl");
-  shaderManager->LoadShader("SH_PPFX", RESOURCE_DIR "/shader_ppfx.wgsl");
-  shaderManager->LoadShader("SH_Shadow", RESOURCE_DIR "/shadow.wgsl");
-  shaderManager->LoadShader("SH_Debug", RESOURCE_DIR "/debug.wgsl");
+  shaderManager->LoadShader("SH_Default", RESOURCE_DIR "/shaders/default.wgsl");
+  shaderManager->LoadShader("SH_DefaultBasic", RESOURCE_DIR "/shaders/default_basic.wgsl");
+  shaderManager->LoadShader("SH_PPFX", RESOURCE_DIR "/shaders/ppfx.wgsl");
+  shaderManager->LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
+  shaderManager->LoadShader("SH_Debug", RESOURCE_DIR "/shaders/debug.wgsl");
 
   pipelineManager = std::make_unique<PipelineManager>(render->m_device, shaderManager);
 
@@ -265,13 +267,11 @@ void Application::OnStart() {
                                                    render->m_surface,
                                                    render->m_adapter);
 
-  //shadowPos = glm::vec3(0, 1300, 0);
-  //shadowRot = glm::vec3(-91, 0, 0);
-	shadowPos = glm::vec3(-282, 2346, -65);
-  shadowRot = glm::vec3(-85, 28, 0);
+	shadowPos = glm::vec3(0, 250, 0);
+  shadowRot = glm::vec3(-89, 0, 0);
 
   shadowView = GetViewMatrix(shadowPos, shadowRot);
-  shadowProjection = glm::ortho(-SHADOW_WIDTH / 2, SHADOW_WIDTH / 2, -SHADOW_HEIGHT / 2, SHADOW_HEIGHT / 2,
+  shadowProjection = glm::ortho(-SHADOW_WIDTH / 20, SHADOW_WIDTH / 20, -SHADOW_HEIGHT / 20, SHADOW_HEIGHT / 20,
                                 SHADOW_NEAR,
                                 SHADOW_FAR);
 
@@ -292,7 +292,7 @@ void Application::OnStart() {
       {2, GroupLayoutVisibility::Both, GroupLayoutType::Default}};
 
   pipelineDefault = pipelineManager->CreatePipeline("RP_Default",
-                                                    "SH_Default",
+                                                    "SH_DefaultBasic",
                                                     avertexLayoutDefault,
                                                     groupLayoutDefault,
                                                     render->m_depthTextureFormat,
@@ -528,10 +528,15 @@ void Application::OnStart() {
   // Prep. Scene & Systems
   // =======================================================
 
-  sponza = new Model(RESOURCE_DIR "/sponza.obj", bglScene, render->m_device, render->m_queue, render->m_sampler);
-  //sponza = new Model(RESOURCE_DIR "/sponza.obj", bglScene, render->m_device, render->m_queue, render->m_sampler);
-	sponza->Transform.scale = glm::vec3(0.5f);
+  floorCube = new Model(RESOURCE_DIR "/models/box.gltf", bglScene, render->m_device, render->m_queue, render->m_sampler);
+	floorCube->Transform.position = glm::vec3(0, -5, 0);
+	floorCube->Transform.scale = glm::vec3(10, 0.5, 10);
+
+  sponza = new Model(RESOURCE_DIR "/models/box.gltf", bglScene, render->m_device, render->m_queue, render->m_sampler);
+	sponza->Transform.rotation = glm::vec3(-30, -30, 0);
+
   sponza->UpdateUniforms(render->m_queue);
+  floorCube->UpdateUniforms(render->m_queue);
 
   Cursor::Setup(render->m_window);
   Keyboard::Setup(render->m_window);
@@ -553,7 +558,7 @@ void Application::OnResize(int height, int width) {
 }
 
 void MoveControls() {
-  float speed = 2.0f;
+  float speed = 0.3f;
 
   if (Keyboard::IsKeyPressing(Rain::Key::W)) {
     Player->ProcessKeyboard(FORWARD, speed);
@@ -616,6 +621,7 @@ void Application::OnUpdate() {
   wgpuRenderPassEncoderSetBindGroup(shadowPassEncoder, 1, bgCameraShadow, 0, NULL);
   wgpuRenderPassEncoderSetViewport(shadowPassEncoder, 0, 0, SHADOW_WIDTH, SHADOW_HEIGHT, 0, 1);
 
+  floorCube->Draw(shadowPassEncoder, pipelineShadow);
   sponza->Draw(shadowPassEncoder, pipelineShadow);
 
   wgpuRenderPassEncoderEnd(shadowPassEncoder);
@@ -623,31 +629,31 @@ void Application::OnUpdate() {
   // Debug Pass
   // =======================================================
 
-//   WGPURenderPassColorAttachment debugColorAttachment = {};
-//   debugColorAttachment.loadOp = WGPULoadOp_Clear;
-//   debugColorAttachment.storeOp = WGPUStoreOp_Store;
-//   debugColorAttachment.clearValue = {0.0, 0.0, 0.0, 1.0};
-//   debugColorAttachment.view = debugOutTextureView;
-//  #if !__EMSCRIPTEN__
-//   debugColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
-//  #endif
-//  
-//   WGPURenderPassDescriptor debugPassDesc{.label = "debug_pass"};
-//   debugPassDesc.colorAttachmentCount = 1;
-//   debugPassDesc.timestampWrites = 0;
-//   debugPassDesc.timestampWrites = nullptr;
-//   debugPassDesc.colorAttachments = &debugColorAttachment;
-//  
-//   WGPURenderPassEncoder debugPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &debugPassDesc);
-//  
-//   wgpuRenderPassEncoderSetPipeline(debugPassEncoder, pipelineDebug);
-//   wgpuRenderPassEncoderSetVertexBuffer(debugPassEncoder, 0, vertexBufferPpfx, 0, sizeof(quadVertices));
-//   wgpuRenderPassEncoderSetIndexBuffer(debugPassEncoder, indexBufferPpfx, WGPUIndexFormat_Uint32, 0, sizeof(quadIndices));
-//   wgpuRenderPassEncoderSetBindGroup(debugPassEncoder, 0, bgDebug, 0, nullptr);
-//  
-//   wgpuRenderPassEncoderDrawIndexed(debugPassEncoder, 6, 1, 0, 0, 0);
-//  
-//   wgpuRenderPassEncoderEnd(debugPassEncoder);
+   WGPURenderPassColorAttachment debugColorAttachment = {};
+   debugColorAttachment.loadOp = WGPULoadOp_Clear;
+   debugColorAttachment.storeOp = WGPUStoreOp_Store;
+   debugColorAttachment.clearValue = {0.0, 0.0, 0.0, 1.0};
+   debugColorAttachment.view = debugOutTextureView;
+  #if !__EMSCRIPTEN__
+   debugColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+  #endif
+  
+   WGPURenderPassDescriptor debugPassDesc{.label = "debug_pass"};
+   debugPassDesc.colorAttachmentCount = 1;
+   debugPassDesc.timestampWrites = 0;
+   debugPassDesc.timestampWrites = nullptr;
+   debugPassDesc.colorAttachments = &debugColorAttachment;
+  
+   WGPURenderPassEncoder debugPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &debugPassDesc);
+  
+   wgpuRenderPassEncoderSetPipeline(debugPassEncoder, pipelineDebug);
+   wgpuRenderPassEncoderSetVertexBuffer(debugPassEncoder, 0, vertexBufferPpfx, 0, sizeof(quadVertices));
+   wgpuRenderPassEncoderSetIndexBuffer(debugPassEncoder, indexBufferPpfx, WGPUIndexFormat_Uint32, 0, sizeof(quadIndices));
+   wgpuRenderPassEncoderSetBindGroup(debugPassEncoder, 0, bgDebug, 0, nullptr);
+  
+   wgpuRenderPassEncoderDrawIndexed(debugPassEncoder, 6, 1, 0, 0, 0);
+  
+   wgpuRenderPassEncoderEnd(debugPassEncoder);
 
   // Lit Pass
   // =======================================================
@@ -685,6 +691,7 @@ void Application::OnUpdate() {
   wgpuRenderPassEncoderSetBindGroup(litPassEncoder, 1, bgCameraDefault, 0, NULL);
   wgpuRenderPassEncoderSetBindGroup(litPassEncoder, 2, bgShadowMap, 0, NULL);
 
+  floorCube->Draw(litPassEncoder, pipelineDefault);
   sponza->Draw(litPassEncoder, pipelineDefault);
 
   wgpuRenderPassEncoderEnd(litPassEncoder);
@@ -818,7 +825,7 @@ void Application::drawImgui(WGPURenderPassEncoder renderPass) {
     updateShadows = true;
   }
 
-	//ImGui::Image((ImTextureID)debugOutTextureView, ImVec2(500, 500));
+	ImGui::Image((ImTextureID)debugOutTextureView, ImVec2(500, 500));
 
   if (updateShadows) {
     shadowUniform.lightPos = shadowPos;

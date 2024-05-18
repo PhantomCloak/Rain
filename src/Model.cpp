@@ -123,7 +123,7 @@ Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLa
   }
 
   if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_SPECULAR, color)) {
-    //materialUniform.specularColor = glm::vec3(color.r, color.g, color.b);
+    materialUniform.specularColor = glm::vec3(color.r, color.g, color.b);
   }
 	materialUniform.specularColor = glm::vec3(1);
 	
