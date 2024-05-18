@@ -1,4 +1,22 @@
 #include "PipelineManager.h"
+#include <iostream>
+#include <ostream>
+
+// in WASM environment these resources passed through C++ to Browser
+// in meantime if these resources isn't in the heap it likely to cause issues related to resource pointers
+struct PipelineBundle {
+  WGPURenderPipelineDescriptor pipelineDescriptor;
+  WGPUColorTargetState colorTargetState;
+  WGPUFragmentState fragmentState;
+  WGPUBlendState blendState;
+  WGPUDepthStencilState depthStencilState;
+  std::vector<WGPUBindGroupLayout> bindGroupLayouts;
+  std::vector<WGPUBindGroupLayoutDescriptor> bindGroupLayoutDescriptors;
+  std::map<int, std::vector<WGPUBindGroupLayoutEntry>> groupLayoutEntries;
+	WGPUPipelineLayoutDescriptor pipelineLayoutDescriptor;
+  WGPUPipelineLayout pipelineLayout;
+  WGPURenderPipeline pipeline;
+};
 
 WGPUVertexBufferLayout CreateVertexBufferLayout(BufferLayout layout) {
   // TODO: Introduce clear
@@ -98,7 +116,7 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
     GroupLayout groupLayout,
     WGPUTextureFormat depthFormat,
     WGPUTextureFormat colorFormat,
-		WGPUCullMode cullingMode,
+    WGPUCullMode cullingMode,
     WGPUSurface surface,
     WGPUAdapter adapter) {
   WGPUShaderModule shader = shaderManager_->GetShader(shaderId);
@@ -111,13 +129,15 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 #endif
 
-  static std::map<std::string, WGPURenderPipelineDescriptor> pipelineDescList = {};
+  static std::map<std::string, PipelineBundle> pipelineBundle = {};
 
-  if (pipelineDescList.find(pipelineId) == pipelineDescList.end()) {
-    pipelineDescList[pipelineId] = {};
+  if (pipelineBundle.find(pipelineId) == pipelineBundle.end()) {
+    pipelineBundle[pipelineId] = {};
   }
 
-  WGPURenderPipelineDescriptor& pipelineDesc = pipelineDescList[pipelineId];
+  PipelineBundle& bundle = pipelineBundle[pipelineId];
+
+  WGPURenderPipelineDescriptor& pipelineDesc = bundle.pipelineDescriptor;
 
   pipelineDesc.label = pipelineId.c_str();
 
@@ -141,14 +161,14 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   //  - Transparency and Alpha Blending
   //  - Post-Processing Effects
 
-  WGPUFragmentState fragmentState = {};
+  WGPUFragmentState& fragmentState = bundle.fragmentState;
   fragmentState.module = shader;
   fragmentState.entryPoint = "fs_main";
   fragmentState.constantCount = 0;
   fragmentState.constants = NULL;
 
   if (colorFormat != WGPUTextureFormat_Undefined) {
-    WGPUBlendState blendState = {};
+    WGPUBlendState& blendState = bundle.blendState;
     blendState.color.srcFactor = WGPUBlendFactor_SrcAlpha;
     blendState.color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
     blendState.color.operation = WGPUBlendOperation_Add;
@@ -156,7 +176,7 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
     blendState.alpha.dstFactor = WGPUBlendFactor_One;
     blendState.alpha.operation = WGPUBlendOperation_Add;
 
-    WGPUColorTargetState colorTarget = {};
+    WGPUColorTargetState& colorTarget = bundle.colorTargetState;
     colorTarget.format = swapChainFormat;
     colorTarget.blend = &blendState;
     colorTarget.writeMask = WGPUColorWriteMask_All;
@@ -175,9 +195,10 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   // - Stencil Operations such as Shadow-Mapping
 
   if (depthFormat == WGPUTextureFormat_Undefined) {
+    std::cout << "DS EMPTY" << std::endl;
     pipelineDesc.depthStencil = nullptr;
   } else {
-    WGPUDepthStencilState depthStencilState = {};
+    WGPUDepthStencilState& depthStencilState = bundle.depthStencilState;
     depthStencilState.format = depthFormat;
     depthStencilState.stencilReadMask = 0xFFFFFFFF;
     depthStencilState.stencilWriteMask = 0xFFFFFFFF;
@@ -204,6 +225,7 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
     depthStencilState.stencilReadMask = 0xFFFFFFFF;
     depthStencilState.stencilWriteMask = 0xFFFFFFFF;
 
+    std::cout << "DS FILL FORMAT: " << depthFormat << std::endl;
     pipelineDesc.depthStencil = &depthStencilState;
   }
 
@@ -212,46 +234,42 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   pipelineDesc.multisample.alphaToCoverageEnabled = false;
 
   // Interface to it's uniforms
-  static std::map<std::string, std::map<int, std::vector<WGPUBindGroupLayoutEntry>>> groupLayouts;
+  std::map<int, std::vector<WGPUBindGroupLayoutEntry>>& groupLayouts = bundle.groupLayoutEntries;
 
-  if (groupLayouts.find(pipelineId) == groupLayouts.end()) {
-    groupLayouts[pipelineId] = ParseGroupLayout(groupLayout);
-  }
+  groupLayouts = ParseGroupLayout(groupLayout);
 
-  std::vector<WGPUBindGroupLayout> bindGroupLayouts;
+	std::vector<WGPUBindGroupLayout>& bindGroupLayouts = bundle.bindGroupLayouts;
+	bundle.bindGroupLayoutDescriptors.resize(groupLayouts.size());
 
-  for (int i = 0; i < groupLayouts[pipelineId].size(); i++) {
-    WGPUBindGroupLayoutDescriptor descriptor = {};
+  for (int i = 0; i < groupLayouts.size(); i++) {
+
+		WGPUBindGroupLayoutDescriptor& descriptor = bundle.bindGroupLayoutDescriptors[i];
+
+		descriptor = {};
     descriptor.label = std::string("bgl_" + pipelineId).c_str();
-    descriptor.entryCount = groupLayouts[pipelineId][i].size();
-    descriptor.entries = groupLayouts[pipelineId][i].data();
+    descriptor.entryCount = groupLayouts[i].size();
+    descriptor.entries = groupLayouts[i].data();
 
     WGPUBindGroupLayout bindGroupLayout = wgpuDeviceCreateBindGroupLayout(_device, &descriptor);
     bindGroupLayouts.push_back(bindGroupLayout);
   }
 
-  static std::map<std::string, WGPUPipelineLayoutDescriptor> layoutDesc;
+	WGPUPipelineLayoutDescriptor& layoutDesc = bundle.pipelineLayoutDescriptor;
 
-  if (layoutDesc.find(pipelineId) == layoutDesc.end()) {
-    layoutDesc[pipelineId] = {};
-  }
+  layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
+  layoutDesc.bindGroupLayouts = bindGroupLayouts.data();
 
-  layoutDesc[pipelineId].bindGroupLayoutCount = bindGroupLayouts.size();
-  layoutDesc[pipelineId].bindGroupLayouts = bindGroupLayouts.data();
+  WGPUPipelineLayout& pipelineLayout = bundle.pipelineLayout;
+  pipelineLayout = wgpuDeviceCreatePipelineLayout(_device, &layoutDesc);
+  pipelineDesc.layout = pipelineLayout;
 
-  static std::map<std::string, WGPUPipelineLayout> pipelineLayout;
-
-  if (pipelineLayout.find(pipelineId) == pipelineLayout.end()) {
-    pipelineLayout[pipelineId] = wgpuDeviceCreatePipelineLayout(_device, &layoutDesc[pipelineId]);
-  }
-
-  pipelineDesc.layout = pipelineLayout[pipelineId];
-
-  WGPURenderPipeline pipe =
+  std::cout << "CREAT RP" << std::endl;
+  bundle.pipeline =
       wgpuDeviceCreateRenderPipeline(_device, &pipelineDesc);
 
-  pipelines_.emplace(pipelineId, pipe);
-  return pipe;
+  pipelines_.emplace(pipelineId, bundle.pipeline);
+
+  return bundle.pipeline;
 }
 WGPURenderPipeline PipelineManager::GetPipeline(const std::string& pipelineId) {
   return pipelines_[pipelineId];

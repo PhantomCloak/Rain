@@ -9,11 +9,12 @@
 
 Render* Render::Instance = nullptr;
 
+WGPUInstanceDescriptor desc = {};
+WGPUInstance instance;
 WGPUInstance Render::CreateInstance() {
-  WGPUInstanceDescriptor desc = {};
   desc.nextInChain = nullptr;
 
-  WGPUInstance instance = wgpuCreateInstance(&desc);
+  instance = wgpuCreateInstance(&desc);
   if (!instance) {
     std::cerr << "Could not initialize WebGPU!" << std::endl;
     assert(true);
@@ -24,7 +25,7 @@ WGPUInstance Render::CreateInstance() {
 bool Render::Init(void* window, WGPUInstance instance) {
   Instance = this;
 
-  WGPURequestAdapterOptions adapterOpts{};
+  static WGPURequestAdapterOptions adapterOpts{};
   adapterOpts.compatibleSurface = m_surface;
   m_adapter = requestAdapter(instance, &adapterOpts);
 
@@ -157,7 +158,7 @@ WGPUDevice Render::requestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const
 }
 
 WGPURequiredLimits Render::GetRequiredLimits(WGPUAdapter adapter) {
-  WGPUSupportedLimits supportedLimits = {};  // Zero-initialize the struct
+  static WGPUSupportedLimits supportedLimits = {};  // Zero-initialize the struct
 
 #ifdef __EMSCRIPTEN__
                                              // Error in Chrome handling
@@ -168,23 +169,23 @@ WGPURequiredLimits Render::GetRequiredLimits(WGPUAdapter adapter) {
 #endif
 
   static WGPURequiredLimits requiredLimits = {};  // Assuming this is how the default is defined
-  requiredLimits.limits.maxVertexAttributes = 4;
-  requiredLimits.limits.maxVertexBuffers = 8;
+	requiredLimits.limits.maxVertexAttributes = supportedLimits.limits.maxVertexAttributes;
+	requiredLimits.limits.maxVertexBuffers = supportedLimits.limits.maxVertexBuffers;
   requiredLimits.limits.maxBufferSize = 150000 * sizeof(VertexAttribute);
   requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);
   requiredLimits.limits.minStorageBufferOffsetAlignment =
       supportedLimits.limits.minStorageBufferOffsetAlignment;
   requiredLimits.limits.minUniformBufferOffsetAlignment =
       supportedLimits.limits.minUniformBufferOffsetAlignment;
-  requiredLimits.limits.maxInterStageShaderComponents = 8;
-  requiredLimits.limits.maxBindGroups = 2;
-  requiredLimits.limits.maxUniformBuffersPerShaderStage = 1;
-  requiredLimits.limits.maxUniformBufferBindingSize = 32 * 4 * sizeof(float);
-  requiredLimits.limits.maxTextureDimension1D = 2048;
-  requiredLimits.limits.maxTextureDimension2D = 2048;
-  requiredLimits.limits.maxTextureArrayLayers = 1;
-  requiredLimits.limits.maxSampledTexturesPerShaderStage = 1;
-  requiredLimits.limits.maxSamplersPerShaderStage = 1;
+	requiredLimits.limits.maxInterStageShaderComponents = supportedLimits.limits.maxInterStageShaderComponents;
+	requiredLimits.limits.maxBindGroups = supportedLimits.limits.maxBindGroups;
+	requiredLimits.limits.maxUniformBuffersPerShaderStage = supportedLimits.limits.maxUniformBuffersPerShaderStage;
+  requiredLimits.limits.maxUniformBufferBindingSize = 64 * 4 * sizeof(float);
+  requiredLimits.limits.maxTextureDimension1D = 4096;
+  requiredLimits.limits.maxTextureDimension2D = 4096;
+	requiredLimits.limits.maxTextureArrayLayers = supportedLimits.limits.maxTextureArrayLayers;
+	requiredLimits.limits.maxSampledTexturesPerShaderStage = supportedLimits.limits.maxSampledTexturesPerShaderStage;;
+	requiredLimits.limits.maxSamplersPerShaderStage = supportedLimits.limits.maxSamplersPerShaderStage;
 
   return requiredLimits;
 }

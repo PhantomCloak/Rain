@@ -17,15 +17,25 @@ struct VertexAttribute {
 	float _pad4;
 };
 
-struct RenderMeshUniform {
+struct SceneUniform {
   glm::mat4x4 modelMatrix;
   glm::vec4 color;
+};
+
+struct MaterialUniform {
+  glm::vec3 ambientColor;
+	float _pad0 = 0.0;
+  glm::vec3 diffuseColor;
+	float _pad1 = 0.0;
+  glm::vec3 specularColor;
+	float shininess;
 };
 
 class Mesh : public Node {
  public:
   // mesh data
-  RenderMeshUniform uniform;
+  SceneUniform sceneUniform;
+  MaterialUniform materialUniform;
   std::vector<VertexAttribute> vertices;
   std::vector<unsigned int> indices;
 
@@ -35,6 +45,7 @@ class Mesh : public Node {
         std::vector<unsigned int> indices,
         std::shared_ptr<Texture> textureDiffuse,
         std::shared_ptr<Texture> textureHeight,
+				MaterialUniform material,
         WGPUBindGroupLayout resourceLayout,
 				WGPUDevice& device,
 				WGPUQueue& queue,
@@ -45,7 +56,8 @@ class Mesh : public Node {
 
  private:
   WGPUBindGroup defaultResourcesBindGroup;
-  WGPUBuffer uniformBuffer;
+  WGPUBuffer sceneUniformBuffer;
+  WGPUBuffer materialUniformBuffer;
   WGPUBuffer vertexBuffer;
   WGPUBuffer indexBuffer;
 };

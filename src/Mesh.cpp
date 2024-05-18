@@ -5,6 +5,7 @@ Mesh::Mesh(std::vector<VertexAttribute> vertices,
              std::vector<unsigned int> indices,
              std::shared_ptr<Texture> textureDiffuse,
 						 std::shared_ptr<Texture> textureHeight,
+						 MaterialUniform material,
              WGPUBindGroupLayout resourceLayout,
              WGPUDevice& device,
              WGPUQueue& queue,
@@ -13,27 +14,35 @@ Mesh::Mesh(std::vector<VertexAttribute> vertices,
   this->vertices = vertices;
   this->indices = indices;
   this->textureDiffuse = textureDiffuse;
+	this->materialUniform = material;
 
-  uniform = {};
+  sceneUniform = {};
   if (Parent != nullptr) {
-    uniform.modelMatrix = Parent->GetModelMatrix() * GetModelMatrix();
+    sceneUniform.modelMatrix = Parent->GetModelMatrix() * GetModelMatrix();
   } else {
-    uniform.modelMatrix = GetModelMatrix();
+    sceneUniform.modelMatrix = GetModelMatrix();
   }
 
-  static WGPUBufferDescriptor uniformBufferDesc = {};
-  uniformBufferDesc.size = sizeof(RenderMeshUniform);
-  uniformBufferDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
-  uniformBufferDesc.mappedAtCreation = false;
+  WGPUBufferDescriptor sceneUniformDesc = {};
+  sceneUniformDesc.size = sizeof(SceneUniform);
+  sceneUniformDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
+  sceneUniformDesc.mappedAtCreation = false;
 
-  uniformBuffer = wgpuDeviceCreateBuffer(device, &uniformBufferDesc);
+  sceneUniformBuffer = wgpuDeviceCreateBuffer(device, &sceneUniformDesc);
 
-  static std::vector<WGPUBindGroupEntry> bindingsOne(4);
+  WGPUBufferDescriptor materialUniformDesc = {};
+  materialUniformDesc.size = sizeof(MaterialUniform);
+  materialUniformDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
+  materialUniformDesc.mappedAtCreation = false;
+
+  materialUniformBuffer = wgpuDeviceCreateBuffer(device, &materialUniformDesc);
+
+  static std::vector<WGPUBindGroupEntry> bindingsOne(5);
 
   bindingsOne[0].binding = 0;
-  bindingsOne[0].buffer = uniformBuffer;
+  bindingsOne[0].buffer = sceneUniformBuffer;
   bindingsOne[0].offset = 0;
-  bindingsOne[0].size = sizeof(RenderMeshUniform);
+  bindingsOne[0].size = sizeof(SceneUniform);
 
   bindingsOne[1].binding = 1;
   bindingsOne[1].offset = 0;
@@ -46,6 +55,11 @@ Mesh::Mesh(std::vector<VertexAttribute> vertices,
   bindingsOne[3].binding = 3;
   bindingsOne[3].offset = 0;
   bindingsOne[3].textureView = textureHeight->View;
+
+  bindingsOne[4].binding = 4;
+  bindingsOne[4].buffer = materialUniformBuffer;
+  bindingsOne[4].offset = 0;
+  bindingsOne[4].size = sizeof(MaterialUniform);
 
 	WGPUBindGroupDescriptor bindGroupOneDesc = { .label = "bg_mesh"};
   bindGroupOneDesc.layout = resourceLayout;
@@ -70,7 +84,8 @@ Mesh::Mesh(std::vector<VertexAttribute> vertices,
 
   wgpuQueueWriteBuffer(queue, vertexBuffer, 0, vertices.data(), vertexBufferDesc.size);
   wgpuQueueWriteBuffer(queue, indexBuffer, 0, indices.data(), indexBufferDesc.size);
-  wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(RenderMeshUniform));
+  wgpuQueueWriteBuffer(queue, sceneUniformBuffer, 0, &sceneUniform, sizeof(SceneUniform));
+  wgpuQueueWriteBuffer(queue, materialUniformBuffer, 0, &materialUniform, sizeof(MaterialUniform));
 }
 
 void Mesh::Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline) {
@@ -86,9 +101,9 @@ void Mesh::Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline)
 
 void Mesh::UpdateUniforms(WGPUQueue& queue) {
   if (Parent != nullptr) {
-    uniform.modelMatrix = Parent->GetModelMatrix() * GetModelMatrix();
+    sceneUniform.modelMatrix = Parent->GetModelMatrix() * GetModelMatrix();
   } else {
-    uniform.modelMatrix = GetModelMatrix();
+    sceneUniform.modelMatrix = GetModelMatrix();
   }
-  wgpuQueueWriteBuffer(queue, uniformBuffer, 0, &uniform, sizeof(RenderMeshUniform));
+  wgpuQueueWriteBuffer(queue, sceneUniformBuffer, 0, &sceneUniform, sizeof(SceneUniform));
 }

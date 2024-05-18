@@ -2,20 +2,34 @@
 #include <iostream>
 #include "io/filesystem.h"
 
+struct ShaderBundle {
+  WGPUShaderModuleWGSLDescriptor shaderDescriptor;
+	WGPUShaderModuleDescriptor shaderModuleDescriptor;
+  WGPUShaderModule shaderModule;
+};
+
 void ShaderManager::LoadShader(const std::string& shaderId,
                                const std::string& shaderPath) {
+  static std::map<std::string, ShaderBundle> shaderBundles;
+
+  if (shaderBundles.find(shaderId) == shaderBundles.end()) {
+    shaderBundles[shaderId] = {};
+  }
+
+  ShaderBundle& bundle = shaderBundles[shaderId];
+
   std::string srcShader = FileSys::ReadFile(shaderPath);
 
-  WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
+  WGPUShaderModuleWGSLDescriptor& shaderCodeDesc = bundle.shaderDescriptor;
   shaderCodeDesc.chain.next = nullptr;
   shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
   shaderCodeDesc.code = srcShader.c_str();
 
-  WGPUShaderModuleDescriptor shaderDesc;
+	WGPUShaderModuleDescriptor& shaderDesc = bundle.shaderModuleDescriptor;
   shaderDesc.nextInChain = &shaderCodeDesc.chain;
 
-  WGPUShaderModule module = wgpuDeviceCreateShaderModule(_device, &shaderDesc);
-  _shaders.emplace(shaderId, module);
+  bundle.shaderModule = wgpuDeviceCreateShaderModule(_device, &shaderDesc);
+  _shaders.emplace(shaderId, bundle.shaderModule);
 };
 
 WGPUShaderModule ShaderManager::GetShader(const std::string& shaderId) {
