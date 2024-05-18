@@ -102,8 +102,6 @@ glm::mat4 defaultView;
 glm::mat4 shadowProjection;
 glm::mat4 shadowView;
 
-bool updateShadow = true;
-
 glm::mat4 GetViewMatrix(glm::vec3 pos, glm::vec3 rot) {
   glm::vec3 shadowCameraPos = pos;
   glm::vec3 shadowCameraRot = rot;
@@ -123,16 +121,6 @@ glm::mat4 GetViewMatrix(glm::vec3 pos, glm::vec3 rot) {
   glm::vec3 up = glm::rotate(glm::mat4(1.0f), glm::radians(roll), right) * glm::vec4(worldUp, 1.0);
 
   return glm::lookAt(shadowCameraPos, shadowCameraPos + Front, up);
-}
-
-void UpdateShadowBuffer() {
-  shadowUniform.lightPos = shadowPos;
-  shadowUniform.lightView = GetViewMatrix(shadowPos, shadowRot);
-
-  shadowCameraUniform.viewMatrix = shadowUniform.lightView;
-
-  wgpuQueueWriteBuffer(render->m_queue, shadowUniformBuffer, 0, &shadowUniform, sizeof(ShadowUniform));
-  wgpuQueueWriteBuffer(render->m_queue, shadowCameraUniformBuffer, 0, &shadowUniform, sizeof(CameraUniform));
 }
 
 void ppfxCreateBindings(int width, int height) {
@@ -206,51 +194,52 @@ void Application::OnStart() {
 
   // Shared
   // =======================================================
-  static std::vector<WGPUVertexAttribute> vertexAttribsScene(4);
+	static std::vector<WGPUVertexAttribute> vertexAttribsScene(4);
 
-  vertexAttribsScene[0] = {};
-  vertexAttribsScene[0].shaderLocation = 0;
-  vertexAttribsScene[0].offset = 0;
-  vertexAttribsScene[0].format = WGPUVertexFormat_Float32x3;
+	vertexAttribsScene[0] = {};
+	vertexAttribsScene[0].shaderLocation = 0;
+	vertexAttribsScene[0].offset = 0;
+	vertexAttribsScene[0].format = WGPUVertexFormat_Float32x3;
 
-  vertexAttribsScene[1] = {};
-  vertexAttribsScene[1].shaderLocation = 1;
-  vertexAttribsScene[1].offset = 16;
-  vertexAttribsScene[1].format = WGPUVertexFormat_Float32x3;
+	vertexAttribsScene[1] = {};
+	vertexAttribsScene[1].shaderLocation = 1;
+	vertexAttribsScene[1].offset = 16;
+	vertexAttribsScene[1].format = WGPUVertexFormat_Float32x3;
 
-  vertexAttribsScene[2] = {};
-  vertexAttribsScene[2].shaderLocation = 2;
-  vertexAttribsScene[2].offset = 32;
-  vertexAttribsScene[2].format = WGPUVertexFormat_Float32x2;
+	vertexAttribsScene[2] = {};
+	vertexAttribsScene[2].shaderLocation = 2;
+	vertexAttribsScene[2].offset = 32;
+	vertexAttribsScene[2].format = WGPUVertexFormat_Float32x2;
 
-  vertexAttribsScene[3] = {};
-  vertexAttribsScene[3].shaderLocation = 3;
-  vertexAttribsScene[3].offset = 48;
-  vertexAttribsScene[3].format = WGPUVertexFormat_Float32x3;
+	vertexAttribsScene[3] = {};
+	vertexAttribsScene[3].shaderLocation = 3;
+	vertexAttribsScene[3].offset = 48;
+	vertexAttribsScene[3].format = WGPUVertexFormat_Float32x3;
 
   WGPUVertexBufferLayout avertexLayoutDefault = {};
-  avertexLayoutDefault.attributeCount = vertexAttribsScene.size();
+	avertexLayoutDefault.attributeCount = vertexAttribsScene.size();
   avertexLayoutDefault.attributes = vertexAttribsScene.data();
   avertexLayoutDefault.arrayStride = 64;
   avertexLayoutDefault.stepMode = WGPUVertexStepMode_Vertex;
 
-  static std::vector<WGPUVertexAttribute> vertexAttribsQuad(3);
+	static std::vector<WGPUVertexAttribute> vertexAttribsQuad(3);
 
-  vertexAttribsQuad[0] = {};
-  vertexAttribsQuad[0].shaderLocation = 0;
-  vertexAttribsQuad[0].offset = 0;
-  vertexAttribsQuad[0].format = WGPUVertexFormat_Float32x3;
+	vertexAttribsQuad[0] = {};
+	vertexAttribsQuad[0].shaderLocation = 0;
+	vertexAttribsQuad[0].offset = 0;
+	vertexAttribsQuad[0].format = WGPUVertexFormat_Float32x3;
 
-  vertexAttribsQuad[1] = {};
-  vertexAttribsQuad[1].shaderLocation = 1;
-  vertexAttribsQuad[1].offset = 16;
-  vertexAttribsQuad[1].format = WGPUVertexFormat_Float32x3;
+	vertexAttribsQuad[1] = {};
+	vertexAttribsQuad[1].shaderLocation = 1;
+	vertexAttribsQuad[1].offset = 16;
+	vertexAttribsQuad[1].format = WGPUVertexFormat_Float32x3;
 
   WGPUVertexBufferLayout vertexLayoutQuad = {};
   vertexLayoutQuad.attributeCount = 2;
   vertexLayoutQuad.attributes = vertexAttribsQuad.data();
   vertexLayoutQuad.arrayStride = 32;
   vertexLayoutQuad.stepMode = WGPUVertexStepMode_Vertex;
+
 
   // Prep. Shadow Resources
   // =======================================================
@@ -272,13 +261,13 @@ void Application::OnStart() {
                                                    groupLayoutShadow,
                                                    render->m_depthTextureFormat,
                                                    WGPUTextureFormat_Undefined,
-                                                   WGPUCullMode_Back,
+																									 WGPUCullMode_Back,
                                                    render->m_surface,
                                                    render->m_adapter);
 
-  // shadowPos = glm::vec3(0, 1300, 0);
-  // shadowRot = glm::vec3(-91, 0, 0);
-  shadowPos = glm::vec3(-282, 2346, -65);
+  //shadowPos = glm::vec3(0, 1300, 0);
+  //shadowRot = glm::vec3(-91, 0, 0);
+	shadowPos = glm::vec3(-282, 2346, -65);
   shadowRot = glm::vec3(-85, 28, 0);
 
   shadowView = GetViewMatrix(shadowPos, shadowRot);
@@ -308,7 +297,7 @@ void Application::OnStart() {
                                                     groupLayoutDefault,
                                                     render->m_depthTextureFormat,
                                                     render->m_swapChainFormat,
-                                                    WGPUCullMode_None,
+																										WGPUCullMode_None,
                                                     render->m_surface,
                                                     render->m_adapter);
 
@@ -418,7 +407,7 @@ void Application::OnStart() {
                                                   groupLayoutDebug,
                                                   WGPUTextureFormat_Undefined,
                                                   render->m_swapChainFormat,
-                                                  WGPUCullMode_None,
+																									WGPUCullMode_None,
                                                   render->m_surface,
                                                   render->m_adapter);
 
@@ -458,7 +447,7 @@ void Application::OnStart() {
                                                     groupLayoutPpfx,
                                                     render->m_depthTextureFormat,
                                                     render->m_swapChainFormat,
-                                                    WGPUCullMode_None,
+																										WGPUCullMode_None,
                                                     render->m_surface,
                                                     render->m_adapter);
 
@@ -540,8 +529,8 @@ void Application::OnStart() {
   // =======================================================
 
   sponza = new Model(RESOURCE_DIR "/sponza.obj", bglScene, render->m_device, render->m_queue, render->m_sampler);
-  // sponza = new Model(RESOURCE_DIR "/sponza.obj", bglScene, render->m_device, render->m_queue, render->m_sampler);
-  sponza->Transform.scale = glm::vec3(0.5f);
+  //sponza = new Model(RESOURCE_DIR "/sponza.obj", bglScene, render->m_device, render->m_queue, render->m_sampler);
+	sponza->Transform.scale = glm::vec3(0.5f);
   sponza->UpdateUniforms(render->m_queue);
 
   Cursor::Setup(render->m_window);
@@ -590,10 +579,6 @@ void Application::OnUpdate() {
   glfwPollEvents();
   MoveControls();
 
-  if (updateShadow) {
-		UpdateShadowBuffer();
-  }
-
   render->nextTexture = wgpuSwapChainGetCurrentTextureView(render->m_swapChain);
 
   if (!render->nextTexture) {
@@ -607,64 +592,62 @@ void Application::OnUpdate() {
   // Shadow Pass
   // =======================================================
 
-  if (updateShadow) {
-    WGPURenderPassDepthStencilAttachment shadowDepthAttachment;
-    shadowDepthAttachment.view = shadowDepthView;
-    shadowDepthAttachment.depthClearValue = 1.0f;
-    shadowDepthAttachment.depthLoadOp = WGPULoadOp_Clear;
-    shadowDepthAttachment.depthStoreOp = WGPUStoreOp_Store;
-    shadowDepthAttachment.depthReadOnly = false;
-    shadowDepthAttachment.stencilClearValue = 0;
-    shadowDepthAttachment.stencilLoadOp = WGPULoadOp_Undefined;
-    shadowDepthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
-    shadowDepthAttachment.stencilReadOnly = true;
+  WGPURenderPassDepthStencilAttachment shadowDepthAttachment;
+  shadowDepthAttachment.view = shadowDepthView;
+  shadowDepthAttachment.depthClearValue = 1.0f;
+  shadowDepthAttachment.depthLoadOp = WGPULoadOp_Clear;
+  shadowDepthAttachment.depthStoreOp = WGPUStoreOp_Store;
+  shadowDepthAttachment.depthReadOnly = false;
+  shadowDepthAttachment.stencilClearValue = 0;
+  shadowDepthAttachment.stencilLoadOp = WGPULoadOp_Undefined;
+  shadowDepthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
+  shadowDepthAttachment.stencilReadOnly = true;
 
-    WGPURenderPassDescriptor shadowPassDesc{.label = "shadow_pass"};
-    shadowPassDesc.timestampWrites = 0;
-    shadowPassDesc.timestampWrites = nullptr;
-    shadowPassDesc.colorAttachments = nullptr;
+  WGPURenderPassDescriptor shadowPassDesc{.label = "shadow_pass"};
+  shadowPassDesc.timestampWrites = 0;
+  shadowPassDesc.timestampWrites = nullptr;
+  shadowPassDesc.colorAttachments = nullptr;
 
-    shadowPassDesc.colorAttachmentCount = 0;
-    shadowPassDesc.depthStencilAttachment = &shadowDepthAttachment;
+  shadowPassDesc.colorAttachmentCount = 0;
+  shadowPassDesc.depthStencilAttachment = &shadowDepthAttachment;
 
-    WGPURenderPassEncoder shadowPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &shadowPassDesc);
+  WGPURenderPassEncoder shadowPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &shadowPassDesc);
 
-    wgpuRenderPassEncoderSetBindGroup(shadowPassEncoder, 1, bgCameraShadow, 0, NULL);
-    wgpuRenderPassEncoderSetViewport(shadowPassEncoder, 0, 0, SHADOW_WIDTH, SHADOW_HEIGHT, 0, 1);
+  wgpuRenderPassEncoderSetBindGroup(shadowPassEncoder, 1, bgCameraShadow, 0, NULL);
+  wgpuRenderPassEncoderSetViewport(shadowPassEncoder, 0, 0, SHADOW_WIDTH, SHADOW_HEIGHT, 0, 1);
 
-    sponza->Draw(shadowPassEncoder, pipelineShadow);
+  sponza->Draw(shadowPassEncoder, pipelineShadow);
 
-    wgpuRenderPassEncoderEnd(shadowPassEncoder);
-  }
+  wgpuRenderPassEncoderEnd(shadowPassEncoder);
 
   // Debug Pass
   // =======================================================
 
-  //   WGPURenderPassColorAttachment debugColorAttachment = {};
-  //   debugColorAttachment.loadOp = WGPULoadOp_Clear;
-  //   debugColorAttachment.storeOp = WGPUStoreOp_Store;
-  //   debugColorAttachment.clearValue = {0.0, 0.0, 0.0, 1.0};
-  //   debugColorAttachment.view = debugOutTextureView;
-  //  #if !__EMSCRIPTEN__
-  //   debugColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
-  //  #endif
-  //
-  //   WGPURenderPassDescriptor debugPassDesc{.label = "debug_pass"};
-  //   debugPassDesc.colorAttachmentCount = 1;
-  //   debugPassDesc.timestampWrites = 0;
-  //   debugPassDesc.timestampWrites = nullptr;
-  //   debugPassDesc.colorAttachments = &debugColorAttachment;
-  //
-  //   WGPURenderPassEncoder debugPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &debugPassDesc);
-  //
-  //   wgpuRenderPassEncoderSetPipeline(debugPassEncoder, pipelineDebug);
-  //   wgpuRenderPassEncoderSetVertexBuffer(debugPassEncoder, 0, vertexBufferPpfx, 0, sizeof(quadVertices));
-  //   wgpuRenderPassEncoderSetIndexBuffer(debugPassEncoder, indexBufferPpfx, WGPUIndexFormat_Uint32, 0, sizeof(quadIndices));
-  //   wgpuRenderPassEncoderSetBindGroup(debugPassEncoder, 0, bgDebug, 0, nullptr);
-  //
-  //   wgpuRenderPassEncoderDrawIndexed(debugPassEncoder, 6, 1, 0, 0, 0);
-  //
-  //   wgpuRenderPassEncoderEnd(debugPassEncoder);
+//   WGPURenderPassColorAttachment debugColorAttachment = {};
+//   debugColorAttachment.loadOp = WGPULoadOp_Clear;
+//   debugColorAttachment.storeOp = WGPUStoreOp_Store;
+//   debugColorAttachment.clearValue = {0.0, 0.0, 0.0, 1.0};
+//   debugColorAttachment.view = debugOutTextureView;
+//  #if !__EMSCRIPTEN__
+//   debugColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+//  #endif
+//  
+//   WGPURenderPassDescriptor debugPassDesc{.label = "debug_pass"};
+//   debugPassDesc.colorAttachmentCount = 1;
+//   debugPassDesc.timestampWrites = 0;
+//   debugPassDesc.timestampWrites = nullptr;
+//   debugPassDesc.colorAttachments = &debugColorAttachment;
+//  
+//   WGPURenderPassEncoder debugPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &debugPassDesc);
+//  
+//   wgpuRenderPassEncoderSetPipeline(debugPassEncoder, pipelineDebug);
+//   wgpuRenderPassEncoderSetVertexBuffer(debugPassEncoder, 0, vertexBufferPpfx, 0, sizeof(quadVertices));
+//   wgpuRenderPassEncoderSetIndexBuffer(debugPassEncoder, indexBufferPpfx, WGPUIndexFormat_Uint32, 0, sizeof(quadIndices));
+//   wgpuRenderPassEncoderSetBindGroup(debugPassEncoder, 0, bgDebug, 0, nullptr);
+//  
+//   wgpuRenderPassEncoderDrawIndexed(debugPassEncoder, 6, 1, 0, 0, 0);
+//  
+//   wgpuRenderPassEncoderEnd(debugPassEncoder);
 
   // Lit Pass
   // =======================================================
@@ -733,12 +716,6 @@ void Application::OnUpdate() {
   wgpuRenderPassEncoderSetBindGroup(ppfxPassEncoder, 0, bg_bgPpfx, 0, nullptr);
 
   wgpuRenderPassEncoderDrawIndexed(ppfxPassEncoder, 6, 1, 0, 0, 0);
-
-  if (updateShadow) {
-		updateShadow = false;
-  }
-
-
   drawImgui(ppfxPassEncoder);
 
   wgpuRenderPassEncoderEnd(ppfxPassEncoder);
@@ -752,6 +729,7 @@ void Application::OnUpdate() {
   WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(render->encoder, &cmdBufferDescriptor);
 
   wgpuQueueSubmit(render->m_queue, 1, &commandBuffer);
+
 #ifndef __EMSCRIPTEN__
   wgpuSwapChainPresent(render->m_swapChain);
 #endif
@@ -816,30 +794,41 @@ void Application::drawImgui(WGPURenderPassEncoder renderPass) {
 
   ImGuiIO& io = ImGui::GetIO();
   ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+  bool updateShadows = false;
 
   if (ImGui::InputFloat(_labelPrefix("Light Pos X").c_str(), &shadowPos.x, 1.0f)) {
-    updateShadow = true;
+    updateShadows = true;
   }
   if (ImGui::InputFloat(_labelPrefix("Light Pos Y: ").c_str(), &shadowPos.y, 1.0f)) {
-    updateShadow = true;
+    updateShadows = true;
   }
   if (ImGui::InputFloat(_labelPrefix("Light Pos Z").c_str(), &shadowPos.z, 1.0f)) {
-    updateShadow = true;
+    updateShadows = true;
   }
 
   ImGui::Spacing();
 
   if (ImGui::InputFloat(_labelPrefix("Shadow Rot X").c_str(), &shadowRot.x, 0.5f)) {
-    updateShadow = true;
+    updateShadows = true;
   }
   if (ImGui::InputFloat(_labelPrefix("Shadow Rot Y").c_str(), &shadowRot.y, 0.5f)) {
-    updateShadow = true;
+    updateShadows = true;
   }
   if (ImGui::InputFloat(_labelPrefix("Shadow Rot Z").c_str(), &shadowRot.z, 0.5f)) {
-    updateShadow = true;
+    updateShadows = true;
   }
 
-  //ImGui::Image((ImTextureID)debugOutTextureView, ImVec2(500, 500));
+	//ImGui::Image((ImTextureID)debugOutTextureView, ImVec2(500, 500));
+
+  if (updateShadows) {
+    shadowUniform.lightPos = shadowPos;
+
+    shadowUniform.lightView = GetViewMatrix(shadowPos, shadowRot);
+    shadowCameraUniform.viewMatrix = shadowUniform.lightView;
+
+    wgpuQueueWriteBuffer(render->m_queue, shadowUniformBuffer, 0, &shadowUniform, sizeof(ShadowUniform));
+    wgpuQueueWriteBuffer(render->m_queue, shadowCameraUniformBuffer, 0, &shadowUniform, sizeof(CameraUniform));
+  }
 
   ImGui::End();
 
