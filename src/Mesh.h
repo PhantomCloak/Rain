@@ -27,12 +27,18 @@ struct MaterialUniform {
 	float _pad1 = 0.0;
   glm::vec3 specularColor;
 	float shininess;
+
+	MaterialUniform() {
+		ambientColor = glm::vec3(0);
+		diffuseColor = glm::vec3(0);
+		specularColor = glm::vec3(0);
+		shininess = -1;
+	}
 };
 
-class Mesh : public Node {
+class Mesh {
  public:
   // mesh data
-  SceneUniform sceneUniform;
   MaterialUniform materialUniform;
   std::vector<VertexAttribute> vertices;
   std::vector<unsigned int> indices;
@@ -44,17 +50,13 @@ class Mesh : public Node {
         std::shared_ptr<Texture> textureDiffuse,
         std::shared_ptr<Texture> textureHeight,
 				MaterialUniform material,
-        WGPUBindGroupLayout resourceLayout,
-				WGPUDevice& device,
-				WGPUQueue& queue,
 				WGPUSampler& sampler);
 
   void Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline);
 	void UpdateUniforms(WGPUQueue& queue);
 
  private:
-  WGPUBindGroup defaultResourcesBindGroup;
-  WGPUBuffer sceneUniformBuffer;
+  WGPUBindGroup bgMaterial;
   WGPUBuffer materialUniformBuffer;
   WGPUBuffer vertexBuffer;
   WGPUBuffer indexBuffer;

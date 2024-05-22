@@ -37,6 +37,7 @@ struct ShadowUniform {
 };
 
 @group(0) @binding(0) var<uniform> uScene: SceneUniform;
+
 @group(0) @binding(1) var gradientTexture: texture_2d<f32>;
 @group(0) @binding(2) var textureSampler: sampler;
 @group(0) @binding(3) var heightTexture: texture_2d<f32>;

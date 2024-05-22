@@ -36,6 +36,7 @@ bool Render::Init(void* window, WGPUInstance instance) {
 #if __EMSCRIPTEN__
   deviceDesc.requiredFeaturesCount = 0;
 #else
+  //deviceDesc.requiredFeaturesCount = 0;
   deviceDesc.requiredFeatureCount = 0;
 #endif
   deviceDesc.requiredLimits = &requiredLimits;

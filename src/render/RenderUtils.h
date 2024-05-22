@@ -3,20 +3,8 @@
 #include <cstdint>
 #include <string>
 #include <set>
-
-enum class GroupLayoutVisibility {
-  Vertex,
-  Fragment,
-  Both
-};
-
-enum class GroupLayoutType {
-  Default,
-  Sampler,
-  SamplerCompare,
-  Texture,
-	TextureDepth
-};
+#include <webgpu/webgpu.h>
+#include <map>
 
 enum class ShaderDataType {
   None = 0,
@@ -109,18 +97,6 @@ struct BufferElement {
   }
 };
 
-struct LayoutElement {
-  int Binding;
-  GroupLayoutVisibility Visiblity;
-  GroupLayoutType Type;
-
-  LayoutElement() = default;
-
-  LayoutElement(int binding, GroupLayoutVisibility visibility, GroupLayoutType type = GroupLayoutType::Default)
-      : Binding(binding), Visiblity(visibility), Type(type) {
-  }
-};
-
 class BufferLayout {
  public:
   BufferLayout() {
@@ -172,6 +148,32 @@ class BufferLayout {
   uint32_t m_Stride = 0;
 };
 
+enum class GroupLayoutVisibility {
+  Vertex,
+  Fragment,
+  Both
+};
+
+enum class GroupLayoutType {
+  Uniform,
+  Sampler,
+  SamplerCompare,
+  Texture,
+	TextureDepth
+};
+
+struct LayoutElement {
+  int Binding;
+  GroupLayoutVisibility Visiblity;
+  GroupLayoutType Type;
+
+  LayoutElement() = default;
+
+  LayoutElement(int binding, GroupLayoutVisibility visibility, GroupLayoutType type = GroupLayoutType::Uniform)
+      : Binding(binding), Visiblity(visibility), Type(type) {
+  }
+};
+
 class GroupLayout {
  public:
   GroupLayout() {
@@ -220,4 +222,10 @@ class GroupLayout {
   std::vector<LayoutElement> m_Elements;
 };
 
-
+class LayoutUtils {
+	public:
+	static void SetVisibility(WGPUBindGroupLayoutEntry& entry, GroupLayoutVisibility visibility);
+	static void SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type);
+	static std::vector<WGPUBindGroupLayoutEntry> ParseGroupLayout(GroupLayout layout);
+	static WGPUBindGroupLayout CreateBindGroup(std::string label, WGPUDevice device, GroupLayout layout);
+};

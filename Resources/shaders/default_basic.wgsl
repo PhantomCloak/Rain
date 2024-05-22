@@ -27,7 +27,7 @@ struct MaterialUniform {
     ambientColor: vec3f,
     diffuseColor: vec3f,
     specularColor: vec3f,
-		shininess: f32
+	shininess: f32
 };
 
 struct ShadowUniform {
@@ -37,15 +37,15 @@ struct ShadowUniform {
 };
 
 @group(0) @binding(0) var<uniform> uScene: SceneUniform;
-@group(0) @binding(1) var gradientTexture: texture_2d<f32>;
-@group(0) @binding(2) var textureSampler: sampler;
-@group(0) @binding(4) var<uniform> uMaterial: MaterialUniform;
-
 @group(1) @binding(0) var<uniform> uCam: Camera;
 
-@group(2) @binding(0) var shadowMap: texture_depth_2d;
-@group(2) @binding(1) var shadowSampler: sampler_comparison;
-@group(2) @binding(2) var<uniform> shadowUniform: ShadowUniform;
+@group(2) @binding(0) var gradientTexture: texture_2d<f32>;
+@group(2) @binding(1) var textureSampler: sampler;
+@group(2) @binding(2) var<uniform> uMaterial: MaterialUniform;
+
+@group(3) @binding(0) var shadowMap: texture_depth_2d;
+@group(3) @binding(1) var shadowSampler: sampler_comparison;
+@group(3) @binding(2) var<uniform> shadowUniform: ShadowUniform;
 
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
@@ -65,51 +65,55 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 }
 
 fn ShadowCalculation(
-    fragPosLightSpace: vec4<f32>,
-    normal: vec3<f32>,
-    lightDir: vec3<f32>
-) -> f32 {
-    var projCoords: vec3<f32> = fragPosLightSpace.xyz;
-    projCoords = vec3(projCoords.xy * vec2(0.5, -0.5) + vec2(0.5), projCoords.z);
+		fragPosLightSpace: vec4<f32>,
+		normal: vec3<f32>,
+		lightDir: vec3<f32>
+		) -> f32 {
+	var projCoords: vec3<f32> = fragPosLightSpace.xyz;
+	projCoords = vec3(projCoords.xy * vec2(0.5, -0.5) + vec2(0.5), projCoords.z);
 
-    let currentDepth: f32 = projCoords.z;
-    let bias: f32 = max(0.005 * (1.0 - dot(normal, lightDir)), 0.001);
+	let currentDepth: f32 = projCoords.z;
+	let bias: f32 = max(0.009 * (1.0 - dot(normal, lightDir)), 0.0005);
 
-    var shadow: f32 = 0.0;
+	var visibility = 0.0;
+	let oneOverShadowDepthTextureSize = 1.0 / 4096;
+	for (var y = -1; y <= 1; y++) {
+		for (var x = -1; x <= 1; x++) {
+			let offset = vec2f(vec2(x, y)) * oneOverShadowDepthTextureSize;
+			visibility += textureSampleCompare(
+					shadowMap, shadowSampler,
+					projCoords.xy + offset, currentDepth - bias
+					);
+		}
+	}
+	visibility /= 9.0;
 
-    let texelSize: vec2<f32> = vec2(1.0 / 2048.0);
-    const halfKernelWidth: i32 = 1;
-
-    for (var x: i32 = -halfKernelWidth; x <= halfKernelWidth; x++) {
-        for (var y: i32 = -halfKernelWidth; y <= halfKernelWidth; y++) {
-            let sampleCoords: vec2<f32> = projCoords.xy + vec2<f32>(f32(x), f32(y)) * texelSize;
-            let pcfDepth: f32 = textureSampleCompare(shadowMap, shadowSampler, sampleCoords, currentDepth - bias);
-            shadow += pcfDepth;
-        }
-    }
-    shadow /= f32((halfKernelWidth * 2 + 1) * (halfKernelWidth * 2 + 1));
-
-    return shadow;
+	return visibility;
 }
-
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	let textureColor = textureSample(gradientTexture, textureSampler, in.uv).rgba;
 	var ambient = vec3f(0.1);
+	//var ambient = uMaterial.ambientColor;
 
 	// Diffuse
 	let norm = normalize(in.Normal);
 	let lightDir = normalize(in.LightPos - in.FragPos);
-	var diffuse = vec3f(max(dot(norm, lightDir), 0.0));
+	var diffuse = vec3f(max(dot(norm, lightDir), 0.0)) * uMaterial.diffuseColor;
 
 	// Specular
 	let viewDir = normalize(-in.FragPos);
 	let halfwayDir = normalize(lightDir + viewDir);
-	var specular = vec3f(pow(max(dot(norm, halfwayDir), 0.0), 64));
+	var specular = vec3f(pow(max(dot(norm, halfwayDir), 0.0), uMaterial.shininess));
 
 	var shadow = ShadowCalculation(in.FragPosLightSpace, norm, lightDir);
-	let finalColor = (ambient + (shadow)  * (diffuse + specular)) * textureColor.rgb;
+	shadow = shadow * 0.8 + 0.2;
 
+	let shadowedAmbient = shadow * ambient;
+	let shadowedDiffuse = shadow * diffuse;
+	let shadowedSpecular = shadow * specular;
+
+	let finalColor = (ambient + shadowedDiffuse + shadowedSpecular) * textureColor.rgb;
 	return vec4f(finalColor, 1.0);
 }

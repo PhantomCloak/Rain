@@ -13,18 +13,18 @@ struct Camera {
     viewMatrix: mat4x4f,
 };
 
-struct MyUniforms {
+struct SceneUniform {
     modelMatrix: mat4x4f,
     color: vec4f,
 };
 
-@group(0) @binding(0) var<uniform> uMyUniforms: MyUniforms;
+@group(0) @binding(0) var<uniform> uSceneUniform: SceneUniform;
 @group(1) @binding(0) var<uniform> uCam: Camera;
 
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
 	var out: VertexOutput;
-	out.position = uCam.projectionMatrix * uCam.viewMatrix * uMyUniforms.modelMatrix * vec4f(in.position, 1.0);
+	out.position = uCam.projectionMatrix * uCam.viewMatrix * uSceneUniform.modelMatrix * vec4f(in.position, 1.0);
 	return out;
 }
 

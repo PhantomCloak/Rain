@@ -39,6 +39,7 @@ class Render {
   WGPURenderPassEncoder renderPass;
   WGPUCommandEncoder encoder;
   WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_Undefined;
-  WGPUTextureFormat m_depthTextureFormat = WGPUTextureFormat_Depth32Float;
+  WGPUTextureFormat m_depthTextureFormat = WGPUTextureFormat_Depth24Plus;
+
   WGPUSwapChainDescriptor m_swapChainDesc;
 };

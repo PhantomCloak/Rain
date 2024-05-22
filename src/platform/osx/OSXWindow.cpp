@@ -4,7 +4,7 @@
 #include "core/Log.h"
 
 static void GLFWErrorCallback(int error, const char* description) {
-  RN_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
+  //RN_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
 }
 
 Rain::OSXWindow::~OSXWindow() {
@@ -12,11 +12,11 @@ Rain::OSXWindow::~OSXWindow() {
 }
 
 void Rain::OSXWindow::Init(const WindowProps& props) {
-  Rain::Log::Init();
-  RN_CORE_INFO("Creating window {0} ({1}, {2})", props.Title, props.Width, props.Height);
+  //Rain::Log::Init();
+  //RN_CORE_INFO("Creating window {0} ({1}, {2})", props.Title, props.Width, props.Height);
 
   bool success = glfwInit();
-  RN_CORE_ASSERT(success, "Could not initialize GLFW!");
+  //RN_CORE_ASSERT(success, "Could not initialize GLFW!");
 
   glfwSetErrorCallback(GLFWErrorCallback);
 

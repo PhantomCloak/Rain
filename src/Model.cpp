@@ -4,6 +4,8 @@
 #include "core/Assert.h"
 #include "core/Log.h"
 #include "io/filesystem.h"
+#include "render/Render.h"
+#include "render/RenderUtils.h"
 #include "render/ResourceManager.h"
 
 #ifndef STB_IMAGE_IMPLEMENTATION
@@ -11,12 +13,12 @@
 #define STB_IMAGE_IMPLEMENTATION
 #endif
 
-Model::Model(const char* path, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler) {
-  Name = path;
-  loadModel(path, resourceLayout, device, queue, textureSampler);
+Model::Model(const char* path, MaterialUniform mat, WGPUSampler& textureSampler) {
+  materialOverride = mat;
+  loadModel(path, textureSampler);
 }
 
-void Model::loadModel(std::string path, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler) {
+void Model::loadModel(std::string path, WGPUSampler& textureSampler) {
   strPath = path;
 
   Assimp::Importer import;
@@ -29,30 +31,27 @@ void Model::loadModel(std::string path, WGPUBindGroupLayout& resourceLayout, WGP
   }
   directory = path.substr(0, path.find_last_of('/'));
 
-  processNode(scene->mRootNode, scene, resourceLayout, device, queue, textureSampler);
+  processNode(scene->mRootNode, scene, textureSampler);
 }
 
-bool f = false;
-aiMatrix4x4 foo;
-
-void Model::processNode(aiNode* node, const aiScene* scene, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler) {
+void Model::processNode(aiNode* node, const aiScene* scene, WGPUSampler& textureSampler) {
   // process all the node's meshes (if any)
   for (unsigned int i = 0; i < node->mNumMeshes; i++) {
     aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 
-    Ref<Mesh> modelMesh = processMesh(mesh, scene, resourceLayout, device, queue, textureSampler);
-    modelMesh->Name = mesh->mName.C_Str();
+    Ref<Mesh> modelMesh = processMesh(mesh, scene, textureSampler);
+    // modelMesh->Name = mesh->mName.C_Str();
     meshes.push_back(modelMesh);
-    AddChild(modelMesh);
+    // AddChild(modelMesh);
   }
 
   // then do the same for each of its children
   for (unsigned int i = 0; i < node->mNumChildren; i++) {
-    processNode(node->mChildren[i], scene, resourceLayout, device, queue, textureSampler);
+    processNode(node->mChildren[i], scene, textureSampler);
   }
 }
 
-Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLayout& resourceLayout, WGPUDevice& device, WGPUQueue& queue, WGPUSampler& textureSampler) {
+Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUSampler& textureSampler) {
   std::vector<VertexAttribute> vertices;
   std::vector<unsigned int> indices;
   std::vector<std::shared_ptr<Texture>> textures;
@@ -100,50 +99,64 @@ Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene, WGPUBindGroupLa
 
   aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
   aiColor3D color;
+  float shininess;
+  aiColor3D colorEmpty = {0, 0, 0};
 
   std::shared_ptr<Texture> diffuseTexture = loadMaterialTexture(material, aiTextureType_DIFFUSE, "texture_diffuse");
   std::shared_ptr<Texture> heightTexture = loadMaterialTexture(material, aiTextureType_DISPLACEMENT, "texture_height");
 
   MaterialUniform materialUniform;
+  materialUniform.ambientColor = glm::vec3(0.1);
+  materialUniform.diffuseColor = glm::vec3(1);
+  materialUniform.specularColor = glm::vec3(1);
+  materialUniform.shininess = 0.0;
 
-  if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_AMBIENT, color)) {
-    if (color.r == 0 && color.g == 0 && color.b == 0) {
-      materialUniform.ambientColor = glm::vec3(0.1);
-    } else {
-      materialUniform.ambientColor = glm::vec3(color.r, color.g, color.b);
+  aiReturn result = AI_FAILURE;
+
+  if (materialOverride.ambientColor == glm::vec3(0)) {
+    aiReturn result = material->Get(AI_MATKEY_COLOR_AMBIENT, color);
+    if (result == AI_SUCCESS) {
+      materialUniform.ambientColor = color != colorEmpty ? glm::vec3(color.r, color.g, color.b) : glm::vec3(0.1);
     }
   } else {
-    materialUniform.ambientColor = glm::vec3(0.1);
+    materialUniform.ambientColor = materialOverride.ambientColor;
   }
 
-  if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_DIFFUSE, color)) {
-    materialUniform.diffuseColor = glm::vec3(color.r, color.g, color.b);
+  if (materialOverride.diffuseColor == glm::vec3(0)) {
+    result = material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
+    if (result == AI_SUCCESS) {
+      materialUniform.diffuseColor = glm::vec3(color.r, color.g, color.b);
+    }
   } else {
-    materialUniform.diffuseColor = glm::vec3(1);
+    materialUniform.diffuseColor = materialOverride.diffuseColor;
   }
 
-  if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_SPECULAR, color)) {
-    materialUniform.specularColor = glm::vec3(color.r, color.g, color.b);
-  }
-	materialUniform.specularColor = glm::vec3(1);
-	
-
-  float shininess;
-  if (material->Get(AI_MATKEY_SHININESS, shininess) == AI_SUCCESS) {
-    materialUniform.shininess = (shininess / 10.0f) * 128.0f;
+  if (materialOverride.specularColor == glm::vec3(0)) {
+    result = material->Get(AI_MATKEY_COLOR_SPECULAR, color);
+    if (result == AI_SUCCESS) {
+      materialUniform.specularColor = glm::vec3(color.r, color.g, color.b);
+    }
   } else {
-		materialUniform.shininess = 0.0;
+    materialUniform.specularColor = materialOverride.specularColor;
   }
 
-  auto m = CreateRef<Mesh>(vertices, indices, diffuseTexture, heightTexture, materialUniform, resourceLayout, device, queue, textureSampler);
+  if (materialOverride.shininess == -1) {
+    result = material->Get(AI_MATKEY_SHININESS, shininess);
+    if (result == AI_SUCCESS) {
+      materialUniform.shininess = (shininess / 10.0f) * 128.0f;
+    }
+  } else {
+    materialUniform.shininess = materialOverride.shininess;
+  }
+
+  auto m = CreateRef<Mesh>(vertices, indices, diffuseTexture, heightTexture, materialUniform, textureSampler);
   return m;
 }
 
 std::shared_ptr<Texture> Model::loadMaterialTexture(aiMaterial* mat, aiTextureType type, std::string typeName) {
   static auto defaultTexture = Rain::ResourceManager::GetTexture("T_Default");
 
-  RN_CORE_ASSERT(defaultTexture != nullptr, "Default texture for model couldn't initialised.");
-
+  // RN_CORE_ASSERT(defaultTexture != nullptr, "Default texture for model couldn't initialised.");
   aiString str;
   int textureCount = mat->GetTextureCount(type);
   mat->GetTexture(type, 0, &str);

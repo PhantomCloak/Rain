@@ -2,8 +2,7 @@
 #include <iostream>
 #include <ostream>
 
-// in WASM environment these resources passed through C++ to Browser
-// in meantime if these resources isn't in the heap it likely to cause issues related to resource pointers
+// In some environments (such as Emscriptten) underlying implementation details of the WebGPU API might require HEAP pointers
 struct PipelineBundle {
   WGPURenderPipelineDescriptor pipelineDescriptor;
   WGPUColorTargetState colorTargetState;
@@ -13,7 +12,7 @@ struct PipelineBundle {
   std::vector<WGPUBindGroupLayout> bindGroupLayouts;
   std::vector<WGPUBindGroupLayoutDescriptor> bindGroupLayoutDescriptors;
   std::map<int, std::vector<WGPUBindGroupLayoutEntry>> groupLayoutEntries;
-	WGPUPipelineLayoutDescriptor pipelineLayoutDescriptor;
+  WGPUPipelineLayoutDescriptor pipelineLayoutDescriptor;
   WGPUPipelineLayout pipelineLayout;
   WGPURenderPipeline pipeline;
 };
@@ -70,7 +69,7 @@ void SetVisibility(WGPUBindGroupLayoutEntry& entry,
 
 void SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type) {
   switch (type) {
-    case GroupLayoutType::Default:
+    case GroupLayoutType::Uniform:
       entry.buffer.type = WGPUBufferBindingType_Uniform;
       break;
     case GroupLayoutType::Texture:
@@ -113,7 +112,7 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
     const std::string& pipelineId,
     const std::string& shaderId,
     WGPUVertexBufferLayout vertexLayout,
-    GroupLayout groupLayout,
+    std::map<int, GroupLayout> groupLayout,
     WGPUTextureFormat depthFormat,
     WGPUTextureFormat colorFormat,
     WGPUCullMode cullingMode,
@@ -233,28 +232,15 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   pipelineDesc.multisample.mask = ~0u;
   pipelineDesc.multisample.alphaToCoverageEnabled = false;
 
-  // Interface to it's uniforms
-  std::map<int, std::vector<WGPUBindGroupLayoutEntry>>& groupLayouts = bundle.groupLayoutEntries;
+  std::vector<WGPUBindGroupLayout>& bindGroupLayouts = bundle.bindGroupLayouts;
 
-  groupLayouts = ParseGroupLayout(groupLayout);
-
-	std::vector<WGPUBindGroupLayout>& bindGroupLayouts = bundle.bindGroupLayouts;
-	bundle.bindGroupLayoutDescriptors.resize(groupLayouts.size());
-
-  for (int i = 0; i < groupLayouts.size(); i++) {
-
-		WGPUBindGroupLayoutDescriptor& descriptor = bundle.bindGroupLayoutDescriptors[i];
-
-		descriptor = {};
-    descriptor.label = std::string("bgl_" + pipelineId).c_str();
-    descriptor.entryCount = groupLayouts[i].size();
-    descriptor.entries = groupLayouts[i].data();
-
-    WGPUBindGroupLayout bindGroupLayout = wgpuDeviceCreateBindGroupLayout(_device, &descriptor);
-    bindGroupLayouts.push_back(bindGroupLayout);
+  for(int i = 0; i < groupLayout.size(); i++)
+  {
+	  WGPUBindGroupLayout layout = LayoutUtils::CreateBindGroup("bgl_" + pipelineId + std::to_string(i), _device, groupLayout[i]);
+	  bindGroupLayouts.push_back(layout);
   }
 
-	WGPUPipelineLayoutDescriptor& layoutDesc = bundle.pipelineLayoutDescriptor;
+  WGPUPipelineLayoutDescriptor& layoutDesc = bundle.pipelineLayoutDescriptor;
 
   layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
   layoutDesc.bindGroupLayouts = bindGroupLayouts.data();

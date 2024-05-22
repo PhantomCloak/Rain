@@ -1,9 +1,10 @@
+#include <iostream>
+#include <ostream>
 #include "Application.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/html5.h>
 #endif
-
 Rain::Window* appi;
 int main(int, char**) {
   Rain::WindowProps props("Bouncing Balls");
