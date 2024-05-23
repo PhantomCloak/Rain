@@ -1,9 +1,4 @@
 #pragma once
-
-#ifndef _DEBUG
-#define _DEBUG
-#endif
-
 #include <PxPhysicsAPI.h>
 #include <glm/glm.hpp>
 

@@ -15,6 +15,11 @@ struct VertexAttribute {
 	float _pad3;
 };
 
+struct SceneUniformBatch {
+  glm::mat4x4 modelMatrixArr[16];
+  glm::vec4 color;
+};
+
 struct SceneUniform {
   glm::mat4x4 modelMatrix;
   glm::vec4 color;

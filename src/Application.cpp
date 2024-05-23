@@ -23,7 +23,6 @@
 #include "render/Render.h"
 #include "render/ResourceManager.h"
 
-#define _DEBUG
 #include <PxPhysicsAPI.h>
 #include <pthread.h>
 
@@ -31,8 +30,6 @@
 #include <emscripten.h>
 #include "platform/web/web_window.h"
 #endif
-// #ifndef _DEBUG
-#define _DEBUG
 
 extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
 
@@ -118,17 +115,12 @@ Ref<Model> sphereModel;
 // PhysX Stuff
 //=================================================================================
 using namespace physx;
-PxDefaultAllocator gAllocator;
-//std::vector<PxRigidDynamic*> projectiles;
 
-// PxRigidDynamic* gCube = nullptr;
 PxRigidStatic* gFloor = nullptr;
 
 void createPhysXObjects() {
-    // Create material
     PxMaterial* material = physics->gPhysics->createMaterial(0.5f, 2.5f, 0.0f);
 
-    // Define the dimensions of the cube
     PxVec3 dimensions(50.0f, 1.0f, 50.0f); // Scale of the cube
     PxShape* shape = physics->gPhysics->createShape(PxBoxGeometry(dimensions.x, dimensions.y, dimensions.z), *material);
 
@@ -136,17 +128,14 @@ void createPhysXObjects() {
         throw std::runtime_error("Failed to create shape.");
     }
 
-    // Create static actor
     PxRigidStatic* staticActor = physics->gPhysics->createRigidStatic(PxTransform(PxVec3(0.0f, -1.0f, 0.0f)));
     if (!staticActor) {
         throw std::runtime_error("Failed to create static actor.");
     }
 
-    // Attach the shape to the actor
     staticActor->attachShape(*shape);
-    shape->release(); // Release the shape as it's now attached to the actor
+    shape->release();
 
-    // Add the static actor to the scene
     physics->gScene->addActor(*staticActor);
 }
 
@@ -207,23 +196,6 @@ void ppfxCreateBindings(int width, int height) {
 
   bg_bgPpfx = wgpuDeviceCreateBindGroup(render->m_device, &bgDescPpfx);
 }
-
-#if RENDER & PHYSX
-void shootSphere(const glm::vec3& startPos, const glm::vec3& velocity) {
-  const float sphereRadius = 0.5f;
-  const float sphereDensity = 3.0f;
-
-  PxSphereGeometry sphereGeometry(sphereRadius);
-  PxTransform sphereTransform(PxVec3(startPos.x, startPos.y, startPos.z));
-  PxRigidDynamic* sphere = PxCreateDynamic(
-      *gPhysics, sphereTransform, sphereGeometry,
-      *gPhysics->createMaterial(0.5f, 0.5f, 0.6f), sphereDensity);
-
-  sphere->setLinearVelocity(PxVec3(velocity.x, velocity.y, velocity.z));
-  gScene->addActor(*sphere);
-  projectiles.push_back(sphere);
-}
-#endif
 
 void shootSphere(const glm::vec3& startPos, const glm::vec3& velocity) {
   Ref<GameObject> projectile = CreateRef<GameObject>(sphereModel);
@@ -996,6 +968,16 @@ void Application::drawImgui(WGPURenderPassEncoder renderPass) {
     wgpuQueueWriteBuffer(render->m_queue, shadowUniformBuffer, 0, &shadowUniform, sizeof(ShadowUniform));
     wgpuQueueWriteBuffer(render->m_queue, shadowCameraUniformBuffer, 0, &shadowUniform, sizeof(CameraUniform));
   }
+
+  ImGui::Spacing();
+	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)); // RGB for green, with full opacity
+	ImGui::Text("PRESS F TO SHOOT'EM UP");
+	ImGui::PopStyleColor();
+  ImGui::Spacing();
+	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.0f, 1.0f)); // RGB for green, with full opacity
+	ImGui::Text("PRESS ESC TO UNLOCK MOUSE");
+	ImGui::PopStyleColor();
+
 
   ImGui::End();
 

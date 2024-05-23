@@ -15,7 +15,7 @@
         "CMAKE_CXX_STANDARD": "17",
         "CMAKE_CXX_STANDARD_REQUIRED": "TRUE",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
@@ -30,6 +30,8 @@
         "DAWN_ENABLE_METAL": "OFF",
         "DAWN_ENABLE_VULKAN": "OFF",
         "DAWN_BUILD_SAMPLES": "OFF",
+        "DAWN_ENABLE_OPENGLES": "OFF",
+        "DAWN_ENABLE_DESKTOP_GL": "OFF",
         "TINT_BUILD_TINT": "OFF",
         "DEV_MODE": "ON"
       }
@@ -51,7 +53,17 @@
       "cacheVariables": {
         "USE_METAL": "ON",
         "DAWN_ENABLE_METAL": "ON",
-        "RN_DEBUG": "ON"
+        "RN_DEBUG": "ON",
+        "PHYSX_ROOT_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
+        "CMAKEMODULES_PATH": "/Users/ph4nt0m/packman-repo/chk/CMakeModules/1.28.trunk.31965103",
+        "PX_OUTPUT_LIB_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
+        "PX_OUTPUT_BIN_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
+        "PX_EMSCRIPTEN ": "1",
+        "TARGET_BUILD_PLATFORM": "mac",
+        "PX_SCALAR_MATH": "1",
+        "PX_OUTPUT_ARCH": "arm",
+        "PX_SIMD_DISABLED ": "1",
+        "DAWN_DEBUG_BREAK_ON_ERROR": "1"
       }
     },
     {
@@ -68,15 +80,22 @@
       "inherits": "base",
       "description": "Build for WebAssembly with Emscripten",
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "/opt/homebrew/Cellar/emscripten/3.1.51/libexec/cmake/Modules/Platform/Emscripten.cmake",
+        "CMAKE_TOOLCHAIN_FILE": "/Users/ph4nt0m/Developer/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
         "EMSCRIPTEN": "ON",
         "USE_GLFW": "3",
         "USE_WEBGPU": "ON",
         "ASYNCIFY": "ON",
         "WASM_BIGINT": "ON",
-        "ALLOW_MEMORY_GROWTH": "ON",
-        "EMCC_DEBUG": "True",
-        "DEV_MODE": "ON"
+        "PHYSX_ROOT_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
+        "CMAKEMODULES_PATH": "/Users/ph4nt0m/packman-repo/chk/CMakeModules/1.28.trunk.31965103",
+        "PX_OUTPUT_LIB_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
+        "PX_OUTPUT_BIN_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
+        "PX_EMSCRIPTEN ": "1",
+        "TARGET_BUILD_PLATFORM": "emscripten",
+        "PX_SCALAR_MATH": "1",
+        "PX_SIMD_DISABLED ": "1",
+				"ASSIMP_BUILD_NO_3DS_IMPORTER": "ON",
+				"ALLOW_BLOCKING_ON_MAIN_THREAD": "1"
       }
     }
   ]

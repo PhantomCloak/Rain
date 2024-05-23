@@ -8,6 +8,20 @@
 Rain::Window* appi;
 int main(int, char**) {
   Rain::WindowProps props("Bouncing Balls");
+
+#if __EMSCRIPTEN__
+  double canvasWidth, canvasHeight;
+  emscripten_get_element_css_size("#canvas", &canvasWidth, &canvasHeight);
+	props.Width = canvasWidth;
+	props.Height = canvasHeight;
+#endif
+
+	if(props.Height < 500 || props.Height < 500)
+	{
+		props.Height = 1080;
+		props.Width = 1920;
+	}
+
   Rain::Window* app = new Application(props);
   app->OnStart();
   appi = app;
@@ -25,6 +39,5 @@ int main(int, char**) {
   }
 #endif  // __EMSCRIPTEN__
 
-  //
   return 0;
 }

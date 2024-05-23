@@ -1,9 +1,5 @@
 #pragma once
 
-#ifndef _DEBUG
-#define _DEBUG
-#endif
-
 #include <PxPhysicsAPI.h>
 #include "Model.h"
 #include "Node.h"

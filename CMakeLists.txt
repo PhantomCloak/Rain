@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.1...3.25)
 project(MyDawnProject VERSION 0.1.0 LANGUAGES CXX C)
 
@@ -25,35 +26,73 @@ set_target_properties(MyApp PROPERTIES
   EXPORT_COMPILE_COMMANDS ON
 )
 
-add_subdirectory(vendor/spdlog)
-add_subdirectory(vendor/assimp)
+add_definitions(-DNDEBUG)
+# Include dependencies
+set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT FALSE)
+set(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT FALSE)
 
+set(ASSIMP_BUILD_GLTF_IMPORTER TRUE)
+set(ASSIMP_BUILD_GLTF2_IMPORTER TRUE)
+set(ASSIMP_BUILD_SMD_IMPORTER TRUE)
+set(ASSIMP_BUILD_SIB_IMPORTER TRUE)
+set(ASSIMP_BUILD_OBJ_IMPORTER TRUE)
+
+add_subdirectory(vendor/PhysX/physx/compiler/public)
 if(DEV_MODE)
   target_compile_definitions(MyApp PRIVATE RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources")
 else()
-  target_compile_definitions(MyApp PRIVATE RESOURCE_DIR="./Resources")
+  target_compile_definitions(MyApp PRIVATE RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources")
 endif()
 
-target_link_libraries(MyApp PRIVATE spdlog assimp)
 
 if(EMSCRIPTEN)
-  target_link_options(MyApp PRIVATE
-    -sUSE_GLFW=3
-    -sUSE_WEBGPU=1
-    -sASYNCIFY=1
-    -sALLOW_MEMORY_GROWTH
-    -sWASM_BIGINT=1
-    -sSTACK_SIZE=1mb
-    -O0
-    -g3
-    --source-map
-    --emit-symbol-map
-    --preload-file "${CMAKE_CURRENT_SOURCE_DIR}/Resources"
-  )
-  set_target_properties(MyApp PROPERTIES SUFFIX ".html")
+
+	set(EMSCRIPTEN_PTHREADS_COMPILER_FLAGS "-pthread")
+	set(EMSCRIPTEN_PTHREADS_LINKER_FLAGS "${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}") # -sPROXY_TO_PTHREAD
+
+	string(APPEND CMAKE_C_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
+	string(APPEND CMAKE_CXX_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
+	string(APPEND CMAKE_EXE_LINKER_FLAGS " ${EMSCRIPTEN_PTHREADS_LINKER_FLAGS}")
+	add_subdirectory(vendor/assimp)
+
+	target_link_options(PhysX PRIVATE -sALLOW_BLOCKING_ON_MAIN_THREAD=1)
+
+	target_link_libraries(MyApp PRIVATE assimp PhysX PhysXCooking PhysXCommon PhysXExtensions)
+	target_link_options(MyApp PRIVATE
+		-sUSE_GLFW=3
+		-sUSE_WEBGPU=1
+		-sASYNCIFY=1
+		-sALLOW_MEMORY_GROWTH=0
+		-sMAXIMUM_MEMORY=1GB
+		-sWASM_BIGINT=1
+		-sSTACK_SIZE=1mb
+		-sPTHREAD_POOL_SIZE=4
+		-sALLOW_BLOCKING_ON_MAIN_THREAD=1
+		-O0
+		--preload-file "${CMAKE_CURRENT_SOURCE_DIR}/Resources"
+		)
+	set_target_properties(MyApp PROPERTIES SUFFIX ".html")
 else()
+  add_subdirectory(vendor/assimp)
   add_subdirectory(vendor/dawn)
-  target_link_libraries(MyApp PRIVATE dawn_common dawn_glfw dawn_headers dawn_native dawn_platform dawn_utils dawn_wire dawncpp dawncpp_headers webgpu_dawn libtint glfw)
-  target_link_libraries(MyApp PRIVATE "-framework Cocoa" "-framework CoreVideo" "-framework IOKit" "-framework QuartzCore")
+  add_compile_definitions(DAWN_DEBUG_BREAK_ON_ERROR)
+  target_link_libraries(MyApp PRIVATE dawn_common
+    dawn_glfw
+    dawn_headers
+    dawn_native
+    dawn_platform
+    dawn_utils
+    dawn_wire
+    dawncpp
+    dawncpp_headers
+    webgpu_dawn
+    libtint
+	glfw
+	assimp
+	PhysX
+	PhysXCooking 
+	PhysXCommon 
+	PhysXExtensions
+	"-framework Cocoa" "-framework CoreVideo" "-framework IOKit" "-framework QuartzCore")
 endif()
 

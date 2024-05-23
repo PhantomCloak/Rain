@@ -69,12 +69,12 @@ void GameObject::AddPhysics() {
 			cubeGeometry,
 			*material, 2.0f);
 
-	//PxTransform massOffset = PxTransform(PxVec3(0.0f, -0.5f, 0.0f));
-	//pxActorDynamic->setCMassLocalPose(massOffset);
+	PxTransform massOffset = PxTransform(PxVec3(0.0f, -0.5f, 0.0f));
+	pxActorDynamic->setCMassLocalPose(massOffset);
 	//pxActorDynamic->setSolverIterationCounts(16, 4); // Default is 4 position, 1 velocity
-	//pxActorDynamic->setLinearDamping(0.1f);
-	//pxActorDynamic->setAngularDamping(0.1f);
-	//pxActorDynamic->setSleepThreshold(0.05f);
+	pxActorDynamic->setLinearDamping(0.1f);
+	pxActorDynamic->setAngularDamping(0.1f);
+	pxActorDynamic->setSleepThreshold(0.05f);
 
 
 	isStatic = false;
@@ -86,7 +86,7 @@ void GameObject::AddPhysicsSphere(glm::vec3 velocity) {
   const float sphereRadius = 0.5f;
   const float sphereDensity = 10.0f;
 
-	static PxMaterial* sphereMat = Physics::Instance->gPhysics->createMaterial(0.5f, 1.2f, 0.1f);
+	static PxMaterial* sphereMat = Physics::Instance->gPhysics->createMaterial(0.5f, 1.0f, 0.6f);
 
 	PxSphereGeometry sphereGeometry(sphereRadius);
 
@@ -111,6 +111,10 @@ bool GameObject::IsNeedUpdate() const {
 }
 
 void GameObject::Update() {
+
+		if(pxActorDynamic->isSleeping())
+			return;
+
     PxTransform cubeTransform = pxActorDynamic->getGlobalPose();
 
     PxVec3 cubePos = cubeTransform.p;
