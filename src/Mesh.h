@@ -25,6 +25,8 @@ struct SceneUniform {
   glm::vec4 color;
 };
 
+typedef unsigned long UUID;
+
 struct MaterialUniform {
   glm::vec3 ambientColor;
 	float _pad0 = 0.0;
@@ -41,28 +43,29 @@ struct MaterialUniform {
 	}
 };
 
+static UUID nextId = 0;
+
+struct Material {
+	UUID Id;
+	MaterialUniform properties;
+
+	Material() {
+		Id = nextId++;
+	}
+};
+
 class Mesh {
  public:
   // mesh data
-  MaterialUniform materialUniform;
+	UUID Id;
   std::vector<VertexAttribute> vertices;
   std::vector<unsigned int> indices;
 
   std::shared_ptr<Texture> textureDiffuse;
 
   Mesh(std::vector<VertexAttribute> vertices,
-        std::vector<unsigned int> indices,
-        std::shared_ptr<Texture> textureDiffuse,
-        std::shared_ptr<Texture> textureHeight,
-				MaterialUniform material,
-				WGPUSampler& sampler);
+        std::vector<unsigned int> indices);
 
-  void Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline);
-	void UpdateUniforms(WGPUQueue& queue);
-
- private:
-  WGPUBindGroup bgMaterial;
-  WGPUBuffer materialUniformBuffer;
   WGPUBuffer vertexBuffer;
   WGPUBuffer indexBuffer;
 };

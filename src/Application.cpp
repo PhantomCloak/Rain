@@ -1,3 +1,5 @@
+#pragma once
+#define RN_DEBUG
 #include "Application.h"
 #include <GLFW/glfw3.h>
 #include <unistd.h>
@@ -19,8 +21,10 @@
 #include "io/keyboard.h"
 #include "physics/PhysicUtils.h"
 #include "physics/Physics.h"
+#include "render/GPUAllocator.h"
 #include "render/PipelineManager.h"
 #include "render/Render.h"
+#include "render/RenderQueue.h"
 #include "render/ResourceManager.h"
 
 #include <PxPhysicsAPI.h>
@@ -66,7 +70,7 @@ std::unique_ptr<Physics> physics;
 
 std::shared_ptr<PlayerCamera> Player;
 
-GameObject* floorCube;
+//GameObject* floorCube;
 std::vector<Ref<GameObject>> boxes;
 std::vector<Ref<GameObject>> projectiles;
 
@@ -117,26 +121,109 @@ Ref<Model> sphereModel;
 using namespace physx;
 
 PxRigidStatic* gFloor = nullptr;
+WGPUQuerySet m_timestampQueries = nullptr;
+WGPUBuffer m_timestampResolveBuffer;
+WGPUBuffer m_timestampMapBuffer;
+std::unique_ptr<WGPUBufferMapCallback> m_timestampMapHandle = nullptr;
+
+void initBenchmark() {
+  // Create timestamp queries
+  WGPUQuerySetDescriptor querySetDesc;
+  querySetDesc.type = WGPUQueryType_Timestamp;
+  querySetDesc.count = 2;  // start and end
+	querySetDesc.nextInChain = nullptr;
+  m_timestampQueries = wgpuDeviceCreateQuerySet(render->m_device, &querySetDesc);
+
+  // Create buffer to store timestamps
+  WGPUBufferDescriptor bufferDesc;
+  bufferDesc.label = "timestamp resolve buffer";
+  bufferDesc.size = 2 * sizeof(uint64_t);
+  bufferDesc.usage = WGPUBufferUsage_QueryResolve | WGPUBufferUsage_CopySrc;
+  bufferDesc.mappedAtCreation = false;
+	bufferDesc.nextInChain = nullptr;
+  m_timestampResolveBuffer = wgpuDeviceCreateBuffer(render->m_device, &bufferDesc);
+
+  bufferDesc.label = "timestamp map buffer";
+  bufferDesc.size = 2 * sizeof(uint64_t);
+  bufferDesc.usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst;
+  m_timestampMapBuffer = wgpuDeviceCreateBuffer(render->m_device, &bufferDesc);
+}
+
+void CallBack(WGPUBufferMapAsyncStatus status, void* userData) {
+  if (status != WGPUBufferMapAsyncStatus_Success) {
+    std::cerr << "Could not map buffer! status = " << status << std::endl;
+  } else {
+    uint64_t* timestampData = (uint64_t*)wgpuBufferGetConstMappedRange(m_timestampMapBuffer, 0, 2 * sizeof(uint64_t));
+
+		Application* app = (Application*)userData;
+
+    // Use timestampData
+    uint64_t begin = timestampData[0];
+    uint64_t end = timestampData[1];
+    uint64_t nanoseconds = (end - begin);
+    float milliseconds = (float)nanoseconds * 1e-6;
+    //std::cout << "Render pass took " << milliseconds << "ms" << std::endl;
+    app->m_perf.add_sample(milliseconds * 1e-3);
+
+    wgpuBufferUnmap(m_timestampMapBuffer);
+  }
+
+  m_timestampMapHandle.reset();
+}
+
+void Application::fetchTimestamps() {
+  // If we are already in the middle of a mapping operation,
+  // no need to trigger a new one.
+  if (m_timestampMapHandle) {
+    return;
+  }
+  assert(m_timestampMapBuffer.getMapState() == BufferMapState::Unmapped);
+
+	m_timestampMapHandle = std::make_unique<WGPUBufferMapCallback>(CallBack);
+
+   wgpuBufferMapAsync(m_timestampMapBuffer, WGPUMapMode_Read, 0, 2 * sizeof(uint64_t), CallBack, this);
+}
 
 void createPhysXObjects() {
-    PxMaterial* material = physics->gPhysics->createMaterial(0.5f, 2.5f, 0.0f);
+  PxMaterial* material = physics->gPhysics->createMaterial(0.5f, 2.5f, 0.0f);
 
-    PxVec3 dimensions(50.0f, 1.0f, 50.0f); // Scale of the cube
-    PxShape* shape = physics->gPhysics->createShape(PxBoxGeometry(dimensions.x, dimensions.y, dimensions.z), *material);
+  PxVec3 dimensions(50.0f, 1.0f, 50.0f);  // Scale of the cube
+  PxShape* shape = physics->gPhysics->createShape(PxBoxGeometry(dimensions.x, dimensions.y, dimensions.z), *material);
 
-    if (!shape) {
-        throw std::runtime_error("Failed to create shape.");
-    }
+  if (!shape) {
+    throw std::runtime_error("Failed to create shape.");
+  }
 
-    PxRigidStatic* staticActor = physics->gPhysics->createRigidStatic(PxTransform(PxVec3(0.0f, -1.0f, 0.0f)));
-    if (!staticActor) {
-        throw std::runtime_error("Failed to create static actor.");
-    }
+  PxRigidStatic* staticActor = physics->gPhysics->createRigidStatic(PxTransform(PxVec3(0.0f, -1.0f, 0.0f)));
+  if (!staticActor) {
+    throw std::runtime_error("Failed to create static actor.");
+  }
 
-    staticActor->attachShape(*shape);
-    shape->release();
+  staticActor->attachShape(*shape);
+  shape->release();
 
-    physics->gScene->addActor(*staticActor);
+  physics->gScene->addActor(*staticActor);
+}
+
+void resolveTimestamps(WGPUCommandEncoder encoder) {
+	// If we are already in the middle of a mapping operation,
+	// no need to trigger a new one.
+	if (m_timestampMapHandle) return;
+
+	// Resolve the timestamp queries (write their result to the resolve buffer)
+	wgpuCommandEncoderResolveQuerySet(encoder, 
+		m_timestampQueries,
+		0, 2, // get queries 0 to 0+2
+		m_timestampResolveBuffer,
+		0
+	);
+	
+	// Copy to the map buffer
+	wgpuCommandEncoderCopyBufferToBuffer(encoder, 
+		m_timestampResolveBuffer, 0,
+		m_timestampMapBuffer, 0,
+		2 * sizeof(uint64_t)
+	);
 }
 
 //=================================================================================
@@ -197,9 +284,11 @@ void ppfxCreateBindings(int width, int height) {
   bg_bgPpfx = wgpuDeviceCreateBindGroup(render->m_device, &bgDescPpfx);
 }
 
+static int sphereIdNext = 0;
 void shootSphere(const glm::vec3& startPos, const glm::vec3& velocity) {
-  Ref<GameObject> projectile = CreateRef<GameObject>(sphereModel);
-	projectile->Transform.scale = glm::vec3(0.5f);
+  std::string id = std::to_string(sphereIdNext++) + "_sphere";
+  Ref<GameObject> projectile = CreateRef<GameObject>(id, sphereModel);
+  projectile->Transform.scale = glm::vec3(0.5f);
   projectile->Transform.position = startPos;
 
   projectile->AddPhysicsSphere(velocity);
@@ -220,11 +309,13 @@ void Application::OnStart() {
 #endif
 
   if (render->m_surface == nullptr) {
-    // RN_ERROR("Failed to create a rendering surface. The surface returned is null.");
+		// RN_ERROR("Failed to create a rendering surface. The surface returned is null.");
     exit(-1);
   }
 
   render->Init(render->m_window, instance);
+	GPUAllocator::Init(render->m_device);
+  RenderQueue::Init();
 
   Rain::ResourceManager::Init(std::make_shared<WGPUDevice>(render->m_device));
   Rain::ResourceManager::LoadTexture("T_Default", RESOURCE_DIR "/textures/placeholder.jpeg");
@@ -233,8 +324,10 @@ void Application::OnStart() {
 
   shaderManager->LoadShader("SH_Default", RESOURCE_DIR "/shaders/default.wgsl");
   shaderManager->LoadShader("SH_DefaultBasic", RESOURCE_DIR "/shaders/default_basic.wgsl");
+  shaderManager->LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/default_basic_batch.wgsl");
+  shaderManager->LoadShader("SH_DefaultBasicBatchDebug", RESOURCE_DIR "/shaders/default_debug.wgsl");
   shaderManager->LoadShader("SH_PPFX", RESOURCE_DIR "/shaders/ppfx.wgsl");
-  shaderManager->LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
+  shaderManager->LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map_batch.wgsl");
   shaderManager->LoadShader("SH_Debug", RESOURCE_DIR "/shaders/debug.wgsl");
 
   pipelineManager = std::make_unique<PipelineManager>(render->m_device, shaderManager);
@@ -292,7 +385,7 @@ void Application::OnStart() {
   vertexLayoutQuad.stepMode = WGPUVertexStepMode_Vertex;
 
   GroupLayout sceneGroup = {
-      {0, GroupLayoutVisibility::Both, GroupLayoutType::Uniform}};
+      {0, GroupLayoutVisibility::Vertex, GroupLayoutType::StorageReadOnly}};
 
   GroupLayout cameraGroup = {
       {0, GroupLayoutVisibility::Both, GroupLayoutType::Uniform}};
@@ -309,7 +402,7 @@ void Application::OnStart() {
 
   GroupLayout ppfxGroup = {
       {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
-      {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler}};
+      {1, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler}};
 
   static std::map<int, GroupLayout> layoutShadow;
   layoutShadow.insert({0, sceneGroup});
@@ -319,7 +412,7 @@ void Application::OnStart() {
   layoutDefault.insert({0, sceneGroup});
   layoutDefault.insert({1, cameraGroup});
   layoutDefault.insert({2, materialGroup});
-  layoutDefault.insert({3, shadowGroup});
+  //layoutDefault.insert({3, shadowGroup});
 
   static std::map<int, GroupLayout> layoutPpfx;
   layoutPpfx.insert({0, ppfxGroup});
@@ -334,15 +427,15 @@ void Application::OnStart() {
   WGPUTexture shadowDepthTexture = render->GetDepthBufferTexture(render->m_device, render->m_depthTextureFormat, SHADOW_WIDTH, SHADOW_HEIGHT, true);
   shadowDepthView = render->GetDepthBufferTextureView("T_Depth_Shadow", shadowDepthTexture, render->m_depthTextureFormat);
 
-  pipelineShadow = pipelineManager->CreatePipeline("RP_Shadow",
-                                                   "SH_Shadow",
-                                                   avertexLayoutDefault,
-                                                   layoutShadow,
-                                                   render->m_depthTextureFormat,
-                                                   WGPUTextureFormat_Undefined,
-                                                   WGPUCullMode_Back,
-                                                   render->m_surface,
-                                                   render->m_adapter);
+  //pipelineShadow = pipelineManager->CreatePipeline("RP_Shadow",
+  //                                                 "SH_Shadow",
+  //                                                 avertexLayoutDefault,
+  //                                                 layoutShadow,
+  //                                                 render->m_depthTextureFormat,
+  //                                                 WGPUTextureFormat_Undefined,
+  //                                                 WGPUCullMode_Back,
+  //                                                 render->m_surface,
+  //                                                 render->m_adapter);
 
   shadowPos = glm::vec3(-166, 179, 0);
   shadowRot = glm::vec3(-48, 0, 0);
@@ -357,7 +450,7 @@ void Application::OnStart() {
   // =======================================================
 
   pipelineDefault = pipelineManager->CreatePipeline("RP_Default",
-                                                    "SH_DefaultBasic",
+                                                    "SH_DefaultBasicBatchDebug",
                                                     avertexLayoutDefault,
                                                     layoutDefault,
                                                     render->m_depthTextureFormat,
@@ -398,32 +491,32 @@ void Application::OnStart() {
 
   wgpuQueueWriteBuffer(render->m_queue, shadowUniformBuffer, 0, &shadowUniform, sizeof(ShadowUniform));
 
-  WGPUBindGroupLayout bglShadow = wgpuRenderPipelineGetBindGroupLayout(pipelineDefault, 3);
-  static std::vector<WGPUBindGroupEntry> bgEntriesShadowMap(3);
+  //WGPUBindGroupLayout bglShadow = wgpuRenderPipelineGetBindGroupLayout(pipelineDefault, 3);
+  //static std::vector<WGPUBindGroupEntry> bgEntriesShadowMap(3);
 
-  bgEntriesShadowMap[0].binding = 0;
-  bgEntriesShadowMap[0].offset = 0;
-  bgEntriesShadowMap[0].textureView = shadowDepthView;
+  //bgEntriesShadowMap[0].binding = 0;
+  //bgEntriesShadowMap[0].offset = 0;
+  //bgEntriesShadowMap[0].textureView = shadowDepthView;
 
-  bgEntriesShadowMap[1].binding = 1;
-  bgEntriesShadowMap[1].offset = 0;
-  bgEntriesShadowMap[1].sampler = shadowSampler;
+  //bgEntriesShadowMap[1].binding = 1;
+  //bgEntriesShadowMap[1].offset = 0;
+  //bgEntriesShadowMap[1].sampler = shadowSampler;
 
-  bgEntriesShadowMap[2].binding = 2;
-  bgEntriesShadowMap[2].offset = 0;
-  bgEntriesShadowMap[2].buffer = shadowUniformBuffer;
-  bgEntriesShadowMap[2].size = sizeof(ShadowUniform);
+  //bgEntriesShadowMap[2].binding = 2;
+  //bgEntriesShadowMap[2].offset = 0;
+  //bgEntriesShadowMap[2].buffer = shadowUniformBuffer;
+  //bgEntriesShadowMap[2].size = sizeof(ShadowUniform);
 
-  static WGPUBindGroupDescriptor bgDescShadowMap = {.label = "bg_shadowmap"};
-  bgDescShadowMap.layout = bglShadow;
-  bgDescShadowMap.entryCount = (uint32_t)bgEntriesShadowMap.size();
-  bgDescShadowMap.entries = bgEntriesShadowMap.data();
+  //static WGPUBindGroupDescriptor bgDescShadowMap = {.label = "bg_shadowmap"};
+  //bgDescShadowMap.layout = bglShadow;
+  //bgDescShadowMap.entryCount = (uint32_t)bgEntriesShadowMap.size();
+  //bgDescShadowMap.entries = bgEntriesShadowMap.data();
 
-  bgShadowMap = wgpuDeviceCreateBindGroup(render->m_device, &bgDescShadowMap);
+  //bgShadowMap = wgpuDeviceCreateBindGroup(render->m_device, &bgDescShadowMap);
 
   Player = std::make_shared<PlayerCamera>();
-  Player->Position.y = 15;
-  Player->Position.z = 10;
+  Player->Position.y = 0;
+  Player->Position.z = 0;
 
   defaultCameraUniform.projectionMatrix = glm::perspective(glm::radians(FOV), (float)render->m_swapChainDesc.width / render->m_swapChainDesc.height, PERSPECTIVE_NEAR, PERSPECTIVE_FAR);
   defaultCameraUniform.viewMatrix = Player->GetViewMatrix();
@@ -592,29 +685,32 @@ void Application::OnStart() {
   physics->Initialise();
   createPhysXObjects();
 
-  MaterialUniform mat;
-  mat.diffuseColor = glm::vec3(0.30, 0, 0);
-  mat.shininess = 128;
+  Material mat;
+  mat.properties.diffuseColor = glm::vec3(0.30, 0, 0);
+  mat.properties.shininess = 128;
 
-  MaterialUniform mat2;
-  mat2.diffuseColor = glm::vec3(1, 1, 1);
-  mat2.shininess = 32;
+  Material mat2;
+  mat2.properties.diffuseColor = glm::vec3(0, 1, 1);
+  mat2.properties.shininess = 32;
 
-  MaterialUniform mat3;
-  mat3.diffuseColor = glm::vec3(0.0, 0.30, 0);
-  mat3.shininess = 128;
+  Material mat3;
+  mat3.properties.diffuseColor = glm::vec3(0.0, 0.30, 0);
+  mat3.properties.shininess = 128;
 
-  Ref<Model> floorModel = CreateRef<Model>(RESOURCE_DIR "/models/box.gltf", mat, render->m_sampler);
-  Ref<Model> cubeModel = CreateRef<Model>(RESOURCE_DIR "/models/box.gltf", mat2, render->m_sampler);
-  sphereModel = CreateRef<Model>(RESOURCE_DIR "/models/sphere.gltf", mat3, render->m_sampler);
+  //Ref<Model> floorModel = CreateRef<Model>(RESOURCE_DIR "/models/box.gltf", render->m_sampler);
+  //Ref<Model> cubeModel = CreateRef<Model>(RESOURCE_DIR "/models/putty.gltf", render->m_sampler);
+  //Ref<Model> cubeModel = CreateRef<Model>(RESOURCE_DIR "/models/Sponza.gltf", render->m_sampler);
+  Ref<MeshSource> test = CreateRef<MeshSource>(RESOURCE_DIR "/models/Sponza.gltf");
+  //Ref<MeshSource> test = CreateRef<MeshSource>(RESOURCE_DIR "/models/koko.gltf");
+  //sphereModel = CreateRef<Model>(RESOURCE_DIR "/models/sphere.gltf", render->m_sampler);
 
-  floorCube = new GameObject(floorModel);
-  floorCube->Transform.position = glm::vec3(0, -1, 0);
-  floorCube->Transform.scale = glm::vec3(50, 1, 50);
+  //floorCube = new GameObject("floor", floorModel);
+  //floorCube->Transform.position = glm::vec3(0, -1, 0);
+  //floorCube->Transform.scale = glm::vec3(50, 1, 50);
 
-  int slice = 3;
-  for (int i = 0; i < 15; i++) {
-    Ref<GameObject> box = CreateRef<GameObject>(cubeModel);
+  for (int i = 0; i < 1; i++) {
+    std::string id = std::to_string(i) + "_box";
+    Ref<GameObject> box = CreateRef<GameObject>(id, test);
 
     box->Transform.position = glm::vec3(0, (i * 2) + 0.8f, 0);
     box->AddPhysics();
@@ -622,10 +718,12 @@ void Application::OnStart() {
     boxes.push_back(box);
   }
 
-  floorCube->UpdateUniforms();
+  //floorCube->UpdateUniforms();
 
   Cursor::Setup(render->m_window);
   Keyboard::Setup(render->m_window);
+	initBenchmark();
+	sleep(1);
 
   Cursor::CaptureMouse(true);
 }
@@ -644,7 +742,7 @@ void Application::OnResize(int height, int width) {
 }
 
 void MoveControls() {
-  float speed = 0.3f;
+  float speed = 0.1f;
 
   if (Keyboard::IsKeyPressing(Rain::Key::W)) {
     Player->ProcessKeyboard(FORWARD, speed);
@@ -679,12 +777,14 @@ void Application::OnUpdate() {
   // Output the duration
   simElapsed = duration.count();
 
+  //floorCube->Draw();
   for (auto box : boxes) {
     box->Update();
+    box->Draw();
   }
-
   for (auto projectile : projectiles) {
     projectile->Update();
+    projectile->Draw();
   }
 
   render->nextTexture = wgpuSwapChainGetCurrentTextureView(render->m_swapChain);
@@ -694,73 +794,46 @@ void Application::OnUpdate() {
     return;
   }
 
+  static WGPURenderPassTimestampWrites writes;
+  writes.querySet = m_timestampQueries;
+  writes.beginningOfPassWriteIndex = 0;
+  writes.endOfPassWriteIndex = 1;
+
   WGPUCommandEncoderDescriptor commandEncoderDesc = {.label = "Command Encoder"};
   render->encoder = wgpuDeviceCreateCommandEncoder(render->m_device, &commandEncoderDesc);
+
+  //wgpuCommandEncoderWriteTimestamp(render->encoder, m_timestampQueries, 0);
 
   // Shadow Pass
   // =======================================================
 
-  WGPURenderPassDepthStencilAttachment shadowDepthAttachment;
-  shadowDepthAttachment.view = shadowDepthView;
-  shadowDepthAttachment.depthClearValue = 1.0f;
-  shadowDepthAttachment.depthLoadOp = WGPULoadOp_Clear;
-  shadowDepthAttachment.depthStoreOp = WGPUStoreOp_Store;
-  shadowDepthAttachment.depthReadOnly = false;
-  shadowDepthAttachment.stencilClearValue = 0;
-  shadowDepthAttachment.stencilLoadOp = WGPULoadOp_Undefined;
-  shadowDepthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
-  shadowDepthAttachment.stencilReadOnly = true;
+  //WGPURenderPassDepthStencilAttachment shadowDepthAttachment;
+  //shadowDepthAttachment.view = shadowDepthView;
+  //shadowDepthAttachment.depthClearValue = 1.0f;
+  //shadowDepthAttachment.depthLoadOp = WGPULoadOp_Clear;
+  //shadowDepthAttachment.depthStoreOp = WGPUStoreOp_Store;
+  //shadowDepthAttachment.depthReadOnly = false;
+  //shadowDepthAttachment.stencilClearValue = 0;
+  //shadowDepthAttachment.stencilLoadOp = WGPULoadOp_Undefined;
+  //shadowDepthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
+  //shadowDepthAttachment.stencilReadOnly = true;
 
-  WGPURenderPassDescriptor shadowPassDesc{.label = "shadow_pass"};
-  shadowPassDesc.timestampWrites = 0;
-  shadowPassDesc.timestampWrites = nullptr;
-  shadowPassDesc.colorAttachments = nullptr;
+  //WGPURenderPassDescriptor shadowPassDesc{.label = "shadow_pass"};
+  ////shadowPassDesc.timestampWrites = &writes;
+  //shadowPassDesc.timestampWrites = nullptr;
+  //shadowPassDesc.colorAttachments = nullptr;
 
-  shadowPassDesc.colorAttachmentCount = 0;
-  shadowPassDesc.depthStencilAttachment = &shadowDepthAttachment;
+  //shadowPassDesc.colorAttachmentCount = 0;
+  //shadowPassDesc.depthStencilAttachment = &shadowDepthAttachment;
 
-  WGPURenderPassEncoder shadowPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &shadowPassDesc);
+  //WGPURenderPassEncoder shadowPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &shadowPassDesc);
 
-  wgpuRenderPassEncoderSetBindGroup(shadowPassEncoder, 1, bgCameraShadow, 0, NULL);
-  wgpuRenderPassEncoderSetViewport(shadowPassEncoder, 0, 0, SHADOW_WIDTH, SHADOW_HEIGHT, 0, 1);
+  //wgpuRenderPassEncoderSetBindGroup(shadowPassEncoder, 1, bgCameraShadow, 0, NULL);
+  //wgpuRenderPassEncoderSetViewport(shadowPassEncoder, 0, 0, SHADOW_WIDTH, SHADOW_HEIGHT, 0, 1);
 
-  floorCube->Draw(shadowPassEncoder, pipelineShadow);
-  for (auto box : boxes) {
-    box->Draw(shadowPassEncoder, pipelineShadow);
-  }
-  for (auto projectile : projectiles) {
-    projectile->Draw(shadowPassEncoder, pipelineShadow);
-  }
-  wgpuRenderPassEncoderEnd(shadowPassEncoder);
+  //RenderQueue::DrawEntities(shadowPassEncoder, pipelineShadow);
 
-  // Debug Pass
-  // =======================================================
-
-  //  WGPURenderPassColorAttachment debugColorAttachment = {};
-  //  debugColorAttachment.loadOp = WGPULoadOp_Clear;
-  //  debugColorAttachment.storeOp = WGPUStoreOp_Store;
-  //  debugColorAttachment.clearValue = {0.0, 0.0, 0.0, 1.0};
-  //  debugColorAttachment.view = debugOutTextureView;
-  // #if !__EMSCRIPTEN__
-  //  // debugColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
-  // #endif
-  //
-  //  WGPURenderPassDescriptor debugPassDesc{.label = "debug_pass"};
-  //  debugPassDesc.colorAttachmentCount = 1;
-  //  debugPassDesc.timestampWrites = 0;
-  //  debugPassDesc.timestampWrites = nullptr;
-  //  debugPassDesc.colorAttachments = &debugColorAttachment;
-  //
-  //  WGPURenderPassEncoder debugPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &debugPassDesc);
-  //
-  //  wgpuRenderPassEncoderSetPipeline(debugPassEncoder, pipelineDebug);
-  //  wgpuRenderPassEncoderSetVertexBuffer(debugPassEncoder, 0, vertexBufferPpfx, 0, sizeof(quadVertices));
-  //  wgpuRenderPassEncoderSetIndexBuffer(debugPassEncoder, indexBufferPpfx, WGPUIndexFormat_Uint32, 0, sizeof(quadIndices));
-  //  wgpuRenderPassEncoderSetBindGroup(debugPassEncoder, 0, bgDebug, 0, nullptr);
-  //
-  //  wgpuRenderPassEncoderDrawIndexed(debugPassEncoder, 6, 1, 0, 0, 0);
-  //
-  //  wgpuRenderPassEncoderEnd(debugPassEncoder);
+  //wgpuRenderPassEncoderEnd(shadowPassEncoder);
 
   // Lit Pass
   // =======================================================
@@ -771,7 +844,6 @@ void Application::OnUpdate() {
   litColorAttachment.clearValue = WGPUColor{0.52, 0.80, 0.92, 1};
   litColorAttachment.resolveTarget = nullptr;
   litColorAttachment.view = offrenderOutTextureView;
-  // litColorAttachment.view = render->nextTexture;
 #if !__EMSCRIPTEN__
   // litColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
 #endif
@@ -789,23 +861,18 @@ void Application::OnUpdate() {
 
   WGPURenderPassDescriptor litPassDesc{.label = "first_pass"};
   litPassDesc.colorAttachmentCount = 1;
-  litPassDesc.timestampWrites = 0;
-  litPassDesc.timestampWrites = nullptr;
+  //litPassDesc.timestampWrites = nullptr;
+  litPassDesc.timestampWrites = &writes;
   litPassDesc.colorAttachments = &litColorAttachment;
   litPassDesc.depthStencilAttachment = &litDepthAttachment;
 
   WGPURenderPassEncoder litPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &litPassDesc);
 
   wgpuRenderPassEncoderSetBindGroup(litPassEncoder, 1, bgCameraDefault, 0, NULL);
-  wgpuRenderPassEncoderSetBindGroup(litPassEncoder, 3, bgShadowMap, 0, NULL);
+  //wgpuRenderPassEncoderSetBindGroup(litPassEncoder, 3, bgShadowMap, 0, NULL);
 
-  floorCube->Draw(litPassEncoder, pipelineDefault);
-  for (auto box : boxes) {
-    box->Draw(litPassEncoder, pipelineDefault);
-  }
-  for (auto projectile : projectiles) {
-    projectile->Draw(litPassEncoder, pipelineDefault);
-  }
+  RenderQueue::DrawEntities(litPassEncoder, pipelineDefault);
+
   wgpuRenderPassEncoderEnd(litPassEncoder);
 
   // PPFX Pass
@@ -837,22 +904,31 @@ void Application::OnUpdate() {
   wgpuRenderPassEncoderDrawIndexed(ppfxPassEncoder, 6, 1, 0, 0, 0);
   drawImgui(ppfxPassEncoder);
 
+
   wgpuRenderPassEncoderEnd(ppfxPassEncoder);
 
   // Submit
   // =======================================================
 
+  //wgpuCommandEncoderWriteTimestamp(render->encoder, querySet, 1);
+
+	resolveTimestamps(render->encoder);
   wgpuTextureViewRelease(render->nextTexture);
+
 
   WGPUCommandBufferDescriptor cmdBufferDescriptor = {.label = "Command Buffer"};
   WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(render->encoder, &cmdBufferDescriptor);
 
   wgpuQueueSubmit(render->m_queue, 1, &commandBuffer);
+  RenderQueue::Clear();
+
+	fetchTimestamps();
 
 #ifndef __EMSCRIPTEN__
   wgpuSwapChainPresent(render->m_swapChain);
   wgpuDeviceTick(render->m_device);
 #endif
+
 }
 
 void Application::OnMouseClick(Rain::MouseCode button) {
@@ -887,11 +963,10 @@ void Application::OnKeyPressed(KeyCode key, KeyAction action) {
   }
 
   if (key == Rain::Key::F && action == Rain::Key::RN_KEY_RELEASE) {
-
-		glm::vec3 shootDirection = Player->Front;
-		glm::vec3 shootPosition = Player->Position + shootDirection;
+    glm::vec3 shootDirection = Player->Front;
+    glm::vec3 shootPosition = Player->Position + shootDirection;
     glm::vec3 shootVelocity = shootDirection * 50.0f;
-		shootSphere(shootPosition, shootVelocity);
+    shootSphere(shootPosition, shootVelocity);
   }
 }
 
@@ -928,7 +1003,6 @@ void Application::drawImgui(WGPURenderPassEncoder renderPass) {
   physx::PxU32 bugfix = (version >> 8) & 0xFF;
 
   ImGui::Text("PhysX Version: %d.%d.%d", major, minor, bugfix);
-  ImGui::Text("Physics Simulation Elapsed %.3f ms", simElapsed);
 
   ImGui::Spacing();
 
@@ -956,7 +1030,6 @@ void Application::drawImgui(WGPURenderPassEncoder renderPass) {
   if (ImGui::InputFloat(_labelPrefix("Shadow Rot Z").c_str(), &shadowRot.z, 0.5f)) {
     updateShadows = true;
   }
-
   // ImGui::Image((ImTextureID)debugOutTextureView, ImVec2(500, 500));
 
   if (updateShadows) {
@@ -968,18 +1041,24 @@ void Application::drawImgui(WGPURenderPassEncoder renderPass) {
     wgpuQueueWriteBuffer(render->m_queue, shadowUniformBuffer, 0, &shadowUniform, sizeof(ShadowUniform));
     wgpuQueueWriteBuffer(render->m_queue, shadowCameraUniformBuffer, 0, &shadowUniform, sizeof(CameraUniform));
   }
-
   ImGui::Spacing();
-	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f)); // RGB for green, with full opacity
-	ImGui::Text("PRESS F TO SHOOT'EM UP");
-	ImGui::PopStyleColor();
+  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));  // RGB for green, with full opacity
+  ImGui::Text("PRESS F TO SHOOT'EM UP");
+  ImGui::PopStyleColor();
   ImGui::Spacing();
-	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.0f, 1.0f)); // RGB for green, with full opacity
-	ImGui::Text("PRESS ESC TO UNLOCK MOUSE");
-	ImGui::PopStyleColor();
-
+  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.0f, 1.0f));  // RGB for green, with full opacity
+  ImGui::Text("PRESS ESC TO UNLOCK MOUSE");
+  ImGui::PopStyleColor();
 
   ImGui::End();
+
+
+#ifdef RN_DEBUG
+  ImGui::Begin("Statistics");
+	ImGui::Text("Render pass duration on GPU: %s", m_perf.summary().c_str());
+	ImGui::Text("Physics simulation duration %.3f ms", simElapsed);
+	ImGui::End();
+#endif
 
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {

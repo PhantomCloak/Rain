@@ -34,6 +34,20 @@ void LayoutUtils::SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type)
     case GroupLayoutType::SamplerCompare:
       entry.sampler.type = WGPUSamplerBindingType_Comparison;
       break;
+    case GroupLayoutType::UniformDynamic:
+			entry.buffer.type = WGPUBufferBindingType_Uniform;
+			entry.buffer.hasDynamicOffset = true;
+      break;
+    case GroupLayoutType::Storage:
+			entry.buffer.type = WGPUBufferBindingType_Storage;
+      break;
+    case GroupLayoutType::StorageReadOnly:
+			entry.buffer.type = WGPUBufferBindingType_ReadOnlyStorage ;
+      break;
+    case GroupLayoutType::StorageReadOnlyDynamic:
+			entry.buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
+			entry.buffer.hasDynamicOffset = true;
+      break;
   }
 }
 
@@ -55,6 +69,7 @@ std::vector<WGPUBindGroupLayoutEntry> LayoutUtils::ParseGroupLayout(GroupLayout 
   return groups;
 }
 
+
 WGPUBindGroupLayout LayoutUtils::CreateBindGroup(std::string label, WGPUDevice device, GroupLayout layout) {
 	std::vector<WGPUBindGroupLayoutEntry> entries = ParseGroupLayout(layout);
 
@@ -66,4 +81,9 @@ WGPUBindGroupLayout LayoutUtils::CreateBindGroup(std::string label, WGPUDevice d
 	descriptor->entryCount = entries.size();
 
 	return wgpuDeviceCreateBindGroupLayout(device, descriptor);
+}
+
+uint32_t LayoutUtils::CeilToNextMultiple(uint32_t value, uint32_t step) {
+	uint32_t divide_and_ceil = value / step + (value % step == 0 ? 0 : 1);
+  return step * divide_and_ceil;
 }

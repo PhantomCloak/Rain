@@ -156,6 +156,10 @@ enum class GroupLayoutVisibility {
 
 enum class GroupLayoutType {
   Uniform,
+  UniformDynamic,
+	Storage,
+	StorageReadOnly,
+	StorageReadOnlyDynamic,
   Sampler,
   SamplerCompare,
   Texture,
@@ -228,4 +232,5 @@ class LayoutUtils {
 	static void SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type);
 	static std::vector<WGPUBindGroupLayoutEntry> ParseGroupLayout(GroupLayout layout);
 	static WGPUBindGroupLayout CreateBindGroup(std::string label, WGPUDevice device, GroupLayout layout);
+	static uint32_t CeilToNextMultiple(uint32_t value, uint32_t step);
 };

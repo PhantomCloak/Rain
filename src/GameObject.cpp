@@ -1,66 +1,53 @@
+#pragma once
 #include "GameObject.h"
 #include "render/Render.h"
 #include "render/RenderUtils.h"
 #include "physics/Physics.h"
 #include "physics/PhysicUtils.h"
+#include "render/RenderQueue.h"
 #include <PxPhysicsAPI.h>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/constants.hpp>
 
-GameObject::GameObject(Ref<Model> model) {
-  this->model = model;
-  this->meshes = model->meshes;
+
+GameObject::GameObject(std::string objName, Ref<MeshSource> model) {
+  this->modelExp = model;
 
   if (Parent != nullptr) {
     sceneUniform.modelMatrix = Parent->GetModelMatrix() * GetModelMatrix();
   } else {
     sceneUniform.modelMatrix = GetModelMatrix();
   }
-
-  WGPUBufferDescriptor sceneUniformDesc = {};
-  sceneUniformDesc.size = sizeof(SceneUniform);
-  sceneUniformDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
-  sceneUniformDesc.mappedAtCreation = false;
-
-  sceneUniformBuffer = wgpuDeviceCreateBuffer(Render::Instance->m_device, &sceneUniformDesc);
-  wgpuQueueWriteBuffer(Render::Instance->m_queue, sceneUniformBuffer, 0, &sceneUniform, sizeof(SceneUniform));
-
-  static GroupLayout sceneGroup = {
-      {0, GroupLayoutVisibility::Both, GroupLayoutType::Uniform}};
-
-  static WGPUBindGroupLayout sceneLayout = LayoutUtils::CreateBindGroup("bgl_gameobject_scene", Render::Instance->m_device, sceneGroup);
-
-  std::vector<WGPUBindGroupEntry> bindingsScene(1);
-
-  bindingsScene[0].binding = 0;
-  bindingsScene[0].buffer = sceneUniformBuffer;
-  bindingsScene[0].offset = 0;
-  bindingsScene[0].size = sizeof(SceneUniform);
-
-  static int num = 0;
-  num++;
-  std::string id = "bg_mesh_scene";
-  id = id + std::to_string(num);
-
-  WGPUBindGroupDescriptor bgSceneDesc = {.label = id.c_str()};
-  bgSceneDesc.layout = sceneLayout;
-  bgSceneDesc.entryCount = (uint32_t)bindingsScene.size();
-  bgSceneDesc.entries = bindingsScene.data();
-
-  bgScene = wgpuDeviceCreateBindGroup(Render::Instance->m_device, &bgSceneDesc);
 }
 
-void GameObject::Draw(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline) {
-  wgpuRenderPassEncoderSetPipeline(renderPass, pipeline);
-  wgpuRenderPassEncoderSetBindGroup(renderPass, 0, bgScene, 0, NULL);
+GameObject::GameObject(std::string objName, Ref<Model> model) {
+  this->model = model;
+  this->meshes = model->meshes;
+	this->name = objName;
 
-  for (auto mesh : meshes) {
-    mesh->Draw(renderPass, pipeline);
+  if (Parent != nullptr) {
+    sceneUniform.modelMatrix = Parent->GetModelMatrix() * GetModelMatrix();
+  } else {
+    sceneUniform.modelMatrix = GetModelMatrix();
   }
 }
 
+void GameObject::Draw() {
+	RenderQueue::AddQueue(this);
+}
+
+void GameObject::DrawAlt(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline) {
+  wgpuRenderPassEncoderSetPipeline(renderPass, pipeline);
+  wgpuRenderPassEncoderSetBindGroup(renderPass, 0, bgScene, 0, NULL);
+
+  //for (auto mesh : meshes) {
+  //  mesh->Draw(renderPass, pipeline);
+  //}
+}
+
 void GameObject::AddPhysics() {
+	//return;
 	static PxMaterial* material = Physics::Instance->gPhysics->createMaterial(0.8f, 0.8f, 0.1f);
 	PxBoxGeometry cubeGeometry(PxVec3(1.0f, 1.0f, 1.0f));
 
@@ -70,11 +57,11 @@ void GameObject::AddPhysics() {
 			*material, 2.0f);
 
 	PxTransform massOffset = PxTransform(PxVec3(0.0f, -0.5f, 0.0f));
-	pxActorDynamic->setCMassLocalPose(massOffset);
+	//pxActorDynamic->setCMassLocalPose(massOffset);
 	//pxActorDynamic->setSolverIterationCounts(16, 4); // Default is 4 position, 1 velocity
-	pxActorDynamic->setLinearDamping(0.1f);
-	pxActorDynamic->setAngularDamping(0.1f);
-	pxActorDynamic->setSleepThreshold(0.05f);
+	//pxActorDynamic->setLinearDamping(0.1f);
+	//pxActorDynamic->setAngularDamping(0.1f);
+	//pxActorDynamic->setSleepThreshold(0.05f);
 
 
 	isStatic = false;
@@ -83,6 +70,7 @@ void GameObject::AddPhysics() {
 
 
 void GameObject::AddPhysicsSphere(glm::vec3 velocity) {
+	//return;
   const float sphereRadius = 0.5f;
   const float sphereDensity = 10.0f;
 
@@ -111,9 +99,8 @@ bool GameObject::IsNeedUpdate() const {
 }
 
 void GameObject::Update() {
-
-		if(pxActorDynamic->isSleeping())
-			return;
+		//if(pxActorDynamic->isSleeping())
+		//	return;
 
     PxTransform cubeTransform = pxActorDynamic->getGlobalPose();
 
@@ -135,6 +122,7 @@ void GameObject::Update() {
 }
 
 void GameObject::UpdateUniforms() {
+	return;
   sceneUniform.modelMatrix = GetModelMatrix();
   wgpuQueueWriteBuffer(Render::Instance->m_queue, sceneUniformBuffer, 0, &sceneUniform, sizeof(SceneUniform));
 }

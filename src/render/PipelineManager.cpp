@@ -72,6 +72,10 @@ void SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type) {
     case GroupLayoutType::Uniform:
       entry.buffer.type = WGPUBufferBindingType_Uniform;
       break;
+    case GroupLayoutType::UniformDynamic:
+      entry.buffer.type = WGPUBufferBindingType_Uniform;
+			entry.buffer.hasDynamicOffset = true;
+      break;
     case GroupLayoutType::Texture:
       entry.texture.sampleType = WGPUTextureSampleType_Float;
       entry.texture.viewDimension = WGPUTextureViewDimension_2D;

@@ -1,8 +1,7 @@
 #pragma once
-
-//#ifndef _DEBUG
-//#define _DEBUG
-//#endif
+#ifndef NDEBUG
+#define NDEBUG
+#endif
 
 #include <PxPhysicsAPI.h>
 #include <glm/glm.hpp>

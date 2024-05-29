@@ -151,12 +151,15 @@ void Rain::ResourceManager::Init(std::shared_ptr<WGPUDevice> device) {
   m_device = device;
 }
 
+bool Rain::ResourceManager::IsTextureExist(std::string id) {
+	return _loadedTextures.find(id) != _loadedTextures.end();
+}
 std::shared_ptr<Texture> Rain::ResourceManager::LoadTexture(std::string id, std::string path) {
-  auto ptr = std::make_shared<Texture>();
-  ptr->Texture = loadTexture(path.c_str(), m_device, &ptr->View);
+  auto tex = std::make_shared<Texture>();
+  tex->Texture = loadTexture(path.c_str(), m_device, &tex->View);
 
-  _loadedTextures[id] = ptr;
-  return ptr;
+  _loadedTextures[id] = tex;
+  return tex;
 }
 
 std::shared_ptr<Texture> Rain::ResourceManager::GetTexture(std::string id) {

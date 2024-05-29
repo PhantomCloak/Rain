@@ -26,6 +26,7 @@ void ShaderManager::LoadShader(const std::string& shaderId,
   shaderCodeDesc.code = srcShader.c_str();
 
 	WGPUShaderModuleDescriptor& shaderDesc = bundle.shaderModuleDescriptor;
+	shaderDesc.label = shaderId.c_str();
   shaderDesc.nextInChain = &shaderCodeDesc.chain;
 
   bundle.shaderModule = wgpuDeviceCreateShaderModule(_device, &shaderDesc);

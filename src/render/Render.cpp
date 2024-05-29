@@ -7,14 +7,31 @@
 #endif
 #include <iostream>
 
+#include <dawn/dawn_proc.h>
+
 Render* Render::Instance = nullptr;
 
-WGPUInstanceDescriptor desc = {};
 WGPUInstance instance;
 WGPUInstance Render::CreateInstance() {
-  desc.nextInChain = nullptr;
+  WGPUInstanceDescriptor instanceDesc;
+  static std::vector<const char*> enabledToggles = {
+      "allow_unsafe_apis",
+  };
 
-  instance = wgpuCreateInstance(&desc);
+  WGPUDawnTogglesDescriptor dawnToggleDesc;
+  dawnToggleDesc.chain.next = nullptr;
+  dawnToggleDesc.chain.sType = WGPUSType_DawnTogglesDescriptor;
+
+	dawnToggleDesc.enabledToggles = enabledToggles.data();
+  dawnToggleDesc.enabledToggleCount = 1;
+  dawnToggleDesc.disabledToggleCount = 0;
+
+  instanceDesc.nextInChain = &dawnToggleDesc.chain;
+
+	instanceDesc.features.timedWaitAnyEnable = 0;
+	instanceDesc.features.timedWaitAnyMaxCount = 64;
+
+  instance = wgpuCreateInstance(&instanceDesc);
   if (!instance) {
     std::cerr << "Could not initialize WebGPU!" << std::endl;
     assert(true);
@@ -36,8 +53,10 @@ bool Render::Init(void* window, WGPUInstance instance) {
 #if __EMSCRIPTEN__
   deviceDesc.requiredFeaturesCount = 0;
 #else
-  //deviceDesc.requiredFeaturesCount = 0;
-  deviceDesc.requiredFeatureCount = 0;
+  // deviceDesc.requiredFeaturesCount = 0;
+  static WGPUFeatureName sucker[] = {WGPUFeatureName_TimestampQuery};
+  deviceDesc.requiredFeatures = &sucker[0];
+  deviceDesc.requiredFeatureCount = 1;
 #endif
   deviceDesc.requiredLimits = &requiredLimits;
   deviceDesc.defaultQueue.label = "The default queue";
@@ -162,7 +181,7 @@ WGPURequiredLimits Render::GetRequiredLimits(WGPUAdapter adapter) {
   static WGPUSupportedLimits supportedLimits = {};  // Zero-initialize the struct
 
 #ifdef __EMSCRIPTEN__
-                                             // Error in Chrome handling
+                                                    // Error in Chrome handling
   supportedLimits.limits.minStorageBufferOffsetAlignment = 256;
   supportedLimits.limits.minUniformBufferOffsetAlignment = 256;
 #else
@@ -170,23 +189,27 @@ WGPURequiredLimits Render::GetRequiredLimits(WGPUAdapter adapter) {
 #endif
 
   static WGPURequiredLimits requiredLimits = {};  // Assuming this is how the default is defined
-	requiredLimits.limits.maxVertexAttributes = supportedLimits.limits.maxVertexAttributes;
-	requiredLimits.limits.maxVertexBuffers = supportedLimits.limits.maxVertexBuffers;
+  requiredLimits.limits.maxVertexAttributes = supportedLimits.limits.maxVertexAttributes;
+  requiredLimits.limits.maxVertexBuffers = supportedLimits.limits.maxVertexBuffers;
   requiredLimits.limits.maxBufferSize = 150000 * sizeof(VertexAttribute);
   requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);
   requiredLimits.limits.minStorageBufferOffsetAlignment =
       supportedLimits.limits.minStorageBufferOffsetAlignment;
   requiredLimits.limits.minUniformBufferOffsetAlignment =
       supportedLimits.limits.minUniformBufferOffsetAlignment;
-	requiredLimits.limits.maxInterStageShaderComponents = supportedLimits.limits.maxInterStageShaderComponents;
-	requiredLimits.limits.maxBindGroups = supportedLimits.limits.maxBindGroups;
-	requiredLimits.limits.maxUniformBuffersPerShaderStage = supportedLimits.limits.maxUniformBuffersPerShaderStage;
+  requiredLimits.limits.maxInterStageShaderComponents = supportedLimits.limits.maxInterStageShaderComponents;
+  requiredLimits.limits.maxBindGroups = supportedLimits.limits.maxBindGroups;
+  requiredLimits.limits.maxUniformBuffersPerShaderStage = supportedLimits.limits.maxUniformBuffersPerShaderStage;
   requiredLimits.limits.maxUniformBufferBindingSize = 64 * 4 * sizeof(float);
   requiredLimits.limits.maxTextureDimension1D = 4096;
   requiredLimits.limits.maxTextureDimension2D = 4096;
-	requiredLimits.limits.maxTextureArrayLayers = supportedLimits.limits.maxTextureArrayLayers;
-	requiredLimits.limits.maxSampledTexturesPerShaderStage = supportedLimits.limits.maxSampledTexturesPerShaderStage;;
-	requiredLimits.limits.maxSamplersPerShaderStage = supportedLimits.limits.maxSamplersPerShaderStage;
+	requiredLimits.limits.maxDynamicUniformBuffersPerPipelineLayout = supportedLimits.limits.maxDynamicUniformBuffersPerPipelineLayout;
+  requiredLimits.limits.maxTextureArrayLayers = supportedLimits.limits.maxTextureArrayLayers;
+  requiredLimits.limits.maxSampledTexturesPerShaderStage = supportedLimits.limits.maxSampledTexturesPerShaderStage;
+  requiredLimits.limits.maxSamplersPerShaderStage = supportedLimits.limits.maxSamplersPerShaderStage;
+
+  StrideDynamicBuffers = supportedLimits.limits.minUniformBufferOffsetAlignment;
+  StrideStorageBuffers = supportedLimits.limits.minStorageBufferOffsetAlignment;
 
   return requiredLimits;
 }

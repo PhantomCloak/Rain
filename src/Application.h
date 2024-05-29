@@ -1,7 +1,12 @@
 #pragma once
+#ifndef NDEBUG
+#define NDEBUG
+#endif
+
 
 #include <webgpu/webgpu.h>
 #include <glm/glm.hpp>
+#include "TinyTimer.h"
 
 struct GLFWwindow;
 
@@ -29,6 +34,8 @@ class Application : public AppWindow {
 
   void OnUpdate() override;
   void OnStart() override;
+	void fetchTimestamps();
+	TinyTimer::PerformanceCounter m_perf;
  private:
   void updateDragInertia();
 

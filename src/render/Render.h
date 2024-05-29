@@ -1,7 +1,10 @@
 #pragma once
 #include <webgpu/webgpu.h>
 #include "GLFW/glfw3.h"
+#include "Material.h"
+#include "Mesh.h"
 #include <memory>
+#include <unordered_map>
 
 class Render {
  public:
@@ -41,5 +44,11 @@ class Render {
   WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_Undefined;
   WGPUTextureFormat m_depthTextureFormat = WGPUTextureFormat_Depth24Plus;
 
+	uint32_t StrideDynamicBuffers;
+	uint32_t StrideStorageBuffers;
+	uint32_t MaxAllowedStorageBufferSize;
+
   WGPUSwapChainDescriptor m_swapChainDesc;
+
+	std::unordered_map<UUID, MaterialEngine> Materials;
 };

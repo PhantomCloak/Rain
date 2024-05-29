@@ -15,6 +15,7 @@ namespace Rain {
     static std::shared_ptr<Texture> LoadTexture(std::string id, std::string path);
 
     static std::shared_ptr<Texture> GetTexture(std::string id);
+    static bool IsTextureExist(std::string id);
     static std::shared_ptr<WGPUShaderModule> GetShader(std::string id);
 
    private:

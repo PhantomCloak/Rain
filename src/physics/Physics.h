@@ -1,4 +1,8 @@
 #pragma once
+#ifndef NDEBUG
+#define NDEBUG
+#endif
+
 #include <PxPhysicsAPI.h>
 #include <glm/glm.hpp>
 
