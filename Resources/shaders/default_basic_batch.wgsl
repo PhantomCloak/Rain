@@ -33,7 +33,7 @@ struct ShadowUniform {
 };
 
 struct SceneUniform {
-    modelMatrix: mat4x4f,
+	modelMatrix : mat4x4f,
     color: vec4f,
 };
 
@@ -116,5 +116,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	let shadowedSpecular = shadow * specular;
 
 	let finalColor = (ambient + shadowedDiffuse + shadowedSpecular) * textureColor.rgb;
+	//let finalColor = (ambient + diffuse + specular) * textureColor.rgb;
 	return vec4f(finalColor, 1.0);
 }
