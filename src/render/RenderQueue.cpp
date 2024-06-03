@@ -105,7 +105,8 @@ void RenderQueue::DrawEntities(WGPURenderPassEncoder& renderPass, WGPURenderPipe
                                       0,
                                       meshSource->indexBuffer.Size);
 
-  SceneUniform entries[RENDER_BATCH_SIZE];
+	// TODO: Stacksize on emscripten
+  static SceneUniform entries[RENDER_BATCH_SIZE];
 
   wgpuRenderPassEncoderSetBindGroup(renderPass, 0, bgTransform->bindGroup, 0, 0);
 
@@ -130,5 +131,5 @@ void RenderQueue::DrawEntities(WGPURenderPassEncoder& renderPass, WGPURenderPipe
 
 void RenderQueue::Clear() {
   //_renderList.clear();
-  _renderQueue.clear();
+  //_renderQueue.clear();
 }

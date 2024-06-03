@@ -3,7 +3,7 @@
 #define NDEBUG
 #endif
 
-#include <PxPhysicsAPI.h>
+//#include <PxPhysicsAPI.h>
 #include "Model.h"
 #include "Node.h"
 #include "webgpu/webgpu.h"
@@ -27,8 +27,8 @@ class GameObject : public Node {
 		Ref<Material> materialOverride;
 
 		// Physics Stuff
-		physx::PxRigidDynamic* pxActorDynamic;
-		physx::PxRigidStatic* pxActor;
+		//physx::PxRigidDynamic* pxActorDynamic;
+		//physx::PxRigidStatic* pxActor;
 
 		bool isStatic;
 		WGPUBindGroup bgScene;

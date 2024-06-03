@@ -1,4 +1,6 @@
 #include "Material.h"
+#include <iostream>
+#include <ostream>
 #include "render/GPUAllocator.h"
 #include "render/Render.h"
 #include "render/RenderUtils.h"
@@ -13,14 +15,18 @@ void MaterialEngine::CreateMaterial(Ref<MaterialEngine> mat) {
       {2, GroupLayoutVisibility::Both, GroupLayoutType::Uniform}};
   static WGPUBindGroupLayout bglMaterial = LayoutUtils::CreateBindGroup("bgl_mesh_mat", Render::Instance->m_device, materialGroup);
 
-	if(mat->m_diffuseTextures.size() <= 0)
+	if(mat->m_diffuseTextures.size() <= 0 || mat->m_diffuseTextures[0]->View == 0)
 	{
+		std::cout << "Diffuse texture is not exist." << std::endl;
 		mat->m_diffuseTextures.push_back(Rain::ResourceManager::GetTexture("T_Default"));
 	}
 
   mat->materialUniformBuffer = GPUAllocator::GAlloc(mat->name, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(MaterialUniform));
 
-  std::vector<WGPUBindGroupEntry> bindingsMaterial(3);
+
+	std::cout << "Texture View: " << mat->m_diffuseTextures[0]->View << std::endl;
+	std::cout << "Sampler: " << Render::Instance->m_sampler << std::endl;
+  static std::vector<WGPUBindGroupEntry> bindingsMaterial(3);
 
   bindingsMaterial[0].binding = 0;
   bindingsMaterial[0].offset = 0;

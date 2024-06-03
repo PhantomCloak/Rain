@@ -27,8 +27,8 @@
 #include "render/RenderQueue.h"
 #include "render/ResourceManager.h"
 
-#include <PxPhysicsAPI.h>
-#include <pthread.h>
+//#include <PxPhysicsAPI.h>
+//#include <pthread.h>
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -44,8 +44,11 @@ extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* win
 #define SHADOW_WIDTH 4096.0f
 #define SHADOW_HEIGHT 4096.0f
 
-#define SHADOW_NEAR -200.0f
-#define SHADOW_FAR 300.0f
+#define SHADOW_NEAR 0.0f
+#define SHADOW_FAR 1500.0f
+
+//#define SHADOW_NEAR 0.10f
+//#define SHADOW_FAR 2500.0f
 float simElapsed = 0;
 
 struct CameraUniform {
@@ -70,7 +73,7 @@ std::unique_ptr<Physics> physics;
 
 std::shared_ptr<PlayerCamera> Player;
 
-//GameObject* floorCube;
+// GameObject* floorCube;
 std::vector<Ref<GameObject>> boxes;
 std::vector<Ref<GameObject>> projectiles;
 
@@ -131,7 +134,7 @@ void initBenchmark() {
   WGPUQuerySetDescriptor querySetDesc;
   querySetDesc.type = WGPUQueryType_Timestamp;
   querySetDesc.count = 2;  // start and end
-	querySetDesc.nextInChain = nullptr;
+  querySetDesc.nextInChain = nullptr;
   m_timestampQueries = wgpuDeviceCreateQuerySet(render->m_device, &querySetDesc);
 
   // Create buffer to store timestamps
@@ -140,7 +143,7 @@ void initBenchmark() {
   bufferDesc.size = 2 * sizeof(uint64_t);
   bufferDesc.usage = WGPUBufferUsage_QueryResolve | WGPUBufferUsage_CopySrc;
   bufferDesc.mappedAtCreation = false;
-	bufferDesc.nextInChain = nullptr;
+  bufferDesc.nextInChain = nullptr;
   m_timestampResolveBuffer = wgpuDeviceCreateBuffer(render->m_device, &bufferDesc);
 
   bufferDesc.label = "timestamp map buffer";
@@ -155,14 +158,14 @@ void CallBack(WGPUBufferMapAsyncStatus status, void* userData) {
   } else {
     uint64_t* timestampData = (uint64_t*)wgpuBufferGetConstMappedRange(m_timestampMapBuffer, 0, 2 * sizeof(uint64_t));
 
-		Application* app = (Application*)userData;
+    Application* app = (Application*)userData;
 
     // Use timestampData
     uint64_t begin = timestampData[0];
     uint64_t end = timestampData[1];
     uint64_t nanoseconds = (end - begin);
     float milliseconds = (float)nanoseconds * 1e-6;
-    //std::cout << "Render pass took " << milliseconds << "ms" << std::endl;
+    // std::cout << "Render pass took " << milliseconds << "ms" << std::endl;
     app->m_perf.add_sample(milliseconds * 1e-3);
 
     wgpuBufferUnmap(m_timestampMapBuffer);
@@ -179,9 +182,9 @@ void Application::fetchTimestamps() {
   }
   assert(m_timestampMapBuffer.getMapState() == BufferMapState::Unmapped);
 
-	m_timestampMapHandle = std::make_unique<WGPUBufferMapCallback>(CallBack);
+  m_timestampMapHandle = std::make_unique<WGPUBufferMapCallback>(CallBack);
 
-   wgpuBufferMapAsync(m_timestampMapBuffer, WGPUMapMode_Read, 0, 2 * sizeof(uint64_t), CallBack, this);
+  wgpuBufferMapAsync(m_timestampMapBuffer, WGPUMapMode_Read, 0, 2 * sizeof(uint64_t), CallBack, this);
 }
 
 void createPhysXObjects() {
@@ -206,24 +209,24 @@ void createPhysXObjects() {
 }
 
 void resolveTimestamps(WGPUCommandEncoder encoder) {
-	// If we are already in the middle of a mapping operation,
-	// no need to trigger a new one.
-	if (m_timestampMapHandle) return;
+  // If we are already in the middle of a mapping operation,
+  // no need to trigger a new one.
+  if (m_timestampMapHandle) {
+    return;
+  }
 
-	// Resolve the timestamp queries (write their result to the resolve buffer)
-	wgpuCommandEncoderResolveQuerySet(encoder, 
-		m_timestampQueries,
-		0, 2, // get queries 0 to 0+2
-		m_timestampResolveBuffer,
-		0
-	);
-	
-	// Copy to the map buffer
-	wgpuCommandEncoderCopyBufferToBuffer(encoder, 
-		m_timestampResolveBuffer, 0,
-		m_timestampMapBuffer, 0,
-		2 * sizeof(uint64_t)
-	);
+  // Resolve the timestamp queries (write their result to the resolve buffer)
+  wgpuCommandEncoderResolveQuerySet(encoder,
+                                    m_timestampQueries,
+                                    0, 2,  // get queries 0 to 0+2
+                                    m_timestampResolveBuffer,
+                                    0);
+
+  // Copy to the map buffer
+  wgpuCommandEncoderCopyBufferToBuffer(encoder,
+                                       m_timestampResolveBuffer, 0,
+                                       m_timestampMapBuffer, 0,
+                                       2 * sizeof(uint64_t));
 }
 
 //=================================================================================
@@ -309,12 +312,12 @@ void Application::OnStart() {
 #endif
 
   if (render->m_surface == nullptr) {
-		// RN_ERROR("Failed to create a rendering surface. The surface returned is null.");
+    // RN_ERROR("Failed to create a rendering surface. The surface returned is null.");
     exit(-1);
   }
 
   render->Init(render->m_window, instance);
-	GPUAllocator::Init(render->m_device);
+  GPUAllocator::Init(render->m_device);
   RenderQueue::Init();
 
   Rain::ResourceManager::Init(std::make_shared<WGPUDevice>(render->m_device));
@@ -404,6 +407,12 @@ void Application::OnStart() {
       {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
       {1, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler}};
 
+
+  GroupLayout debugGroup = {
+      {0, GroupLayoutVisibility::Fragment, GroupLayoutType::TextureDepth},
+      {1, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler},
+      {2, GroupLayoutVisibility::Fragment, GroupLayoutType::Uniform}};
+
   static std::map<int, GroupLayout> layoutShadow;
   layoutShadow.insert({0, sceneGroup});
   layoutShadow.insert({1, cameraGroup});
@@ -412,10 +421,13 @@ void Application::OnStart() {
   layoutDefault.insert({0, sceneGroup});
   layoutDefault.insert({1, cameraGroup});
   layoutDefault.insert({2, materialGroup});
-  //layoutDefault.insert({3, shadowGroup});
+  layoutDefault.insert({3, shadowGroup});
 
   static std::map<int, GroupLayout> layoutPpfx;
   layoutPpfx.insert({0, ppfxGroup});
+
+  static std::map<int, GroupLayout> layoutDebug;
+	layoutDebug.insert({0, debugGroup});
 
   BufferLayout vertexLayoutPpfx = {
       {ShaderDataType::Float3, "position"},
@@ -427,35 +439,42 @@ void Application::OnStart() {
   WGPUTexture shadowDepthTexture = render->GetDepthBufferTexture(render->m_device, render->m_depthTextureFormat, SHADOW_WIDTH, SHADOW_HEIGHT, true);
   shadowDepthView = render->GetDepthBufferTextureView("T_Depth_Shadow", shadowDepthTexture, render->m_depthTextureFormat);
 
-  //pipelineShadow = pipelineManager->CreatePipeline("RP_Shadow",
-  //                                                 "SH_Shadow",
-  //                                                 avertexLayoutDefault,
-  //                                                 layoutShadow,
-  //                                                 render->m_depthTextureFormat,
-  //                                                 WGPUTextureFormat_Undefined,
-  //                                                 WGPUCullMode_Back,
-  //                                                 render->m_surface,
-  //                                                 render->m_adapter);
+  pipelineShadow = pipelineManager->CreatePipeline("RP_Shadow",
+                                                   "SH_Shadow",
+                                                   avertexLayoutDefault,
+                                                   layoutShadow,
+                                                   render->m_depthTextureFormat,
+                                                   WGPUTextureFormat_Undefined,
+                                                   WGPUCullMode_Back,
+                                                   render->m_surface,
+                                                   render->m_adapter);
 
-  shadowPos = glm::vec3(-166, 179, 0);
-  shadowRot = glm::vec3(-48, 0, 0);
+  //shadowPos = glm::vec3(-166, 179, 0);
+  //shadowRot = glm::vec3(-48, 0, 0);
+
+	shadowPos = glm::vec3(212, 852, 71);
+  shadowRot = glm::vec3(-107, 35, 0);
 
   shadowView = GetViewMatrix(shadowPos, shadowRot);
-  const float shadowFrustum = 80;
-  shadowProjection = glm::ortho(-shadowFrustum, shadowFrustum, -shadowFrustum, shadowFrustum,
-                                SHADOW_NEAR,
-                                SHADOW_FAR);
+  const float shadowFrustum = 200;
+	shadowProjection = glm::ortho(-shadowFrustum, shadowFrustum, -shadowFrustum, shadowFrustum,
+                                 SHADOW_NEAR,
+                                 SHADOW_FAR);
+
+  //shadowProjection = glm::ortho(-SHADOW_WIDTH / 2, SHADOW_WIDTH / 2, -SHADOW_HEIGHT / 2, SHADOW_HEIGHT / 2,
+  //                              SHADOW_NEAR,
+  //                              SHADOW_FAR);
 
   // Prep. Offscreen Render Resources
   // =======================================================
 
   pipelineDefault = pipelineManager->CreatePipeline("RP_Default",
-                                                    "SH_DefaultBasicBatchDebug",
+                                                    "SH_DefaultBasicBatch",
                                                     avertexLayoutDefault,
                                                     layoutDefault,
                                                     render->m_depthTextureFormat,
                                                     render->m_swapChainFormat,
-                                                    WGPUCullMode_None,
+                                                    WGPUCullMode_Back,
                                                     render->m_surface,
                                                     render->m_adapter);
 
@@ -491,28 +510,28 @@ void Application::OnStart() {
 
   wgpuQueueWriteBuffer(render->m_queue, shadowUniformBuffer, 0, &shadowUniform, sizeof(ShadowUniform));
 
-  //WGPUBindGroupLayout bglShadow = wgpuRenderPipelineGetBindGroupLayout(pipelineDefault, 3);
-  //static std::vector<WGPUBindGroupEntry> bgEntriesShadowMap(3);
+  WGPUBindGroupLayout bglShadow = wgpuRenderPipelineGetBindGroupLayout(pipelineDefault, 3);
+  static std::vector<WGPUBindGroupEntry> bgEntriesShadowMap(3);
 
-  //bgEntriesShadowMap[0].binding = 0;
-  //bgEntriesShadowMap[0].offset = 0;
-  //bgEntriesShadowMap[0].textureView = shadowDepthView;
+  bgEntriesShadowMap[0].binding = 0;
+  bgEntriesShadowMap[0].offset = 0;
+  bgEntriesShadowMap[0].textureView = shadowDepthView;
 
-  //bgEntriesShadowMap[1].binding = 1;
-  //bgEntriesShadowMap[1].offset = 0;
-  //bgEntriesShadowMap[1].sampler = shadowSampler;
+  bgEntriesShadowMap[1].binding = 1;
+  bgEntriesShadowMap[1].offset = 0;
+  bgEntriesShadowMap[1].sampler = shadowSampler;
 
-  //bgEntriesShadowMap[2].binding = 2;
-  //bgEntriesShadowMap[2].offset = 0;
-  //bgEntriesShadowMap[2].buffer = shadowUniformBuffer;
-  //bgEntriesShadowMap[2].size = sizeof(ShadowUniform);
+  bgEntriesShadowMap[2].binding = 2;
+  bgEntriesShadowMap[2].offset = 0;
+  bgEntriesShadowMap[2].buffer = shadowUniformBuffer;
+  bgEntriesShadowMap[2].size = sizeof(ShadowUniform);
 
-  //static WGPUBindGroupDescriptor bgDescShadowMap = {.label = "bg_shadowmap"};
-  //bgDescShadowMap.layout = bglShadow;
-  //bgDescShadowMap.entryCount = (uint32_t)bgEntriesShadowMap.size();
-  //bgDescShadowMap.entries = bgEntriesShadowMap.data();
+  static WGPUBindGroupDescriptor bgDescShadowMap = {.label = "bg_shadowmap"};
+  bgDescShadowMap.layout = bglShadow;
+  bgDescShadowMap.entryCount = (uint32_t)bgEntriesShadowMap.size();
+  bgDescShadowMap.entries = bgEntriesShadowMap.data();
 
-  //bgShadowMap = wgpuDeviceCreateBindGroup(render->m_device, &bgDescShadowMap);
+  bgShadowMap = wgpuDeviceCreateBindGroup(render->m_device, &bgDescShadowMap);
 
   Player = std::make_shared<PlayerCamera>();
   Player->Position.y = 0;
@@ -524,71 +543,66 @@ void Application::OnStart() {
   // Prep. Debug Resources
   // =======================================================
 
-  // BufferLayout vertexLayoutDebug = {
-  //     {ShaderDataType::Float3, "position"},
-  //     {ShaderDataType::Float2, "uv"}};
+  BufferLayout vertexLayoutDebug = {
+      {ShaderDataType::Float3, "position"},
+      {ShaderDataType::Float2, "uv"}};
 
-  // GroupLayout groupLayoutDebug = {
-  //     {0, GroupLayoutVisibility::Fragment, GroupLayoutType::TextureDepth},
-  //     {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler},
-  //     {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Uniform}};
+  static DebugUniform debugUniform = {
+      .near = SHADOW_NEAR,
+      .far = SHADOW_FAR};
 
-  // static DebugUniform debugUniform = {
-  //     .near = SHADOW_NEAR,
-  //     .far = SHADOW_FAR};
+  WGPUBufferDescriptor debugUniformDesc = {};
+  debugUniformDesc.size = sizeof(DebugUniform);
+  debugUniformDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
+  debugUniformDesc.mappedAtCreation = false;
 
-  // WGPUBufferDescriptor debugUniformDesc = {};
-  // debugUniformDesc.size = sizeof(DebugUniform);
-  // debugUniformDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform;
-  // debugUniformDesc.mappedAtCreation = false;
+  static WGPUBuffer debugUniformBuffer;
+  debugUniformBuffer = wgpuDeviceCreateBuffer(render->m_device, &debugUniformDesc);
+  wgpuQueueWriteBuffer(render->m_queue, debugUniformBuffer, 0, &debugUniform, sizeof(DebugUniform));
 
-  // static WGPUBuffer debugUniformBuffer;
-  // debugUniformBuffer = wgpuDeviceCreateBuffer(render->m_device, &debugUniformDesc);
-  // wgpuQueueWriteBuffer(render->m_queue, debugUniformBuffer, 0, &debugUniform, sizeof(DebugUniform));
+  static std::vector<WGPUBindGroupEntry> bgEntriesDebug(3);
 
-  // static std::vector<WGPUBindGroupEntry> bgEntriesDebug(3);
+  bgEntriesDebug[0].binding = 0;
+  bgEntriesDebug[0].textureView = shadowDepthView;
+  bgEntriesDebug[0].offset = 0;
 
-  // bgEntriesDebug[0].binding = 0;
-  // bgEntriesDebug[0].textureView = shadowDepthView;
-  // bgEntriesDebug[0].offset = 0;
+  bgEntriesDebug[1].binding = 1;
+  bgEntriesDebug[1].sampler = render->m_sampler;
+  bgEntriesDebug[1].offset = 0;
 
-  // bgEntriesDebug[1].binding = 1;
-  // bgEntriesDebug[1].sampler = render->m_sampler;
-  // bgEntriesDebug[1].offset = 0;
+  bgEntriesDebug[2].binding = 2;
+  bgEntriesDebug[2].buffer = debugUniformBuffer;
+  bgEntriesDebug[2].size = sizeof(DebugUniform);
+  bgEntriesDebug[2].offset = 0;
 
-  // bgEntriesDebug[2].binding = 2;
-  // bgEntriesDebug[2].buffer = debugUniformBuffer;
-  // bgEntriesDebug[2].size = sizeof(DebugUniform);
-  // bgEntriesDebug[2].offset = 0;
+  pipelineDebug = pipelineManager->CreatePipeline("RP_Debug",
+                                                  "SH_Debug",
+                                                  vertexLayoutQuad,
+                                                  layoutDebug,
+                                                  WGPUTextureFormat_Undefined,
+                                                  render->m_swapChainFormat,
+                                                  WGPUCullMode_None,
+                                                  render->m_surface,
+                                                  render->m_adapter);
 
-  // pipelineDebug = pipelineManager->CreatePipeline("RP_Debug",
-  //                                                 "SH_Debug",
-  //                                                 vertexLayoutQuad,
-  //                                                 groupLayoutDebug,
-  //                                                 WGPUTextureFormat_Undefined,
-  //                                                 render->m_swapChainFormat,
-  //                                                 WGPUCullMode_None,
-  //                                                 render->m_surface,
-  //                                                 render->m_adapter);
+  static WGPUBindGroupDescriptor bgDescDebug = {.label = "bg_debug"};
+  bgDescDebug.layout = wgpuRenderPipelineGetBindGroupLayout(pipelineDebug, 0);
+  bgDescDebug.entryCount = (uint32_t)bgEntriesDebug.size();
+  bgDescDebug.entries = bgEntriesDebug.data();
 
-  // static WGPUBindGroupDescriptor bgDescDebug = {.label = "bg_debug"};
-  // bgDescDebug.layout = wgpuRenderPipelineGetBindGroupLayout(pipelineDebug, 0);
-  // bgDescDebug.entryCount = (uint32_t)bgEntriesDebug.size();
-  // bgDescDebug.entries = bgEntriesDebug.data();
+  bgDebug = wgpuDeviceCreateBindGroup(render->m_device, &bgDescDebug);
 
-  // bgDebug = wgpuDeviceCreateBindGroup(render->m_device, &bgDescDebug);
+  WGPUTextureDescriptor textureDescDebug = {
+      .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+      .dimension = WGPUTextureDimension_2D,
+      .size = {static_cast<uint32_t>(screenWidth), static_cast<uint32_t>(screenHeight), 1},
+      .format = WGPUTextureFormat_BGRA8Unorm,
+      .mipLevelCount = 1,
+      .sampleCount = 1,
+  };
 
-  // WGPUTextureDescriptor textureDescDebug = {
-  //     .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
-  //     .dimension = WGPUTextureDimension_2D,
-  //     .size = {static_cast<uint32_t>(screenWidth), static_cast<uint32_t>(screenHeight), 1},
-  //     .format = WGPUTextureFormat_BGRA8Unorm,
-  //     .mipLevelCount = 1,
-  //     .sampleCount = 1,
-  // };
-
-  // WGPUTexture debugOutTexture = wgpuDeviceCreateTexture(render->m_device, &textureDescDebug);
-  // debugOutTextureView = wgpuTextureCreateView(debugOutTexture, nullptr);
+  WGPUTexture debugOutTexture = wgpuDeviceCreateTexture(render->m_device, &textureDescDebug);
+  debugOutTextureView = wgpuTextureCreateView(debugOutTexture, nullptr);
 
   // Prep. PPFX Resources
   // =======================================================
@@ -682,8 +696,8 @@ void Application::OnStart() {
   // Prep. Scene & Systems
   // =======================================================
 
-  physics->Initialise();
-  createPhysXObjects();
+  //physics->Initialise();
+  //createPhysXObjects();
 
   Material mat;
   mat.properties.diffuseColor = glm::vec3(0.30, 0, 0);
@@ -697,33 +711,33 @@ void Application::OnStart() {
   mat3.properties.diffuseColor = glm::vec3(0.0, 0.30, 0);
   mat3.properties.shininess = 128;
 
-  //Ref<Model> floorModel = CreateRef<Model>(RESOURCE_DIR "/models/box.gltf", render->m_sampler);
-  //Ref<Model> cubeModel = CreateRef<Model>(RESOURCE_DIR "/models/putty.gltf", render->m_sampler);
-  //Ref<Model> cubeModel = CreateRef<Model>(RESOURCE_DIR "/models/Sponza.gltf", render->m_sampler);
-  Ref<MeshSource> test = CreateRef<MeshSource>(RESOURCE_DIR "/models/Sponza.gltf");
-  //Ref<MeshSource> test = CreateRef<MeshSource>(RESOURCE_DIR "/models/koko.gltf");
-  //sphereModel = CreateRef<Model>(RESOURCE_DIR "/models/sphere.gltf", render->m_sampler);
+  // Ref<Model> floorModel = CreateRef<Model>(RESOURCE_DIR "/models/box.gltf", render->m_sampler);
+  // Ref<Model> cubeModel = CreateRef<Model>(RESOURCE_DIR "/models/putty.gltf", render->m_sampler);
+  // Ref<Model> cubeModel = CreateRef<Model>(RESOURCE_DIR "/models/Sponza.gltf", render->m_sampler);
+  Ref<MeshSource> test = CreateRef<MeshSource>(RESOURCE_DIR "/models/SponzaExp5.gltf");
+  // Ref<MeshSource> test = CreateRef<MeshSource>(RESOURCE_DIR "/models/koko.gltf");
+  // sphereModel = CreateRef<Model>(RESOURCE_DIR "/models/sphere.gltf", render->m_sampler);
 
-  //floorCube = new GameObject("floor", floorModel);
-  //floorCube->Transform.position = glm::vec3(0, -1, 0);
-  //floorCube->Transform.scale = glm::vec3(50, 1, 50);
+  // floorCube = new GameObject("floor", floorModel);
+  // floorCube->Transform.position = glm::vec3(0, -1, 0);
+  // floorCube->Transform.scale = glm::vec3(50, 1, 50);
 
   for (int i = 0; i < 1; i++) {
     std::string id = std::to_string(i) + "_box";
     Ref<GameObject> box = CreateRef<GameObject>(id, test);
 
     box->Transform.position = glm::vec3(0, (i * 2) + 0.8f, 0);
-    box->AddPhysics();
+    //box->AddPhysics();
 
     boxes.push_back(box);
   }
 
-  //floorCube->UpdateUniforms();
+  // floorCube->UpdateUniforms();
 
   Cursor::Setup(render->m_window);
   Keyboard::Setup(render->m_window);
-	initBenchmark();
-	sleep(1);
+  //initBenchmark();
+  //sleep(1);
 
   Cursor::CaptureMouse(true);
 }
@@ -742,7 +756,7 @@ void Application::OnResize(int height, int width) {
 }
 
 void MoveControls() {
-  float speed = 0.1f;
+  float speed = 1.1f;
 
   if (Keyboard::IsKeyPressing(Rain::Key::W)) {
     Player->ProcessKeyboard(FORWARD, speed);
@@ -765,27 +779,28 @@ void MoveControls() {
 }
 
 void Application::OnUpdate() {
+	//std::cout << "Update start" << std::endl;
   glfwPollEvents();
   MoveControls();
 
   auto start = std::chrono::high_resolution_clock::now();
-  physics->gScene->simulate(1.0f / 60.0f);
-  physics->gScene->fetchResults(true);
+  //physics->gScene->simulate(1.0f / 60.0f);
+  //physics->gScene->fetchResults(true);
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> duration = end - start;
 
   // Output the duration
   simElapsed = duration.count();
 
-  //floorCube->Draw();
+  // floorCube->Draw();
   for (auto box : boxes) {
     box->Update();
     box->Draw();
   }
-  for (auto projectile : projectiles) {
-    projectile->Update();
-    projectile->Draw();
-  }
+  //for (auto projectile : projectiles) {
+  //  projectile->Update();
+  //  projectile->Draw();
+  //}
 
   render->nextTexture = wgpuSwapChainGetCurrentTextureView(render->m_swapChain);
 
@@ -802,38 +817,68 @@ void Application::OnUpdate() {
   WGPUCommandEncoderDescriptor commandEncoderDesc = {.label = "Command Encoder"};
   render->encoder = wgpuDeviceCreateCommandEncoder(render->m_device, &commandEncoderDesc);
 
-  //wgpuCommandEncoderWriteTimestamp(render->encoder, m_timestampQueries, 0);
+  // wgpuCommandEncoderWriteTimestamp(render->encoder, m_timestampQueries, 0);
 
   // Shadow Pass
   // =======================================================
 
-  //WGPURenderPassDepthStencilAttachment shadowDepthAttachment;
-  //shadowDepthAttachment.view = shadowDepthView;
-  //shadowDepthAttachment.depthClearValue = 1.0f;
-  //shadowDepthAttachment.depthLoadOp = WGPULoadOp_Clear;
-  //shadowDepthAttachment.depthStoreOp = WGPUStoreOp_Store;
-  //shadowDepthAttachment.depthReadOnly = false;
-  //shadowDepthAttachment.stencilClearValue = 0;
-  //shadowDepthAttachment.stencilLoadOp = WGPULoadOp_Undefined;
-  //shadowDepthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
-  //shadowDepthAttachment.stencilReadOnly = true;
+  WGPURenderPassDepthStencilAttachment shadowDepthAttachment;
+  shadowDepthAttachment.view = shadowDepthView;
+  shadowDepthAttachment.depthClearValue = 1.0f;
+  shadowDepthAttachment.depthLoadOp = WGPULoadOp_Clear;
+  shadowDepthAttachment.depthStoreOp = WGPUStoreOp_Store;
+  shadowDepthAttachment.depthReadOnly = false;
+  shadowDepthAttachment.stencilClearValue = 0;
+  shadowDepthAttachment.stencilLoadOp = WGPULoadOp_Undefined;
+  shadowDepthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
+  shadowDepthAttachment.stencilReadOnly = true;
 
-  //WGPURenderPassDescriptor shadowPassDesc{.label = "shadow_pass"};
-  ////shadowPassDesc.timestampWrites = &writes;
-  //shadowPassDesc.timestampWrites = nullptr;
-  //shadowPassDesc.colorAttachments = nullptr;
+  WGPURenderPassDescriptor shadowPassDesc{.label = "shadow_pass"};
+  shadowPassDesc.timestampWrites = nullptr;
+  shadowPassDesc.colorAttachments = nullptr;
 
-  //shadowPassDesc.colorAttachmentCount = 0;
-  //shadowPassDesc.depthStencilAttachment = &shadowDepthAttachment;
+  shadowPassDesc.colorAttachmentCount = 0;
+  shadowPassDesc.depthStencilAttachment = &shadowDepthAttachment;
 
-  //WGPURenderPassEncoder shadowPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &shadowPassDesc);
+  WGPURenderPassEncoder shadowPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &shadowPassDesc);
 
-  //wgpuRenderPassEncoderSetBindGroup(shadowPassEncoder, 1, bgCameraShadow, 0, NULL);
-  //wgpuRenderPassEncoderSetViewport(shadowPassEncoder, 0, 0, SHADOW_WIDTH, SHADOW_HEIGHT, 0, 1);
+  wgpuRenderPassEncoderSetBindGroup(shadowPassEncoder, 1, bgCameraShadow, 0, NULL);
+  wgpuRenderPassEncoderSetViewport(shadowPassEncoder, 0, 0, SHADOW_WIDTH, SHADOW_HEIGHT, 0, 1);
 
-  //RenderQueue::DrawEntities(shadowPassEncoder, pipelineShadow);
+	//std::cout << "About to draw" << std::endl;
+  RenderQueue::DrawEntities(shadowPassEncoder, pipelineShadow);
+	//std::cout << "Drwa complete" << std::endl;
 
-  //wgpuRenderPassEncoderEnd(shadowPassEncoder);
+  wgpuRenderPassEncoderEnd(shadowPassEncoder);
+
+	// Debug Pass
+  // =======================================================
+
+   WGPURenderPassColorAttachment debugColorAttachment = {};
+   debugColorAttachment.loadOp = WGPULoadOp_Clear;
+   debugColorAttachment.storeOp = WGPUStoreOp_Store;
+   debugColorAttachment.clearValue = {0.0, 0.0, 0.0, 1.0};
+   debugColorAttachment.view = debugOutTextureView;
+  #if !__EMSCRIPTEN__
+   // debugColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+  #endif
+  
+   WGPURenderPassDescriptor debugPassDesc{.label = "debug_pass"};
+   debugPassDesc.colorAttachmentCount = 1;
+   debugPassDesc.timestampWrites = 0;
+   debugPassDesc.timestampWrites = nullptr;
+   debugPassDesc.colorAttachments = &debugColorAttachment;
+  
+   WGPURenderPassEncoder debugPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &debugPassDesc);
+  
+   wgpuRenderPassEncoderSetPipeline(debugPassEncoder, pipelineDebug);
+   wgpuRenderPassEncoderSetVertexBuffer(debugPassEncoder, 0, vertexBufferPpfx, 0, sizeof(quadVertices));
+   wgpuRenderPassEncoderSetIndexBuffer(debugPassEncoder, indexBufferPpfx, WGPUIndexFormat_Uint32, 0, sizeof(quadIndices));
+   wgpuRenderPassEncoderSetBindGroup(debugPassEncoder, 0, bgDebug, 0, nullptr);
+  
+   wgpuRenderPassEncoderDrawIndexed(debugPassEncoder, 6, 1, 0, 0, 0);
+  
+   wgpuRenderPassEncoderEnd(debugPassEncoder);
 
   // Lit Pass
   // =======================================================
@@ -861,15 +906,20 @@ void Application::OnUpdate() {
 
   WGPURenderPassDescriptor litPassDesc{.label = "first_pass"};
   litPassDesc.colorAttachmentCount = 1;
-  //litPassDesc.timestampWrites = nullptr;
-  litPassDesc.timestampWrites = &writes;
+
+#if __EMSCRIPTEN__
+   litPassDesc.timestampWrites = nullptr;
+#else
+  //litPassDesc.timestampWrites = &writes;
+#endif
+
   litPassDesc.colorAttachments = &litColorAttachment;
   litPassDesc.depthStencilAttachment = &litDepthAttachment;
 
   WGPURenderPassEncoder litPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &litPassDesc);
 
   wgpuRenderPassEncoderSetBindGroup(litPassEncoder, 1, bgCameraDefault, 0, NULL);
-  //wgpuRenderPassEncoderSetBindGroup(litPassEncoder, 3, bgShadowMap, 0, NULL);
+  wgpuRenderPassEncoderSetBindGroup(litPassEncoder, 3, bgShadowMap, 0, NULL);
 
   RenderQueue::DrawEntities(litPassEncoder, pipelineDefault);
 
@@ -904,17 +954,15 @@ void Application::OnUpdate() {
   wgpuRenderPassEncoderDrawIndexed(ppfxPassEncoder, 6, 1, 0, 0, 0);
   drawImgui(ppfxPassEncoder);
 
-
   wgpuRenderPassEncoderEnd(ppfxPassEncoder);
 
   // Submit
   // =======================================================
 
-  //wgpuCommandEncoderWriteTimestamp(render->encoder, querySet, 1);
+  // wgpuCommandEncoderWriteTimestamp(render->encoder, querySet, 1);
 
-	resolveTimestamps(render->encoder);
+  //resolveTimestamps(render->encoder);
   wgpuTextureViewRelease(render->nextTexture);
-
 
   WGPUCommandBufferDescriptor cmdBufferDescriptor = {.label = "Command Buffer"};
   WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(render->encoder, &cmdBufferDescriptor);
@@ -922,13 +970,15 @@ void Application::OnUpdate() {
   wgpuQueueSubmit(render->m_queue, 1, &commandBuffer);
   RenderQueue::Clear();
 
-	fetchTimestamps();
+
+#if !__EMSCRIPTEN__
+  //fetchTimestamps();
+#endif
 
 #ifndef __EMSCRIPTEN__
   wgpuSwapChainPresent(render->m_swapChain);
   wgpuDeviceTick(render->m_device);
 #endif
-
 }
 
 void Application::OnMouseClick(Rain::MouseCode button) {
@@ -1030,7 +1080,7 @@ void Application::drawImgui(WGPURenderPassEncoder renderPass) {
   if (ImGui::InputFloat(_labelPrefix("Shadow Rot Z").c_str(), &shadowRot.z, 0.5f)) {
     updateShadows = true;
   }
-  // ImGui::Image((ImTextureID)debugOutTextureView, ImVec2(500, 500));
+	ImGui::Image((ImTextureID)debugOutTextureView, ImVec2(500, 500));
 
   if (updateShadows) {
     shadowUniform.lightPos = shadowPos;
@@ -1052,12 +1102,11 @@ void Application::drawImgui(WGPURenderPassEncoder renderPass) {
 
   ImGui::End();
 
-
 #ifdef RN_DEBUG
   ImGui::Begin("Statistics");
-	ImGui::Text("Render pass duration on GPU: %s", m_perf.summary().c_str());
-	ImGui::Text("Physics simulation duration %.3f ms", simElapsed);
-	ImGui::End();
+  ImGui::Text("Render pass duration on GPU: %s", m_perf.summary().c_str());
+  ImGui::Text("Physics simulation duration %.3f ms", simElapsed);
+  ImGui::End();
 #endif
 
   if (ImGui::BeginMainMenuBar()) {

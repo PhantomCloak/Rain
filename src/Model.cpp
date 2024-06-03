@@ -240,6 +240,7 @@ MeshSource::MeshSource(std::string path) {
   }
 
   std::string fileName = FileSys::GetFileName(path);
+	std::string fileDirectory = FileSys::GetParentDirectory(path);
 
   vertexBuffer = GPUAllocator::GAlloc("v_buffer_" + fileName, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex, (verticesCount * sizeof(VertexAttribute) + 3) & ~3);
   indexBuffer = GPUAllocator::GAlloc("i_buffer_" + fileName, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index, (indexCount * sizeof(unsigned int) + 3) & ~3);
@@ -292,7 +293,7 @@ MeshSource::MeshSource(std::string path) {
       if (Rain::ResourceManager::IsTextureExist(textureName)) {
         matTexture = Rain::ResourceManager::GetTexture(textureName);
       } else {
-        matTexture = Rain::ResourceManager::LoadTexture(textureName, texturePath.C_Str());
+				matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
       }
 
       currentMaterial->SetDiffuseTexture("texture_diffuse" + std::to_string(j), matTexture);

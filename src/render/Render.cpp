@@ -4,16 +4,19 @@
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
+#else
+#include <dawn/dawn_proc.h>
 #endif
 #include <iostream>
 
-#include <dawn/dawn_proc.h>
 
 Render* Render::Instance = nullptr;
 
 WGPUInstance instance;
 WGPUInstance Render::CreateInstance() {
   WGPUInstanceDescriptor instanceDesc;
+
+#if !__EMSCRIPTEN__
   static std::vector<const char*> enabledToggles = {
       "allow_unsafe_apis",
   };
@@ -30,6 +33,7 @@ WGPUInstance Render::CreateInstance() {
 
 	instanceDesc.features.timedWaitAnyEnable = 0;
 	instanceDesc.features.timedWaitAnyMaxCount = 64;
+#endif
 
   instance = wgpuCreateInstance(&instanceDesc);
   if (!instance) {
