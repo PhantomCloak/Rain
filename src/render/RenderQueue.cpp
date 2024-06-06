@@ -12,31 +12,97 @@ struct BatchGroup {
   int offset;
 };
 
+// MS
+//  -> int MS, vec<Materials>
+//		-> int MatIdx, vec<SubMesh>
+//			-> int SubMeshId, vec<Nodes>
+
+
+typedef int MeshSourceIndex;
+
+typedef std::unordered_map<int, std::vector<int>> SubMeshTable;
+typedef std::unordered_map<int, std::vector<int>> MaterialTable;
+
 std::vector<BatchGroup> _batchGroups;
-std::unordered_map<int, std::vector<int>> materialSubmeshes;
-std::unordered_map<int, std::vector<Ref<MeshNode>>> subMeshNodes;
-std::unordered_map<int, Ref<MeshSource>> indexedMeshSources;
 
-Ref<MeshSource> meshSource = nullptr;
+// MeshSource -> SubMesh
 
-void IndexMeshSource(Ref<MeshSource> meshSource) {
+std::unordered_map<MeshSourceIndex, Ref<MeshSource>> indexedMeshSources;
+std::unordered_map<MeshSourceIndex, MaterialTable> materialSubmeshes;
+std::unordered_map<MeshSourceIndex, SubMeshTable> subMeshNodes;
 
-}
+// Ref<MeshSource> meshSource = nullptr;
 
-void RenderQueue::AddQueue(GameObject* gameObject) {
-  if (meshSource == nullptr) {
-    meshSource = gameObject->modelExp;
+void RenderQueue::IndexMeshSource(Ref<MeshSource> meshSource) {
+  if (indexedMeshSources.find(meshSource->Id) != indexedMeshSources.end()) {
+    return;
+  }
 
-    for (int i = 0; i < meshSource->m_SubMeshes.size(); i++) {
-      const SubMesh& subMesh = meshSource->m_SubMeshes[i];
-      materialSubmeshes[subMesh.MaterialIndex].push_back(i);
-    }
+  indexedMeshSources[meshSource->Id] = meshSource;
 
-    for (const auto& node : gameObject->modelExp->m_Nodes) {
-			subMeshNodes[node->SubMeshId].push_back(node);
-    }
+  for (int i = 0; i < meshSource->m_SubMeshes.size(); i++) {
+    const SubMesh& subMesh = meshSource->m_SubMeshes[i];
+    materialSubmeshes[meshSource->Id][subMesh.MaterialIndex].push_back(i);
   }
 }
+
+void RenderQueue::AddQueue(RenderQueueItem item) {
+  subMeshNodes[item.MeshSourceId][item.Node.SubMeshId].push_back(item.NodeIdx);
+}
+
+// Thus it shall be simple yet efficent "enough" batch loop
+void RenderQueue::DrawEntities(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline) {
+  wgpuRenderPassEncoderSetPipeline(renderPass, pipeline);
+
+  // TODO: Stacksize on emscripten
+  static SceneUniform entries[RENDER_BATCH_SIZE];
+
+  wgpuRenderPassEncoderSetBindGroup(renderPass, 0, bgTransform->bindGroup, 0, 0);
+
+  for (const auto& [sourceIndex, meshSource] : indexedMeshSources) {
+    int drawOffset = 0;
+
+    wgpuRenderPassEncoderSetVertexBuffer(renderPass,
+                                         0,
+                                         meshSource->m_VertexBuffer.Buffer,
+                                         0,
+                                         meshSource->m_VertexBuffer.Size);
+
+    wgpuRenderPassEncoderSetIndexBuffer(renderPass,
+                                        meshSource->m_IndexBuffer.Buffer,
+                                        WGPUIndexFormat_Uint32,
+                                        0,
+                                        meshSource->m_IndexBuffer.Size);
+
+    for (const auto& [materialIndex, subMeshesIndexes] : materialSubmeshes[sourceIndex]) {
+      wgpuRenderPassEncoderSetBindGroup(renderPass, 2, meshSource->m_Materials[materialIndex]->bgMaterial, 0, 0);
+
+      for (int subMeshIndex : subMeshesIndexes) {
+        const SubMesh& subMesh = meshSource->m_SubMeshes[subMeshIndex];
+
+				int drawCount = subMeshNodes[sourceIndex][subMeshIndex].size();
+
+        wgpuRenderPassEncoderDrawIndexed(renderPass, subMesh.IndexCount, drawCount, subMesh.BaseIndex, subMesh.BaseVertex, drawOffset);
+
+        for (int i = 0; i < drawCount; i++) {
+          Ref<MeshNode> node = meshSource->m_Nodes[subMeshNodes[sourceIndex][subMeshIndex][i]];
+          entries[drawOffset + i].modelMatrix = node->LocalTransform;
+        }
+        drawOffset += drawCount;
+      }
+    }
+    wgpuQueueWriteBuffer(Render::Instance->m_queue, bgTransform->buffer.Buffer, 0, &entries[0], sizeof(SceneUniform) * drawOffset);
+  }
+}
+
+void RenderQueue::Clear() {
+
+	for(const auto& [_, subMesh] : subMeshNodes)
+	{
+		subMeshNodes.clear();
+	}
+}
+
 
 BatchGroup CreateBindBatch2(WGPUBindGroupLayout layout) {
   static int nextBindgroupId = 0;
@@ -62,7 +128,6 @@ BatchGroup CreateBindBatch2(WGPUBindGroupLayout layout) {
 
   return result;
 }
-
 BatchGroup* bgTransform;
 void RenderQueue::Init() {
   static GroupLayout sceneGroup = {{0, GroupLayoutVisibility::Vertex, GroupLayoutType::StorageReadOnly}};
@@ -88,48 +153,4 @@ void RenderQueue::Init() {
   bgSceneDesc.entries = binding.data();
 
   bgTransform->bindGroup = wgpuDeviceCreateBindGroup(Render::Instance->m_device, &bgSceneDesc);
-}
-
-void RenderQueue::DrawEntities(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline) {
-  wgpuRenderPassEncoderSetPipeline(renderPass, pipeline);
-
-  wgpuRenderPassEncoderSetVertexBuffer(renderPass,
-                                       0,
-                                       meshSource->vertexBuffer.Buffer,
-                                       0,
-                                       meshSource->vertexBuffer.Size);
-
-  wgpuRenderPassEncoderSetIndexBuffer(renderPass,
-                                      meshSource->indexBuffer.Buffer,
-                                      WGPUIndexFormat_Uint32,
-                                      0,
-                                      meshSource->indexBuffer.Size);
-
-	// TODO: Stacksize on emscripten
-  static SceneUniform entries[RENDER_BATCH_SIZE];
-
-  wgpuRenderPassEncoderSetBindGroup(renderPass, 0, bgTransform->bindGroup, 0, 0);
-
-  int drawOffset = 0;
-  for (const auto& [materialIndex, subMeshesIndexes] : materialSubmeshes) {
-    wgpuRenderPassEncoderSetBindGroup(renderPass, 2, meshSource->m_Materials[materialIndex]->bgMaterial, 0, 0);
-
-    for (int subMeshIndex : subMeshesIndexes) {
-      const SubMesh& subMesh = meshSource->m_SubMeshes[subMeshIndex];
-      int drawCount = subMeshNodes[subMeshIndex].size();
-      wgpuRenderPassEncoderDrawIndexed(renderPass, subMesh.IndexCount, drawCount, subMesh.BaseIndex, subMesh.BaseVertex, drawOffset);
-
-      for (int i = 0; i < drawCount; i++) {
-        entries[drawOffset + i].modelMatrix = subMeshNodes[subMeshIndex][i]->LocalTransform;
-      }
-      drawOffset += drawCount;
-    }
-  }
-
-  wgpuQueueWriteBuffer(Render::Instance->m_queue, bgTransform->buffer.Buffer, 0, &entries[0], sizeof(SceneUniform) * drawOffset);
-}
-
-void RenderQueue::Clear() {
-  //_renderList.clear();
-  //_renderQueue.clear();
 }

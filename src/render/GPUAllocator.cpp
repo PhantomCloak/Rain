@@ -1,5 +1,6 @@
 #include "GPUAllocator.h"
 #include <cassert>
+#include "core/Assert.h"
 
 WGPUDevice GPUAllocator::m_Device;
 
@@ -16,7 +17,8 @@ GPUBuffer GPUAllocator::GAlloc(WGPUBufferUsageFlags usage, int size) {
 }
 
 GPUBuffer GPUAllocator::GAlloc(std::string label, WGPUBufferUsageFlags usage, int size) {
-	assert(m_Device != NULL);
+	RN_ASSERT(m_Device != NULL, "GPUAllocator::GAlloc: Device is not initialized.");
+
 
   WGPUBufferDescriptor bufferDesc = {};
   bufferDesc.size = size;

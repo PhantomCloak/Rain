@@ -1,11 +1,14 @@
 #pragma once
+#include "core/Assert.h"
+#include "scene/Components.h"
+#include "scene/Scene.h"
 #define RN_DEBUG
-#include "Application.h"
 #include <GLFW/glfw3.h>
 #include <unistd.h>
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
 #include <iostream>
+#include "Application.h"
 
 #include "Cam.h"
 #include "GameObject.h"
@@ -15,20 +18,20 @@
 
 #include "Constants.h"
 
-#include "Model.h"
 #include "core/Log.h"
 #include "io/cursor.h"
 #include "io/keyboard.h"
 #include "physics/PhysicUtils.h"
 #include "physics/Physics.h"
 #include "render/GPUAllocator.h"
+#include "render/Model.h"
 #include "render/PipelineManager.h"
 #include "render/Render.h"
 #include "render/RenderQueue.h"
 #include "render/ResourceManager.h"
 
-//#include <PxPhysicsAPI.h>
-//#include <pthread.h>
+// #include <PxPhysicsAPI.h>
+// #include <pthread.h>
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -47,8 +50,8 @@ extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* win
 #define SHADOW_NEAR 0.0f
 #define SHADOW_FAR 1500.0f
 
-//#define SHADOW_NEAR 0.10f
-//#define SHADOW_FAR 2500.0f
+// #define SHADOW_NEAR 0.10f
+// #define SHADOW_FAR 2500.0f
 float simElapsed = 0;
 
 struct CameraUniform {
@@ -116,8 +119,6 @@ glm::mat4 defaultView;
 
 glm::mat4 shadowProjection;
 glm::mat4 shadowView;
-
-Ref<Model> sphereModel;
 
 // PhysX Stuff
 //=================================================================================
@@ -287,20 +288,25 @@ void ppfxCreateBindings(int width, int height) {
   bg_bgPpfx = wgpuDeviceCreateBindGroup(render->m_device, &bgDescPpfx);
 }
 
-static int sphereIdNext = 0;
-void shootSphere(const glm::vec3& startPos, const glm::vec3& velocity) {
-  std::string id = std::to_string(sphereIdNext++) + "_sphere";
-  Ref<GameObject> projectile = CreateRef<GameObject>(id, sphereModel);
-  projectile->Transform.scale = glm::vec3(0.5f);
-  projectile->Transform.position = startPos;
+// static int sphereIdNext = 0;
+// void shootSphere(const glm::vec3& startPos, const glm::vec3& velocity) {
+//   std::string id = std::to_string(sphereIdNext++) + "_sphere";
+//   Ref<GameObject> projectile = CreateRef<GameObject>(id, sphereModel);
+//   projectile->Transform.scale = glm::vec3(0.5f);
+//   projectile->Transform.position = startPos;
+//
+//   projectile->AddPhysicsSphere(velocity);
+//   projectiles.push_back(projectile);
+// }
 
-  projectile->AddPhysicsSphere(velocity);
-  projectiles.push_back(projectile);
-}
-
+Scene* scene;
 void Application::OnStart() {
   render = std::make_unique<Render>();
   physics = std::make_unique<Physics>();
+
+  scene = new Scene("Test Scene");
+
+  Rain::Log::Init();
 
   WGPUInstance instance = render->CreateInstance();
   render->m_window = static_cast<GLFWwindow*>(GetNativeWindow());
@@ -407,7 +413,6 @@ void Application::OnStart() {
       {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
       {1, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler}};
 
-
   GroupLayout debugGroup = {
       {0, GroupLayoutVisibility::Fragment, GroupLayoutType::TextureDepth},
       {1, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler},
@@ -427,7 +432,7 @@ void Application::OnStart() {
   layoutPpfx.insert({0, ppfxGroup});
 
   static std::map<int, GroupLayout> layoutDebug;
-	layoutDebug.insert({0, debugGroup});
+  layoutDebug.insert({0, debugGroup});
 
   BufferLayout vertexLayoutPpfx = {
       {ShaderDataType::Float3, "position"},
@@ -449,21 +454,21 @@ void Application::OnStart() {
                                                    render->m_surface,
                                                    render->m_adapter);
 
-  //shadowPos = glm::vec3(-166, 179, 0);
-  //shadowRot = glm::vec3(-48, 0, 0);
+  // shadowPos = glm::vec3(-166, 179, 0);
+  // shadowRot = glm::vec3(-48, 0, 0);
 
-	shadowPos = glm::vec3(212, 852, 71);
+  shadowPos = glm::vec3(212, 852, 71);
   shadowRot = glm::vec3(-107, 35, 0);
 
   shadowView = GetViewMatrix(shadowPos, shadowRot);
   const float shadowFrustum = 200;
-	shadowProjection = glm::ortho(-shadowFrustum, shadowFrustum, -shadowFrustum, shadowFrustum,
-                                 SHADOW_NEAR,
-                                 SHADOW_FAR);
+  shadowProjection = glm::ortho(-shadowFrustum, shadowFrustum, -shadowFrustum, shadowFrustum,
+                                SHADOW_NEAR,
+                                SHADOW_FAR);
 
-  //shadowProjection = glm::ortho(-SHADOW_WIDTH / 2, SHADOW_WIDTH / 2, -SHADOW_HEIGHT / 2, SHADOW_HEIGHT / 2,
-  //                              SHADOW_NEAR,
-  //                              SHADOW_FAR);
+  // shadowProjection = glm::ortho(-SHADOW_WIDTH / 2, SHADOW_WIDTH / 2, -SHADOW_HEIGHT / 2, SHADOW_HEIGHT / 2,
+  //                               SHADOW_NEAR,
+  //                               SHADOW_FAR);
 
   // Prep. Offscreen Render Resources
   // =======================================================
@@ -696,25 +701,25 @@ void Application::OnStart() {
   // Prep. Scene & Systems
   // =======================================================
 
-  //physics->Initialise();
-  //createPhysXObjects();
+  // physics->Initialise();
+  // createPhysXObjects();
 
-  Material mat;
-  mat.properties.diffuseColor = glm::vec3(0.30, 0, 0);
-  mat.properties.shininess = 128;
+  // Material mat;
+  // mat.properties.diffuseColor = glm::vec3(0.30, 0, 0);
+  // mat.properties.shininess = 128;
 
-  Material mat2;
-  mat2.properties.diffuseColor = glm::vec3(0, 1, 1);
-  mat2.properties.shininess = 32;
+  // Material mat2;
+  // mat2.properties.diffuseColor = glm::vec3(0, 1, 1);
+  // mat2.properties.shininess = 32;
 
-  Material mat3;
-  mat3.properties.diffuseColor = glm::vec3(0.0, 0.30, 0);
-  mat3.properties.shininess = 128;
+  // Material mat3;
+  // mat3.properties.diffuseColor = glm::vec3(0.0, 0.30, 0);
+  // mat3.properties.shininess = 128;
 
   // Ref<Model> floorModel = CreateRef<Model>(RESOURCE_DIR "/models/box.gltf", render->m_sampler);
   // Ref<Model> cubeModel = CreateRef<Model>(RESOURCE_DIR "/models/putty.gltf", render->m_sampler);
   // Ref<Model> cubeModel = CreateRef<Model>(RESOURCE_DIR "/models/Sponza.gltf", render->m_sampler);
-  Ref<MeshSource> test = CreateRef<MeshSource>(RESOURCE_DIR "/models/SponzaExp5.gltf");
+  Ref<MeshSource> sponzaModel = CreateRef<MeshSource>(RESOURCE_DIR "/models/SponzaExp5.gltf");
   // Ref<MeshSource> test = CreateRef<MeshSource>(RESOURCE_DIR "/models/koko.gltf");
   // sphereModel = CreateRef<Model>(RESOURCE_DIR "/models/sphere.gltf", render->m_sampler);
 
@@ -722,22 +727,27 @@ void Application::OnStart() {
   // floorCube->Transform.position = glm::vec3(0, -1, 0);
   // floorCube->Transform.scale = glm::vec3(50, 1, 50);
 
-  for (int i = 0; i < 1; i++) {
-    std::string id = std::to_string(i) + "_box";
-    Ref<GameObject> box = CreateRef<GameObject>(id, test);
+  // for (int i = 0; i < 1; i++) {
+  //   std::string id = std::to_string(i) + "_box";
+  //   Ref<GameObject> box = CreateRef<GameObject>(id, test);
 
-    box->Transform.position = glm::vec3(0, (i * 2) + 0.8f, 0);
-    //box->AddPhysics();
+  //  box->Transform.position = glm::vec3(0, (i * 2) + 0.8f, 0);
+  //  //box->AddPhysics();
 
-    boxes.push_back(box);
-  }
+  //  boxes.push_back(box);
+  //}
+
+  // Scene s;
 
   // floorCube->UpdateUniforms();
 
+  Entity entitySponza = scene->CreateEntity("Sponza");
+	scene->BuildMeshEntityHierarchy(entitySponza, sponzaModel);
+
   Cursor::Setup(render->m_window);
   Keyboard::Setup(render->m_window);
-  //initBenchmark();
-  //sleep(1);
+  // initBenchmark();
+  // sleep(1);
 
   Cursor::CaptureMouse(true);
 }
@@ -779,13 +789,13 @@ void MoveControls() {
 }
 
 void Application::OnUpdate() {
-	//std::cout << "Update start" << std::endl;
+  // std::cout << "Update start" << std::endl;
   glfwPollEvents();
   MoveControls();
 
   auto start = std::chrono::high_resolution_clock::now();
-  //physics->gScene->simulate(1.0f / 60.0f);
-  //physics->gScene->fetchResults(true);
+  // physics->gScene->simulate(1.0f / 60.0f);
+  // physics->gScene->fetchResults(true);
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> duration = end - start;
 
@@ -797,10 +807,13 @@ void Application::OnUpdate() {
     box->Update();
     box->Draw();
   }
-  //for (auto projectile : projectiles) {
-  //  projectile->Update();
-  //  projectile->Draw();
-  //}
+
+	scene->OnRender();
+
+  // for (auto projectile : projectiles) {
+  //   projectile->Update();
+  //   projectile->Draw();
+  // }
 
   render->nextTexture = wgpuSwapChainGetCurrentTextureView(render->m_swapChain);
 
@@ -845,40 +858,40 @@ void Application::OnUpdate() {
   wgpuRenderPassEncoderSetBindGroup(shadowPassEncoder, 1, bgCameraShadow, 0, NULL);
   wgpuRenderPassEncoderSetViewport(shadowPassEncoder, 0, 0, SHADOW_WIDTH, SHADOW_HEIGHT, 0, 1);
 
-	//std::cout << "About to draw" << std::endl;
+  // std::cout << "About to draw" << std::endl;
   RenderQueue::DrawEntities(shadowPassEncoder, pipelineShadow);
-	//std::cout << "Drwa complete" << std::endl;
+  // std::cout << "Drwa complete" << std::endl;
 
   wgpuRenderPassEncoderEnd(shadowPassEncoder);
 
-	// Debug Pass
+  // Debug Pass
   // =======================================================
 
-   WGPURenderPassColorAttachment debugColorAttachment = {};
-   debugColorAttachment.loadOp = WGPULoadOp_Clear;
-   debugColorAttachment.storeOp = WGPUStoreOp_Store;
-   debugColorAttachment.clearValue = {0.0, 0.0, 0.0, 1.0};
-   debugColorAttachment.view = debugOutTextureView;
-  #if !__EMSCRIPTEN__
-   // debugColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
-  #endif
-  
-   WGPURenderPassDescriptor debugPassDesc{.label = "debug_pass"};
-   debugPassDesc.colorAttachmentCount = 1;
-   debugPassDesc.timestampWrites = 0;
-   debugPassDesc.timestampWrites = nullptr;
-   debugPassDesc.colorAttachments = &debugColorAttachment;
-  
-   WGPURenderPassEncoder debugPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &debugPassDesc);
-  
-   wgpuRenderPassEncoderSetPipeline(debugPassEncoder, pipelineDebug);
-   wgpuRenderPassEncoderSetVertexBuffer(debugPassEncoder, 0, vertexBufferPpfx, 0, sizeof(quadVertices));
-   wgpuRenderPassEncoderSetIndexBuffer(debugPassEncoder, indexBufferPpfx, WGPUIndexFormat_Uint32, 0, sizeof(quadIndices));
-   wgpuRenderPassEncoderSetBindGroup(debugPassEncoder, 0, bgDebug, 0, nullptr);
-  
-   wgpuRenderPassEncoderDrawIndexed(debugPassEncoder, 6, 1, 0, 0, 0);
-  
-   wgpuRenderPassEncoderEnd(debugPassEncoder);
+  WGPURenderPassColorAttachment debugColorAttachment = {};
+  debugColorAttachment.loadOp = WGPULoadOp_Clear;
+  debugColorAttachment.storeOp = WGPUStoreOp_Store;
+  debugColorAttachment.clearValue = {0.0, 0.0, 0.0, 1.0};
+  debugColorAttachment.view = debugOutTextureView;
+#if !__EMSCRIPTEN__
+  // debugColorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+#endif
+
+  WGPURenderPassDescriptor debugPassDesc{.label = "debug_pass"};
+  debugPassDesc.colorAttachmentCount = 1;
+  debugPassDesc.timestampWrites = 0;
+  debugPassDesc.timestampWrites = nullptr;
+  debugPassDesc.colorAttachments = &debugColorAttachment;
+
+  WGPURenderPassEncoder debugPassEncoder = wgpuCommandEncoderBeginRenderPass(render->encoder, &debugPassDesc);
+
+  wgpuRenderPassEncoderSetPipeline(debugPassEncoder, pipelineDebug);
+  wgpuRenderPassEncoderSetVertexBuffer(debugPassEncoder, 0, vertexBufferPpfx, 0, sizeof(quadVertices));
+  wgpuRenderPassEncoderSetIndexBuffer(debugPassEncoder, indexBufferPpfx, WGPUIndexFormat_Uint32, 0, sizeof(quadIndices));
+  wgpuRenderPassEncoderSetBindGroup(debugPassEncoder, 0, bgDebug, 0, nullptr);
+
+  wgpuRenderPassEncoderDrawIndexed(debugPassEncoder, 6, 1, 0, 0, 0);
+
+  wgpuRenderPassEncoderEnd(debugPassEncoder);
 
   // Lit Pass
   // =======================================================
@@ -908,9 +921,9 @@ void Application::OnUpdate() {
   litPassDesc.colorAttachmentCount = 1;
 
 #if __EMSCRIPTEN__
-   litPassDesc.timestampWrites = nullptr;
+  litPassDesc.timestampWrites = nullptr;
 #else
-  //litPassDesc.timestampWrites = &writes;
+  // litPassDesc.timestampWrites = &writes;
 #endif
 
   litPassDesc.colorAttachments = &litColorAttachment;
@@ -961,7 +974,7 @@ void Application::OnUpdate() {
 
   // wgpuCommandEncoderWriteTimestamp(render->encoder, querySet, 1);
 
-  //resolveTimestamps(render->encoder);
+  // resolveTimestamps(render->encoder);
   wgpuTextureViewRelease(render->nextTexture);
 
   WGPUCommandBufferDescriptor cmdBufferDescriptor = {.label = "Command Buffer"};
@@ -970,9 +983,8 @@ void Application::OnUpdate() {
   wgpuQueueSubmit(render->m_queue, 1, &commandBuffer);
   RenderQueue::Clear();
 
-
 #if !__EMSCRIPTEN__
-  //fetchTimestamps();
+  // fetchTimestamps();
 #endif
 
 #ifndef __EMSCRIPTEN__
@@ -1016,7 +1028,7 @@ void Application::OnKeyPressed(KeyCode key, KeyAction action) {
     glm::vec3 shootDirection = Player->Front;
     glm::vec3 shootPosition = Player->Position + shootDirection;
     glm::vec3 shootVelocity = shootDirection * 50.0f;
-    shootSphere(shootPosition, shootVelocity);
+    // shootSphere(shootPosition, shootVelocity);
   }
 }
 
@@ -1080,7 +1092,7 @@ void Application::drawImgui(WGPURenderPassEncoder renderPass) {
   if (ImGui::InputFloat(_labelPrefix("Shadow Rot Z").c_str(), &shadowRot.z, 0.5f)) {
     updateShadows = true;
   }
-	ImGui::Image((ImTextureID)debugOutTextureView, ImVec2(500, 500));
+  ImGui::Image((ImTextureID)debugOutTextureView, ImVec2(500, 500));
 
   if (updateShadows) {
     shadowUniform.lightPos = shadowPos;

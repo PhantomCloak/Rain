@@ -3,11 +3,15 @@
 #include <iostream>
 #include <vector>
 #include "../stb_image.h"
+#include "core/Assert.h"
 
 std::shared_ptr<WGPUDevice> Rain::ResourceManager::m_device;
 
 std::unordered_map<std::string, std::shared_ptr<Texture>> Rain::ResourceManager::_loadedTextures;
 std::unordered_map<std::string, std::shared_ptr<WGPUShaderModule>> Rain::ResourceManager::_loadedShaders;
+std::unordered_map<AssetHandle, Ref<MeshSource>> Rain::ResourceManager::m_LoadedMeshSources;
+
+static UUID nextUUID = 0;
 
 WGPUShaderModule loadShaderModule(const std::string& path, WGPUDevice m_device) {
   std::cout << "SSS: " << path;
@@ -177,6 +181,17 @@ std::shared_ptr<Texture> Rain::ResourceManager::GetTexture(std::string id) {
   return texture;
 }
 
+Ref<MeshSource> Rain::ResourceManager::GetMeshSource(UUID handle) {
+	RN_ASSERT(m_LoadedMeshSources.find(handle) != m_LoadedMeshSources.end());
+	return m_LoadedMeshSources[handle];
+}
+
+Ref<MeshSource> Rain::ResourceManager::LoadMeshSource(std::string path) {
+	Ref<MeshSource> meshSource = CreateRef<MeshSource>(path);
+	meshSource->Id = nextUUID++;
+	m_LoadedMeshSources[meshSource->Id] = meshSource;
+	return meshSource;
+}
 
 std::shared_ptr<WGPUShaderModule> Rain::ResourceManager::GetShader(std::string id) {
   if (_loadedShaders.find(id) != _loadedShaders.end()) {

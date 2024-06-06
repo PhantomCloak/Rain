@@ -26,7 +26,6 @@ set_target_properties(MyApp PROPERTIES
   EXPORT_COMPILE_COMMANDS ON
 )
 
-add_definitions(-DNDEBUG)
 # Include dependencies
 set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT FALSE)
 set(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT FALSE)
@@ -45,15 +44,19 @@ else()
 endif()
 
 
+add_subdirectory(vendor/spdlog)
+add_subdirectory(vendor/assimp)
+add_subdirectory(vendor/flecs)
+
 if(EMSCRIPTEN)
 
-	set(EMSCRIPTEN_PTHREADS_COMPILER_FLAGS "-pthread")
-	set(EMSCRIPTEN_PTHREADS_LINKER_FLAGS "${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}") # -sPROXY_TO_PTHREAD
+	# PhysX Needs It
+	#set(EMSCRIPTEN_PTHREADS_COMPILER_FLAGS "-pthread")
+	#set(EMSCRIPTEN_PTHREADS_LINKER_FLAGS "${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}") # -sPROXY_TO_PTHREAD
 
-	string(APPEND CMAKE_C_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
-	string(APPEND CMAKE_CXX_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
-	string(APPEND CMAKE_EXE_LINKER_FLAGS " ${EMSCRIPTEN_PTHREADS_LINKER_FLAGS}")
-	add_subdirectory(vendor/assimp)
+	#string(APPEND CMAKE_C_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
+	#string(APPEND CMAKE_CXX_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
+	#string(APPEND CMAKE_EXE_LINKER_FLAGS " ${EMSCRIPTEN_PTHREADS_LINKER_FLAGS}")
 
 	target_link_options(PhysX PRIVATE -sALLOW_BLOCKING_ON_MAIN_THREAD=1)
 
@@ -62,18 +65,17 @@ if(EMSCRIPTEN)
 		-sUSE_GLFW=3
 		-sUSE_WEBGPU=1
 		-sASYNCIFY=1
-		-sALLOW_MEMORY_GROWTH=0
-		-sMAXIMUM_MEMORY=1GB
+		-sALLOW_MEMORY_GROWTH=1
+		#-sMAXIMUM_MEMORY=1GB
 		-sWASM_BIGINT=1
 		-sSTACK_SIZE=1mb
-		-sPTHREAD_POOL_SIZE=4
-		-sALLOW_BLOCKING_ON_MAIN_THREAD=1
+		#-sPTHREAD_POOL_SIZE=4
+		#-sALLOW_BLOCKING_ON_MAIN_THREAD=1
 		-O0
 		--preload-file "${CMAKE_CURRENT_SOURCE_DIR}/Resources"
 		)
 	set_target_properties(MyApp PROPERTIES SUFFIX ".html")
 else()
-  add_subdirectory(vendor/assimp)
   add_subdirectory(vendor/dawn)
   add_compile_definitions(DAWN_DEBUG_BREAK_ON_ERROR)
   target_link_libraries(MyApp PRIVATE dawn_common
@@ -87,6 +89,8 @@ else()
     dawncpp_headers
     webgpu_dawn
     libtint
+		spdlog
+		flecs
 	glfw
 	assimp
 	PhysX

@@ -66,31 +66,54 @@ fn vs_main(@builtin(instance_index) instanceIdx : u32, in: VertexInput) -> Verte
 }
 
 fn ShadowCalculation(
-		fragPosLightSpace: vec4<f32>,
-		normal: vec3<f32>,
-		lightDir: vec3<f32>
-		) -> f32 {
-	var projCoords: vec3<f32> = fragPosLightSpace.xyz;
-	projCoords = vec3(projCoords.xy * vec2(0.5, -0.5) + vec2(0.5), projCoords.z);
+	fragPosLightSpace: vec4<f32>,
+	normal: vec3<f32>,
+	lightDir: vec3<f32>) -> f32 {
 
-	let currentDepth: f32 = projCoords.z;
-	let bias: f32 = max(0.009 * (1.0 - dot(normal, lightDir)), 0.0005);
+    var projCoords: vec3<f32> = fragPosLightSpace.xyz;
 
-	var visibility = 0.0;
-	let oneOverShadowDepthTextureSize = 1.0 / 4096;
-	for (var y = -1; y <= 1; y++) {
-		for (var x = -1; x <= 1; x++) {
-			let offset = vec2f(vec2(x, y)) * oneOverShadowDepthTextureSize;
-			visibility += textureSampleCompare(
-					shadowMap, shadowSampler,
-					projCoords.xy + offset, currentDepth - bias
-					);
-		}
-	}
-	visibility /= 9.0;
+    projCoords = vec3(projCoords.xy * vec2(0.5, -0.5) + vec2(0.5), projCoords.z);
 
-	return visibility;
+		let currentDepth: f32 = projCoords.z;
+		let bias: f32 = 0.001;
+
+		//let shadow: f32 = textureSampleCompare(shadowMap, shadowSampler, projCoords.xy, currentDepth - bias);
+		let shadow: f32 = textureSampleCompare(shadowMap, shadowSampler, projCoords.xy, currentDepth - bias);
+
+		return shadow;
 }
+
+//fn ShadowCalculation(
+//		fragPosLightSpace: vec4<f32>,
+//		normal: vec3<f32>,
+//		lightDir: vec3<f32>
+//		) -> f32 {
+//	var projCoords: vec3<f32> = fragPosLightSpace.xyz;
+//	projCoords = vec3(projCoords.xy * vec2(0.5, -0.5) + vec2(0.5), projCoords.z);
+//
+//	let currentDepth: f32 = projCoords.z;
+//	let bias: f32 = max(0.002 * (1.0 - dot(normal, lightDir)), 0.0005);
+//
+//	var visibility = 0.0;
+//	let oneOverShadowDepthTextureSize = 1.0 / 4096;
+//	for (var y = -1; y <= 1; y++) {
+//		for (var x = -1; x <= 1; x++) {
+//			let offset = vec2f(vec2(x, y)) * oneOverShadowDepthTextureSize;
+//			visibility += textureSampleCompare(
+//					shadowMap, shadowSampler,
+//					projCoords.xy + offset, currentDepth - bias
+//					);
+//		}
+//	}
+//	visibility /= 9.0;
+//
+//	if(currentDepth > 1.0)
+//	{
+//		visibility = 0.0;
+//	}
+//
+//	return visibility;
+//}
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {

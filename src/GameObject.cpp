@@ -21,20 +21,8 @@ GameObject::GameObject(std::string objName, Ref<MeshSource> model) {
   }
 }
 
-GameObject::GameObject(std::string objName, Ref<Model> model) {
-  this->model = model;
-  this->meshes = model->meshes;
-	this->name = objName;
-
-  if (Parent != nullptr) {
-    sceneUniform.modelMatrix = Parent->GetModelMatrix() * GetModelMatrix();
-  } else {
-    sceneUniform.modelMatrix = GetModelMatrix();
-  }
-}
-
 void GameObject::Draw() {
-	RenderQueue::AddQueue(this);
+	//RenderQueue::AddQueue(this);
 }
 
 void GameObject::DrawAlt(WGPURenderPassEncoder& renderPass, WGPURenderPipeline& pipeline) {

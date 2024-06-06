@@ -14,8 +14,7 @@
       "cacheVariables": {
         "CMAKE_CXX_STANDARD": "17",
         "CMAKE_CXX_STANDARD_REQUIRED": "TRUE",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
     },
     {
@@ -54,6 +53,7 @@
         "USE_METAL": "ON",
         "DAWN_ENABLE_METAL": "ON",
         "RN_DEBUG": "ON",
+				"CMAKE_BUILD_TYPE": "Debug",
         "PHYSX_ROOT_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
         "CMAKEMODULES_PATH": "/Users/ph4nt0m/packman-repo/chk/CMakeModules/1.28.trunk.31965103",
         "PX_OUTPUT_LIB_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
@@ -80,6 +80,7 @@
       "inherits": "base",
       "description": "Build for WebAssembly with Emscripten",
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_TOOLCHAIN_FILE": "/Users/ph4nt0m/Developer/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
         "EMSCRIPTEN": "ON",
         "USE_GLFW": "3",

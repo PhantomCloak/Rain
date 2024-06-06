@@ -36,7 +36,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let acesInput = textureColor * 0.6;
     let aces = acesFilm(acesInput);
 
-    //let gammaCorrected = pow(aces, vec3<f32>(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2));
+    let gammaCorrected = pow(aces, vec3<f32>(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2));
 
-    return vec4<f32>(aces, 1.0);
+    return vec4<f32>(gammaCorrected, 1.0);
 }
