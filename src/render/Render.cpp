@@ -1,6 +1,7 @@
 #include "Render.h"
 #include <map>
 #include "Mesh.h"
+#include "core/Assert.h"
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -9,12 +10,11 @@
 #endif
 #include <iostream>
 
-
 Render* Render::Instance = nullptr;
 
-WGPUInstance instance;
 WGPUInstance Render::CreateInstance() {
   WGPUInstanceDescriptor instanceDesc;
+	static WGPUInstance instance;
 
 #if !__EMSCRIPTEN__
   static std::vector<const char*> enabledToggles = {
@@ -25,22 +25,21 @@ WGPUInstance Render::CreateInstance() {
   dawnToggleDesc.chain.next = nullptr;
   dawnToggleDesc.chain.sType = WGPUSType_DawnTogglesDescriptor;
 
-	dawnToggleDesc.enabledToggles = enabledToggles.data();
+  dawnToggleDesc.enabledToggles = enabledToggles.data();
   dawnToggleDesc.enabledToggleCount = 1;
   dawnToggleDesc.disabledToggleCount = 0;
 
   instanceDesc.nextInChain = &dawnToggleDesc.chain;
 
-	instanceDesc.features.timedWaitAnyEnable = 0;
-	instanceDesc.features.timedWaitAnyMaxCount = 64;
+  instanceDesc.features.timedWaitAnyEnable = 0;
+  instanceDesc.features.timedWaitAnyMaxCount = 64;
 #endif
 
   instance = wgpuCreateInstance(&instanceDesc);
-  if (!instance) {
-    std::cerr << "Could not initialize WebGPU!" << std::endl;
-    assert(true);
-  }
-  return instance;
+
+	RN_CORE_ASSERT(instance, "An error occured while acquiring the WebGPU instance.");
+
+	return instance;
 }
 
 bool Render::Init(void* window, WGPUInstance instance) {
@@ -48,7 +47,7 @@ bool Render::Init(void* window, WGPUInstance instance) {
 
   static WGPURequestAdapterOptions adapterOpts{};
   adapterOpts.compatibleSurface = m_surface;
-  m_adapter = requestAdapter(instance, &adapterOpts);
+  m_adapter = RequestAdapter(instance, &adapterOpts);
 
   WGPURequiredLimits requiredLimits = GetRequiredLimits(m_adapter);
   static WGPUDeviceDescriptor deviceDesc;
@@ -65,27 +64,26 @@ bool Render::Init(void* window, WGPUInstance instance) {
   deviceDesc.requiredLimits = &requiredLimits;
   deviceDesc.defaultQueue.label = "The default queue";
 
-  m_device = requestDevice(m_adapter, &deviceDesc);
-
-  std::cout << "Got device: " << m_device << std::endl;
-
-  // Hack
+  m_device = RequestDevice(m_adapter, &deviceDesc);
 
   m_queue = wgpuDeviceGetQueue(m_device);
 
+  RN_CORE_ASSERT(m_queue, "An error occured while acquiring the queue. this might indicate unsupported browser/device.");
+
+	m_RenderContext = CreateRef<RenderContext>(m_device, m_queue);
+
   int width, height;
   glfwGetFramebufferSize((GLFWwindow*)window, &width, &height);
-  std::cout << "FBO SIZE! (w,h): " << width << ", " << height << std::endl;
 
+  WGPUTextureFormat swapChainFormat;
 #if __EMSCRIPTEN__
-  WGPUTextureFormat swapChainFormat = wgpuSurfaceGetPreferredFormat(m_surface, m_adapter);
+  swapChainFormat = wgpuSurfaceGetPreferredFormat(m_surface, m_adapter);
 #else
-  WGPUTextureFormat swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
+  swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 #endif
 
   m_swapChainFormat = swapChainFormat;
-
-  m_swapChainDesc = {};  // Zero-initialize the struct
+  m_swapChainDesc = {};
 
   m_swapChainDesc.width = (uint32_t)width;
   m_swapChainDesc.height = (uint32_t)height;
@@ -97,11 +95,25 @@ bool Render::Init(void* window, WGPUInstance instance) {
     wgpuSwapChainRelease(m_swapChain);
   }
 
-  m_swapChain = buildSwapChain(m_swapChainDesc, m_device, m_surface);
+  m_swapChain = BuildSwapChain(m_swapChainDesc, m_device, m_surface);
   m_depthTexture = GetDepthBufferTexture(m_device, m_depthTextureFormat, m_swapChainDesc.width, m_swapChainDesc.height);
   m_depthTextureView = GetDepthBufferTextureView("T_Depth_Default", m_depthTexture, m_depthTextureFormat);
 
-  m_sampler = AttachSampler(m_device);
+  WGPUSamplerDescriptor samplerDesc = {};  // Zero-initialize the struct
+
+  // Set the properties
+  samplerDesc.addressModeU = WGPUAddressMode_Repeat;
+  samplerDesc.addressModeV = WGPUAddressMode_Repeat;
+  samplerDesc.addressModeW = WGPUAddressMode_Repeat;
+  samplerDesc.magFilter = WGPUFilterMode_Linear;
+  samplerDesc.minFilter = WGPUFilterMode_Linear;
+  samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Linear;
+  samplerDesc.lodMinClamp = 0.0f;
+  samplerDesc.lodMaxClamp = 80.0f;
+  samplerDesc.compare = WGPUCompareFunction_Undefined;
+  samplerDesc.maxAnisotropy = 1;
+
+  m_sampler = wgpuDeviceCreateSampler(m_device, &samplerDesc);
 
   wgpuDeviceSetUncapturedErrorCallback(
       m_device, [](WGPUErrorType errorType, const char* message, void* userdata) {
@@ -113,7 +125,7 @@ bool Render::Init(void* window, WGPUInstance instance) {
   return true;
 }
 
-WGPUAdapter Render::requestAdapter(WGPUInstance instance,
+WGPUAdapter Render::RequestAdapter(WGPUInstance instance,
                                    WGPURequestAdapterOptions const* options) {
   struct UserData {
     WGPUAdapter adapter = nullptr;
@@ -125,12 +137,11 @@ WGPUAdapter Render::requestAdapter(WGPUInstance instance,
                                   WGPUAdapter adapter, char const* message,
                                   void* pUserData) {
     UserData& userData = *reinterpret_cast<UserData*>(pUserData);
-    if (status == WGPURequestAdapterStatus_Success) {
-      userData.adapter = adapter;
-    } else {
-      std::cout << "Could not get WebGPU adapter: " << message << std::endl;
-    }
-    userData.requestEnded = true;
+
+		RN_CORE_ASSERT(status == WGPURequestAdapterStatus_Success, "An error occured while acquiring WebGPU adapter");
+
+		userData.adapter = adapter;
+		userData.requestEnded = true;
   };
 
   wgpuInstanceRequestAdapter(instance /* equivalent of navigator.gpu */,
@@ -147,7 +158,7 @@ WGPUAdapter Render::requestAdapter(WGPUInstance instance,
   return userData.adapter;
 }
 
-WGPUDevice Render::requestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor) {
+WGPUDevice Render::RequestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor) {
   struct UserData {
     WGPUDevice device = nullptr;
     bool requestEnded = false;
@@ -158,18 +169,17 @@ WGPUDevice Render::requestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const
                                  WGPUDevice device, char const* message,
                                  void* pUserData) {
     UserData& userData = *reinterpret_cast<UserData*>(pUserData);
-    if (status == WGPURequestDeviceStatus_Success) {
-      userData.device = device;
-    } else {
-      std::cout << "Could not get WebGPU device: " << message << std::endl;
-    }
+
+		RN_CORE_ASSERT(status == WGPURequestDeviceStatus_Success, "An error occured while acquiring WebGPU adapter");
+
+    userData.device = device;
     userData.requestEnded = true;
   };
 
   wgpuAdapterRequestDevice(adapter, descriptor, onDeviceRequestEnded,
                            (void*)&userData);
 
-  // saa
+  // TODO: temporary hack for some browsers, it should be investigated more
 #if __EMSCRIPTEN__
   while (!userData.requestEnded) {
     emscripten_sleep(100);
@@ -207,21 +217,15 @@ WGPURequiredLimits Render::GetRequiredLimits(WGPUAdapter adapter) {
   requiredLimits.limits.maxUniformBufferBindingSize = 64 * 4 * sizeof(float);
   requiredLimits.limits.maxTextureDimension1D = 4096;
   requiredLimits.limits.maxTextureDimension2D = 4096;
-	requiredLimits.limits.maxDynamicUniformBuffersPerPipelineLayout = supportedLimits.limits.maxDynamicUniformBuffersPerPipelineLayout;
+  requiredLimits.limits.maxDynamicUniformBuffersPerPipelineLayout = supportedLimits.limits.maxDynamicUniformBuffersPerPipelineLayout;
   requiredLimits.limits.maxTextureArrayLayers = supportedLimits.limits.maxTextureArrayLayers;
   requiredLimits.limits.maxSampledTexturesPerShaderStage = supportedLimits.limits.maxSampledTexturesPerShaderStage;
   requiredLimits.limits.maxSamplersPerShaderStage = supportedLimits.limits.maxSamplersPerShaderStage;
 
-  StrideDynamicBuffers = supportedLimits.limits.minUniformBufferOffsetAlignment;
-  StrideStorageBuffers = supportedLimits.limits.minStorageBufferOffsetAlignment;
-
   return requiredLimits;
 }
 
-WGPUSwapChainDescriptor Render::GetSwapchainDescriptor(int width, int height, WGPUTextureFormat swapChainFormat) {
-}
-
-WGPUSwapChain Render::buildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface) {
+WGPUSwapChain Render::BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface) {
   if (m_swapChain != NULL) {
     wgpuSwapChainRelease(m_swapChain);
   }
@@ -251,7 +255,6 @@ WGPUTexture Render::GetDepthBufferTexture(WGPUDevice device, WGPUTextureFormat f
 
   WGPUTexture depthTexture = wgpuDeviceCreateTexture(device, &depthTextureDesc);
 
-  printf("Depth texture: %p\n", depthTexture);
   return depthTexture;
 }
 
@@ -280,20 +283,37 @@ WGPUTextureView Render::GetDepthBufferTextureView(std::string label, WGPUTexture
   return depthTextureView;
 }
 
-WGPUSampler Render::AttachSampler(WGPUDevice device) {
-  WGPUSamplerDescriptor samplerDesc = {};  // Zero-initialize the struct
+void Render::RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
+                        WGPURenderPipeline pipeline,
+                        Ref<MeshSource> mesh,
+                        uint32_t submeshIndex,
+                        Ref<Material> material,
+                        Ref<GPUBuffer> transformBuffer,
+                        uint32_t transformOffset,
+                        uint32_t instanceCount) {
+  wgpuRenderPassEncoderSetPipeline(renderCommandBuffer, pipeline);
 
-  // Set the properties
-  samplerDesc.addressModeU = WGPUAddressMode_Repeat;
-  samplerDesc.addressModeV = WGPUAddressMode_Repeat;
-  samplerDesc.addressModeW = WGPUAddressMode_Repeat;
-  samplerDesc.magFilter = WGPUFilterMode_Linear;
-  samplerDesc.minFilter = WGPUFilterMode_Linear;
-  samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Linear;
-  samplerDesc.lodMinClamp = 0.0f;
-  samplerDesc.lodMaxClamp = 80.0f;
-  samplerDesc.compare = WGPUCompareFunction_Undefined;
-  samplerDesc.maxAnisotropy = 1;
+  wgpuRenderPassEncoderSetVertexBuffer(renderCommandBuffer,
+                                       0,
+                                       mesh->GetVertexBuffer()->Buffer,
+                                       0,
+                                       mesh->GetVertexBuffer()->Size);
 
-  return wgpuDeviceCreateSampler(device, &samplerDesc);
+  wgpuRenderPassEncoderSetIndexBuffer(renderCommandBuffer,
+                                      mesh->GetIndexBuffer()->Buffer,
+                                      WGPUIndexFormat_Uint32,
+                                      0,
+                                      mesh->GetIndexBuffer()->Size);
+
+  wgpuRenderPassEncoderSetVertexBuffer(renderCommandBuffer,
+                                       1,
+                                       transformBuffer->Buffer,
+                                       transformOffset,
+                                       transformBuffer->Size - transformOffset);
+  if (material) {
+    wgpuRenderPassEncoderSetBindGroup(renderCommandBuffer, 1, material->bgMaterial, 0, 0);
+  }
+
+  auto& subMesh = mesh->m_SubMeshes[submeshIndex];
+  wgpuRenderPassEncoderDrawIndexed(renderCommandBuffer, subMesh.IndexCount, instanceCount, subMesh.BaseIndex, subMesh.BaseVertex, 0);
 }

@@ -160,7 +160,7 @@ bool Rain::ResourceManager::IsTextureExist(std::string id) {
 }
 std::shared_ptr<Texture> Rain::ResourceManager::LoadTexture(std::string id, std::string path) {
   auto tex = std::make_shared<Texture>();
-  tex->Texture = loadTexture(path.c_str(), m_device, &tex->View);
+  tex->Buffer = loadTexture(path.c_str(), m_device, &tex->View);
 
   _loadedTextures[id] = tex;
   return tex;
@@ -188,7 +188,6 @@ Ref<MeshSource> Rain::ResourceManager::GetMeshSource(UUID handle) {
 
 Ref<MeshSource> Rain::ResourceManager::LoadMeshSource(std::string path) {
 	Ref<MeshSource> meshSource = CreateRef<MeshSource>(path);
-	meshSource->Id = nextUUID++;
 	m_LoadedMeshSources[meshSource->Id] = meshSource;
 	return meshSource;
 }

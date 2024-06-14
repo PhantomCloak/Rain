@@ -1,20 +1,37 @@
 #pragma once
 #include <glm/glm.hpp>
+#include "core/UUID.h"
 #include "render/GPUAllocator.h"
-#include "Mesh.h"
+#include "render/Texture.h"
 
-class MaterialEngine {
-	public:
-	UUID Id;
-	std::string name;
-	MaterialUniform properties;
+struct MaterialUniform {
+  glm::vec3 ambientColor;
+  float _pad0 = 0.0;
+  glm::vec3 diffuseColor;
+  float _pad1 = 0.0;
+  glm::vec3 specularColor;
+  float shininess;
 
-	std::vector<Ref<Texture>> m_diffuseTextures;
+  MaterialUniform() {
+    ambientColor = glm::vec3(0);
+    diffuseColor = glm::vec3(0);
+    specularColor = glm::vec3(0);
+    shininess = -1;
+  }
+};
 
-	WGPUBindGroup bgMaterial;
-  GPUBuffer materialUniformBuffer;
+class Material {
+ public:
+  UUID Id = 0;
+  std::string name;
+  MaterialUniform properties;
 
-	void SetDiffuseTexture(const std::string& name, const Ref<Texture> value);
+  std::vector<Ref<Texture>> m_diffuseTextures;
 
-	static void CreateMaterial(Ref<MaterialEngine> mat);
+  WGPUBindGroup bgMaterial;
+  Ref<GPUBuffer> materialUniformBuffer;
+
+  void SetDiffuseTexture(const std::string& name, const Ref<Texture> value);
+
+  static void CreateMaterial(Ref<Material> mat);
 };

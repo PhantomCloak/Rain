@@ -4,6 +4,12 @@ struct VertexInput {
 	@location(2) uv: vec2f,
 };
 
+struct InstanceInput {
+	@location(4) a_MRow0: vec4<f32>,
+	@location(5) a_MRow1: vec4<f32>,
+	@location(6) a_MRow2: vec4<f32>,
+}
+
 struct VertexOutput {
 	@builtin(position) position: vec4f,
 	@location(2) Normal: vec3f,
@@ -13,11 +19,10 @@ struct VertexOutput {
 	@location(6) FragPosLightSpace: vec4f,
 };
 
-struct Camera {
+struct SceneData {
     projectionMatrix: mat4x4f,
     viewMatrix: mat4x4f,
 };
-
 
 struct MaterialUniform {
     ambientColor: vec3f,
@@ -32,94 +37,40 @@ struct ShadowUniform {
     lightPos: vec3<f32>,
 };
 
-struct SceneUniform {
-	modelMatrix : mat4x4f,
-    color: vec4f,
-};
+//@group(0) @binding(0) var<storage> uScene: array<SceneUniform>;
+@group(0) @binding(0) var<uniform> u_scene: SceneData;
 
-@group(0) @binding(0) var<storage> uScene: array<SceneUniform>;
-@group(1) @binding(0) var<uniform> uCam: Camera;
+@group(1) @binding(0) var gradientTexture: texture_2d<f32>;
+@group(1) @binding(1) var textureSampler: sampler;
+@group(1) @binding(2) var<uniform> uMaterial: MaterialUniform;
 
-@group(2) @binding(0) var gradientTexture: texture_2d<f32>;
-@group(2) @binding(1) var textureSampler: sampler;
-@group(2) @binding(2) var<uniform> uMaterial: MaterialUniform;
-
-@group(3) @binding(0) var shadowMap: texture_depth_2d;
-@group(3) @binding(1) var shadowSampler: sampler_comparison;
-@group(3) @binding(2) var<uniform> shadowUniform: ShadowUniform;
+//@group(3) @binding(0) var shadowMap: texture_depth_2d;
+//@group(3) @binding(1) var shadowSampler: sampler_comparison;
+//@group(3) @binding(2) var<uniform> shadowUniform: ShadowUniform;
 
 @vertex
-fn vs_main(@builtin(instance_index) instanceIdx : u32, in: VertexInput) -> VertexOutput {
+fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
 	var out: VertexOutput;
 
-	let fragPos = (uScene[instanceIdx].modelMatrix * vec4f(in.position, 1.0)).xyz;
+	let transform = mat4x4<f32>(
+			vec4<f32>(instance.a_MRow0.x, instance.a_MRow1.x, instance.a_MRow2.x, 0.0),
+			vec4<f32>(instance.a_MRow0.y, instance.a_MRow1.y, instance.a_MRow2.y, 0.0),
+			vec4<f32>(instance.a_MRow0.z, instance.a_MRow1.z, instance.a_MRow2.z, 0.0),
+			vec4<f32>(instance.a_MRow0.w, instance.a_MRow1.w, instance.a_MRow2.w, 1.0)
+	);
 
-	out.position = uCam.projectionMatrix * uCam.viewMatrix * uScene[instanceIdx].modelMatrix * vec4f(in.position, 1.0);
-	out.Normal =   (uCam.viewMatrix * uScene[instanceIdx].modelMatrix * vec4f(in.normal, 0.0)).xyz;
+	out.position = u_scene.projectionMatrix * u_scene.viewMatrix * transform * vec4f(in.position, 1.0);
+
+	out.Normal = in.normal;
 	out.uv = in.uv;
-
-	out.LightPos = (uCam.viewMatrix * vec4f(shadowUniform.lightPos, 1.0)).xyz;
-	out.FragPos =  (uCam.viewMatrix * vec4f(fragPos, 1.0)).xyz;
-	out.FragPosLightSpace = (shadowUniform.lightProjection * shadowUniform.lightView) * vec4f(fragPos, 1.0);
 
 	return out;
 }
-
-fn ShadowCalculation(
-	fragPosLightSpace: vec4<f32>,
-	normal: vec3<f32>,
-	lightDir: vec3<f32>) -> f32 {
-
-    var projCoords: vec3<f32> = fragPosLightSpace.xyz;
-
-    projCoords = vec3(projCoords.xy * vec2(0.5, -0.5) + vec2(0.5), projCoords.z);
-
-		let currentDepth: f32 = projCoords.z;
-		let bias: f32 = 0.001;
-
-		//let shadow: f32 = textureSampleCompare(shadowMap, shadowSampler, projCoords.xy, currentDepth - bias);
-		let shadow: f32 = textureSampleCompare(shadowMap, shadowSampler, projCoords.xy, currentDepth - bias);
-
-		return shadow;
-}
-
-//fn ShadowCalculation(
-//		fragPosLightSpace: vec4<f32>,
-//		normal: vec3<f32>,
-//		lightDir: vec3<f32>
-//		) -> f32 {
-//	var projCoords: vec3<f32> = fragPosLightSpace.xyz;
-//	projCoords = vec3(projCoords.xy * vec2(0.5, -0.5) + vec2(0.5), projCoords.z);
-//
-//	let currentDepth: f32 = projCoords.z;
-//	let bias: f32 = max(0.002 * (1.0 - dot(normal, lightDir)), 0.0005);
-//
-//	var visibility = 0.0;
-//	let oneOverShadowDepthTextureSize = 1.0 / 4096;
-//	for (var y = -1; y <= 1; y++) {
-//		for (var x = -1; x <= 1; x++) {
-//			let offset = vec2f(vec2(x, y)) * oneOverShadowDepthTextureSize;
-//			visibility += textureSampleCompare(
-//					shadowMap, shadowSampler,
-//					projCoords.xy + offset, currentDepth - bias
-//					);
-//		}
-//	}
-//	visibility /= 9.0;
-//
-//	if(currentDepth > 1.0)
-//	{
-//		visibility = 0.0;
-//	}
-//
-//	return visibility;
-//}
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	let textureColor = textureSample(gradientTexture, textureSampler, in.uv).rgba;
 	var ambient = vec3f(0.1);
-	//var ambient = uMaterial.ambientColor;
 
 	// Diffuse
 	let norm = normalize(in.Normal);
@@ -131,14 +82,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	let halfwayDir = normalize(lightDir + viewDir);
 	var specular = vec3f(pow(max(dot(norm, halfwayDir), 0.0), uMaterial.shininess));
 
-	var shadow = ShadowCalculation(in.FragPosLightSpace, norm, lightDir);
-	shadow = shadow * 0.8 + 0.2;
-
-	let shadowedAmbient = shadow * ambient;
-	let shadowedDiffuse = shadow * diffuse;
-	let shadowedSpecular = shadow * specular;
-
-	let finalColor = (ambient + shadowedDiffuse + shadowedSpecular) * textureColor.rgb;
-	//let finalColor = (ambient + diffuse + specular) * textureColor.rgb;
+	let finalColor = ambient + diffuse + specular * textureColor.rgb;
 	return vec4f(finalColor, 1.0);
 }

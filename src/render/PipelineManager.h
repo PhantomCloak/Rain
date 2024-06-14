@@ -12,7 +12,7 @@ class PipelineManager {
 
   WGPURenderPipeline CreatePipeline(const std::string& pipelineId,
 			const std::string& shaderId,
-			WGPUVertexBufferLayout vertexLayout,
+			std::vector<WGPUVertexBufferLayout> vertexLayouts,
 			std::map<int, GroupLayout> groupLayout,
 			WGPUTextureFormat depthFormat,
 			WGPUTextureFormat colorFormat,

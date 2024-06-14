@@ -1,46 +1,63 @@
 #pragma once
-#include <glm/glm.hpp>
+
 #include <vector>
-#include "Node.h"
-#include "render/Texture.h"
+#include "Material.h"
+#include "core/UUID.h"
+
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
+#include <assimp/Importer.hpp>
 
 struct VertexAttribute {
   glm::vec3 Position;
-	float _pad0;
+  float _pad0;
   glm::vec3 Normal;
-	float _pad1;
+  float _pad1;
   glm::vec2 TexCoords;
-	float _pad2[2];
-	glm::vec3 Tangent;
-	float _pad3;
+  float _pad2[2];
+  glm::vec3 Tangent;
+  float _pad3;
 };
 
-struct SceneUniformBatch {
-  glm::mat4x4 modelMatrixArr[16];
-  glm::vec4 color;
+struct SubMesh {
+ public:
+  uint32_t BaseVertex;
+  uint32_t BaseIndex;
+  uint32_t IndexCount;
+  uint32_t VertexCount;
+  uint32_t MaterialIndex;
 };
 
-struct SceneUniform {
-  glm::mat4x4 modelMatrix;
-  glm::vec4 color;
+class MeshNode {
+ public:
+  uint32_t Parent = 0xffffffff;
+  int SubMeshId;
+  std::string Name;
+  glm::mat4 LocalTransform;
+
+  inline bool IsRoot() const { return Parent == 0xffffffff; }
 };
 
-typedef unsigned long UUID;
+class MeshSource {
+ public:
+  UUID Id = 0;
+  std::vector<Ref<MeshNode>> m_Nodes;
+  std::vector<SubMesh> m_SubMeshes;
 
-struct MaterialUniform {
-  glm::vec3 ambientColor;
-	float _pad0 = 0.0;
-  glm::vec3 diffuseColor;
-	float _pad1 = 0.0;
-  glm::vec3 specularColor;
-	float shininess;
+  std::string m_Path;
+  std::string m_Directory;
+  std::vector<Ref<Material>> m_Materials;
 
-	MaterialUniform() {
-		ambientColor = glm::vec3(0);
-		diffuseColor = glm::vec3(0);
-		specularColor = glm::vec3(0);
-		shininess = -1;
-	}
+  MeshSource(std::string path);
+
+  const Ref<MeshNode> GetRootNode() const { return m_Nodes[0]; }
+  const std::vector<Ref<MeshNode>> GetNodes() const { return m_Nodes; }
+
+  Ref<GPUBuffer> GetVertexBuffer() { return m_VertexBuffer; }
+  Ref<GPUBuffer> GetIndexBuffer() { return m_IndexBuffer; }
+
+ private:
+  Ref<GPUBuffer> m_VertexBuffer;
+  Ref<GPUBuffer> m_IndexBuffer;
+  void TraverseNode(aiNode* node, const aiScene* scene);
 };
-
-static UUID nextId = 0;

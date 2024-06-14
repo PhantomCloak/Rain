@@ -1,8 +1,8 @@
 #include "Scene.h"
+#include "Application.h"
 #include "Components.h"
-#include "core/Assert.h"
-#include "render/Model.h"
-#include "render/RenderQueue.h"
+#include "Entity.h"
+#include "SceneRenderer.h"
 #include "render/ResourceManager.h"
 
 Scene::Scene(std::string sceneName)
@@ -13,9 +13,9 @@ Entity Scene::CreateEntity(std::string name) {
 }
 
 Entity Scene::CreateChildEntity(Entity parent, std::string name) {
-  static UUID nextComponentId = 1000;  // TODO: remove it
+  auto entity = Entity(m_World.entity(), this);
+  uint32_t entityHandle = entity;
 
-  auto entity = Entity(m_World.entity(name.c_str()), this);
   entity.AddComponent<TransformComponent>();
   if (!name.empty()) {
     TagComponent* tagComponent = entity.AddComponent<TagComponent>();
@@ -23,42 +23,15 @@ Entity Scene::CreateChildEntity(Entity parent, std::string name) {
   }
   entity.AddComponent<RelationshipComponent>();
   IDComponent* idComponent = entity.AddComponent<IDComponent>();
-  idComponent->ID = nextComponentId;
+  idComponent->ID = {};
 
   if (parent) {
     entity.SetParent(parent);
   }
 
-  m_EntityMap[nextComponentId++] = entity;
+  m_EntityMap[idComponent->ID] = entity;
 
   return entity;
-}
-
-void Scene::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, uint32_t materialIndex, glm::mat4& transform) {
-
-	MeshKey meshKey = { meshSource->Id, materialIndex, submeshIndex };
-
-	auto& drawCommand = m_DrawList[meshKey];
-
-	drawCommand.Mesh = meshSource;
-	drawCommand.SubmeshIndex = submeshIndex;
-	drawCommand.MaterialIndex = materialIndex;
-	drawCommand.InstanceCount++;
-}
-
-void Scene::OnRender() {
-  static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
-
-  drawNodeQuery.each([this](flecs::iter& it, size_t i, TransformComponent* transform, MeshComponent* meshComponent) {
-
-    Entity e = Entity(it.entity(i), this);
-
-		Ref<MeshSource> meshSource = Rain::ResourceManager::GetMeshSource(meshComponent->MeshSourceId);
-
-		glm::mat4 entityTransform = GetWorldSpaceTransformMatrix(e);
-
-		SubmitMesh(meshSource, meshComponent->MeshSourceId, meshComponent->MaterialId, entityTransform);
-  });
 }
 
 Entity Scene::TryGetEntityWithUUID(UUID id) const {
@@ -68,30 +41,43 @@ Entity Scene::TryGetEntityWithUUID(UUID id) const {
   return {};
 }
 
+void Scene::OnUpdate() {
+}
+
+void Scene::OnRender(Ref<SceneRenderer> renderer) {
+  renderer->SetScene(this);
+
+  static float aspectRatio = Application::Get()->GetWindowSize().x / Application::Get()->GetWindowSize().y;
+  static auto projectionMatrix = glm::perspective(glm::radians(75.0f), aspectRatio, 0.10f, 2500.0f);
+  renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 2500, 0.10f});
+
+  static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
+  drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent) {
+    Entity e = Entity(entity, this);
+    Ref<MeshSource> meshSource = Rain::ResourceManager::GetMeshSource(meshComponent.MeshSourceId);
+    glm::mat4 entityTransform = GetWorldSpaceTransformMatrix(e);
+
+    renderer->SubmitMesh(meshSource, meshComponent.SubMeshId, meshComponent.MaterialId, entityTransform);
+  });
+
+  renderer->EndScene();
+}
+
 void Scene::BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh) {
   const std::vector<Ref<MeshNode>> nodes = mesh->GetNodes();
 
-  RenderQueue::IndexMeshSource(mesh);
-
-  // TODO: make it more elegant
-  uint32_t ctx = 0;
   for (const Ref<MeshNode> node : mesh->GetNodes()) {
-    if (node->IsRoot()) {
+    if (node->IsRoot() && mesh->m_SubMeshes[node->SubMeshId].VertexCount == 0) {
       continue;
     }
     Entity nodeEntity = CreateChildEntity(parent, node->Name);
-    nodeEntity.AddComponent<MeshComponent>((uint32_t)mesh->Id, (uint32_t)node->SubMeshId, ctx);
+    uint32_t materialId = mesh->m_SubMeshes[node->SubMeshId].MaterialIndex;
+
+    nodeEntity.AddComponent<MeshComponent>((uint32_t)mesh->Id, (uint32_t)node->SubMeshId, materialId);
     nodeEntity.AddComponent<TransformComponent>();
-    ctx++;
+
+    nodeEntity.Transform()->SetTransform(node->LocalTransform);
   }
-}
-
-Entity::operator bool() const {
-  return (m_Entity != flecs::entity::null()) && m_Scene && m_Scene->m_World.is_valid(m_Entity);
-}
-
-Entity Entity::GetParent() const {
-  return m_Scene->TryGetEntityWithUUID(GetParentUUID());
 }
 
 glm::mat4 Scene::GetWorldSpaceTransformMatrix(Entity entity) {

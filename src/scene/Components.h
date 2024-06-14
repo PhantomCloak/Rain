@@ -1,8 +1,9 @@
 #pragma once
 #include <glm/glm.hpp>
 #include <glm/gtx/euler_angles.hpp>
+#include <string>
+#include "core/UUID.h"
 #include "glm/ext/matrix_transform.hpp"
-#include "render/Mesh.h"
 
 struct IDComponent {
   UUID ID = 0;
@@ -31,6 +32,21 @@ struct TransformComponent {
     glm::mat4 scaleMatrix = glm::scale(glm::mat4(1.0f), Scale);
     return translationMatrix * rotationMatrix * scaleMatrix;
   }
+
+  void SetTransform(const glm::mat4& transform) {
+    Translation = glm::vec3(transform[3]);
+
+    Scale.x = glm::length(glm::vec3(transform[0]));
+    Scale.y = glm::length(glm::vec3(transform[1]));
+    Scale.z = glm::length(glm::vec3(transform[2]));
+
+    glm::mat3 rotationMatrix = glm::mat3(
+        glm::vec3(transform[0]) / Scale.x,
+        glm::vec3(transform[1]) / Scale.y,
+        glm::vec3(transform[2]) / Scale.z);
+
+    RotationEuler = glm::eulerAngles(glm::quat_cast(rotationMatrix));
+  }
 };
 
 struct RigidBodyComponent {
@@ -57,9 +73,10 @@ struct RelationshipComponent {
 };
 
 struct MeshComponent {
-	uint32_t MeshSourceId = -1;
-	uint32_t SubMeshId = -1;
-	uint32_t MaterialId = -1;
+  uint32_t MeshSourceId = -1;
+  uint32_t SubMeshId = -1;
+  uint32_t MaterialId = -1;
 
-	MeshComponent(uint32_t meshSourceId = -1, uint32_t subMeshId = -1, uint32_t materialId = -1) : SubMeshId(subMeshId), MeshSourceId(meshSourceId), MaterialId(materialId) {}
+  MeshComponent(uint32_t meshSourceId = -1, uint32_t subMeshId = -1, uint32_t materialId = -1)
+      : SubMeshId(subMeshId), MeshSourceId(meshSourceId), MaterialId(materialId) {}
 };

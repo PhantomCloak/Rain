@@ -7,6 +7,7 @@
 #include <webgpu/webgpu.h>
 #include <glm/glm.hpp>
 #include "TinyTimer.h"
+#include "scene/SceneRenderer.h"
 
 struct GLFWwindow;
 
@@ -36,6 +37,12 @@ class Application : public AppWindow {
   void OnStart() override;
 	void fetchTimestamps();
 	TinyTimer::PerformanceCounter m_perf;
+	static Application* Get();
+
+	glm::vec2 GetWindowSize();
+ private:
+	Ref<SceneRenderer> m_Renderer;
+	static Application* m_Instance;
  private:
   void updateDragInertia();
 

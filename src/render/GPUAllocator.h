@@ -1,20 +1,39 @@
 #pragma once
+
 #include <webgpu/webgpu.h>
 #include <string>
+#include "render/RenderContext.h"
 
-struct GPUBuffer {
-	WGPUBuffer Buffer;
-	uint32_t Size;
-};
+class GPUBuffer;
 
 class GPUAllocator {
  public:
-  static void Init(WGPUDevice device);
-  static GPUBuffer GAlloc(std::string label, WGPUBufferUsageFlags usage, int size);
-  static GPUBuffer GAlloc(WGPUBufferUsageFlags usage, int size);
+  static void Init();
+  static Ref<GPUBuffer> GAlloc(std::string label, WGPUBufferUsageFlags usage, int size);
+  static Ref<GPUBuffer> GAlloc(WGPUBufferUsageFlags usage, int size);
 
-	static int allocatedBufferCount;
-	static int allocatedBufferTotalSize;
+  static int allocatedBufferCount;
+  static int allocatedBufferTotalSize;
+
  private:
-	static WGPUDevice m_Device;
+  static void GSet(Ref<GPUBuffer> buffer, void* data, int size);
+
+ private:
+  static Ref<RenderContext> m_Context;
+  friend GPUBuffer;
+};
+
+class GPUBuffer {
+ public:
+  WGPUBuffer Buffer;
+  int Size;
+  GPUBuffer() {};
+  GPUBuffer(WGPUBuffer buffer, int size)
+      : Buffer(buffer), Size(size) {};
+
+  void SetData(void const* data, int size);
+  void SetData(void const* data, int offset, int size);
+
+ private:
+  friend GPUAllocator;
 };

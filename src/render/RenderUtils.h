@@ -4,7 +4,6 @@
 #include <string>
 #include <set>
 #include <webgpu/webgpu.h>
-#include <map>
 
 enum class ShaderDataType {
   None = 0,
@@ -90,6 +89,8 @@ struct BufferElement {
         return 4;
       case ShaderDataType::Bool:
         return 1;
+      case ShaderDataType::None:
+        break;
     }
 
     // TOOD Assert

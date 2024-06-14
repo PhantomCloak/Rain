@@ -1,6 +1,5 @@
-#include "PipelineManager.h"
-#include <iostream>
-#include <ostream>
+#include "Pipeline.h"
+#include "render/RenderContext.h"
 
 // In some environments (such as Emscriptten) underlying implementation details of the WebGPU API might require HEAP pointers
 struct PipelineBundle {
@@ -17,18 +16,7 @@ struct PipelineBundle {
   WGPURenderPipeline pipeline;
 };
 
-WGPURenderPipeline PipelineManager::CreatePipeline(
-    const std::string& pipelineId,
-    const std::string& shaderId,
-    std::vector<WGPUVertexBufferLayout> vertexLayouts,
-    std::map<int, GroupLayout> groupLayout,
-    WGPUTextureFormat depthFormat,
-    WGPUTextureFormat colorFormat,
-    WGPUCullMode cullingMode,
-    WGPUSurface surface,
-    WGPUAdapter adapter) {
-  WGPUShaderModule shader = shaderManager_->GetShader(shaderId);
-
+RenderPipeline::RenderPipeline(std::string name, RenderPipelineProps props, const std::vector<WGPUVertexBufferLayout>& vertexLayout, std::map<int, GroupLayout>& groupLayout) {
   WGPUTextureFormat swapChainFormat = WGPUTextureFormat_Undefined;
 
 #if __EMSCRIPTEN__
@@ -39,21 +27,18 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
 
   static std::map<std::string, PipelineBundle> pipelineBundle = {};
 
-  if (pipelineBundle.find(pipelineId) == pipelineBundle.end()) {
-    pipelineBundle[pipelineId] = {};
-  }
-
-  PipelineBundle& bundle = pipelineBundle[pipelineId];
+  PipelineBundle& bundle = pipelineBundle[name];
+	m_PipelineProps = props;
 
   WGPURenderPipelineDescriptor& pipelineDesc = bundle.pipelineDescriptor;
 
-  pipelineDesc.label = pipelineId.c_str();
+  pipelineDesc.label = name.c_str();
 
-	// TODO: Inspect memory for emscriptten
-	pipelineDesc.vertex.bufferCount = vertexLayouts.size();
-	pipelineDesc.vertex.buffers = vertexLayouts.data();
+  // TODO: Inspect memory for emscriptten
+  pipelineDesc.vertex.bufferCount = vertexLayout.size();
+  pipelineDesc.vertex.buffers = vertexLayout.data();
 
-  pipelineDesc.vertex.module = shader;
+  pipelineDesc.vertex.module = props.VertexShader;
   pipelineDesc.vertex.entryPoint = "vs_main";  // let be constant for now
 
   pipelineDesc.vertex.constantCount = 0;
@@ -62,21 +47,25 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
   pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
   pipelineDesc.primitive.frontFace = WGPUFrontFace_CCW;
-  pipelineDesc.primitive.cullMode = cullingMode;
 
-  // The Fragment State controls how fragment shaders process pixel data,
-  // including color blending and format.
-  //  Use cases
-  //  - Transparency and Alpha Blending
-  //  - Post-Processing Effects
+  WGPUCullMode mode;
+  if (props.CullingMode == PipelineCullingMode::BACK) {
+    mode = WGPUCullMode_Back;
+  } else if (props.CullingMode == PipelineCullingMode::FRONT) {
+    mode = WGPUCullMode_Front;
+  } else {
+    mode = WGPUCullMode_None;
+  }
+
+  pipelineDesc.primitive.cullMode = mode;
 
   WGPUFragmentState& fragmentState = bundle.fragmentState;
-  fragmentState.module = shader;
+  fragmentState.module = props.FragmentShader;
   fragmentState.entryPoint = "fs_main";
   fragmentState.constantCount = 0;
   fragmentState.constants = NULL;
 
-  if (colorFormat != WGPUTextureFormat_Undefined) {
+  if (props.ColorFormat != TextureFormat::Undefined) {
     WGPUBlendState& blendState = bundle.blendState;
     blendState.color.srcFactor = WGPUBlendFactor_SrcAlpha;
     blendState.color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
@@ -103,12 +92,11 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   // - Depth Testing for 3D Scenes
   // - Stencil Operations such as Shadow-Mapping
 
-  if (depthFormat == WGPUTextureFormat_Undefined) {
-    std::cout << "DS EMPTY" << std::endl;
+  if (props.DepthFormat == TextureFormat::Undefined) {
     pipelineDesc.depthStencil = nullptr;
   } else {
     WGPUDepthStencilState& depthStencilState = bundle.depthStencilState;
-    depthStencilState.format = depthFormat;
+    depthStencilState.format = WGPUTextureFormat_Depth24Plus;
     depthStencilState.stencilReadMask = 0xFFFFFFFF;
     depthStencilState.stencilWriteMask = 0xFFFFFFFF;
 
@@ -134,7 +122,6 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
     depthStencilState.stencilReadMask = 0xFFFFFFFF;
     depthStencilState.stencilWriteMask = 0xFFFFFFFF;
 
-    std::cout << "DS FILL FORMAT: " << depthFormat << std::endl;
     pipelineDesc.depthStencil = &depthStencilState;
   }
 
@@ -144,10 +131,10 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
 
   std::vector<WGPUBindGroupLayout>& bindGroupLayouts = bundle.bindGroupLayouts;
 
-  for(int i = 0; i < groupLayout.size(); i++)
-  {
-	  WGPUBindGroupLayout layout = LayoutUtils::CreateBindGroup("bgl_" + pipelineId + std::to_string(i), _device, groupLayout[i]);
-	  bindGroupLayouts.push_back(layout);
+	auto device = RenderContext::GetDevice();
+  for (int i = 0; i < groupLayout.size(); i++) {
+    WGPUBindGroupLayout layout = LayoutUtils::CreateBindGroup("bgl_" + name + std::to_string(i), device, groupLayout[i]);
+    bindGroupLayouts.push_back(layout);
   }
 
   WGPUPipelineLayoutDescriptor& layoutDesc = bundle.pipelineLayoutDescriptor;
@@ -156,17 +143,8 @@ WGPURenderPipeline PipelineManager::CreatePipeline(
   layoutDesc.bindGroupLayouts = bindGroupLayouts.data();
 
   WGPUPipelineLayout& pipelineLayout = bundle.pipelineLayout;
-  pipelineLayout = wgpuDeviceCreatePipelineLayout(_device, &layoutDesc);
+  pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &layoutDesc);
   pipelineDesc.layout = pipelineLayout;
 
-  std::cout << "CREAT RP" << std::endl;
-  bundle.pipeline =
-      wgpuDeviceCreateRenderPipeline(_device, &pipelineDesc);
-
-  pipelines_.emplace(pipelineId, bundle.pipeline);
-
-  return bundle.pipeline;
-}
-WGPURenderPipeline PipelineManager::GetPipeline(const std::string& pipelineId) {
-  return pipelines_[pipelineId];
+	m_Pipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
 }

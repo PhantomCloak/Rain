@@ -1,35 +1,44 @@
 #pragma once
 #include <webgpu/webgpu.h>
+#include <unordered_map>
 #include "GLFW/glfw3.h"
 #include "Material.h"
-#include "Mesh.h"
-#include <memory>
-#include <unordered_map>
+#include "render/Mesh.h"
 
 class Render {
  public:
-	static Render* Instance;
+  static Render* Instance;
   WGPUInstance CreateInstance();
-  WGPUDevice RequestDevice();
   bool Init(void* window, WGPUInstance instance);
   void OnFrameStart();
   void OnFrameEnd();
 
-  WGPUAdapter requestAdapter(WGPUInstance instance, WGPURequestAdapterOptions const* options);
-  WGPUDevice requestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor);
-  WGPUSwapChainDescriptor GetSwapchainDescriptor(int width, int height, WGPUTextureFormat swapChainFormat);
-  WGPURequiredLimits GetRequiredLimits(WGPUAdapter adapter);
-  WGPUSwapChain buildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface);
+  WGPUSwapChain BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface);
   WGPUTexture GetDepthBufferTexture(WGPUDevice device, WGPUTextureFormat format, int width, int height, bool dbg = false);
   WGPUTextureView GetDepthBufferTextureView(std::string label, WGPUTexture& depthTexture, WGPUTextureFormat depthTextureFormat);
-  WGPUVertexBufferLayout GetVertexBufferLayout();
-  void AttachFragmentStateToPipeline(WGPURenderPipelineDescriptor* pipe, WGPUShaderModule& shaderModule, WGPUTextureFormat swapChainFormat);
-  void AttachDepthStencilStateToPipeline(WGPURenderPipelineDescriptor& pipe, WGPUTextureFormat depthTextureFormat);
-  WGPUBindGroupLayout* SetupBindingLayouts(WGPURenderPipelineDescriptor* pipe, WGPUDevice device);
-  WGPUSampler AttachSampler(WGPUDevice device);
 
-	WGPUSurface m_surface = nullptr;
-	GLFWwindow* m_window = nullptr;
+  Ref<RenderContext> GetRenderContext() { return m_RenderContext; }
+
+  void RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
+                  WGPURenderPipeline pipeline,
+                  Ref<MeshSource> mesh,
+                  uint32_t submeshIndex,
+                  Ref<Material> material,
+                  Ref<GPUBuffer> transformBuffer,
+                  uint32_t transformOffset,
+                  uint32_t instanceCount);
+
+  std::unordered_map<UUID, Material> Materials;
+
+ private:
+  WGPURequiredLimits GetRequiredLimits(WGPUAdapter adapter);
+  WGPUAdapter RequestAdapter(WGPUInstance instance, WGPURequestAdapterOptions const* options);
+  WGPUDevice RequestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor);
+
+ public:
+  Ref<RenderContext> m_RenderContext;
+  WGPUSurface m_surface = nullptr;
+  GLFWwindow* m_window = nullptr;
   WGPUAdapter m_adapter = nullptr;
   WGPUDevice m_device = nullptr;
   WGPUQueue m_queue = nullptr;
@@ -37,18 +46,10 @@ class Render {
   WGPUTextureView m_depthTextureView = nullptr;
   WGPUSwapChain m_swapChain = nullptr;
   WGPUSampler m_sampler = nullptr;
-  WGPUColor m_Color;
-  WGPUTextureView nextTexture = nullptr;
-  WGPURenderPassEncoder renderPass;
-  WGPUCommandEncoder encoder;
   WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_Undefined;
   WGPUTextureFormat m_depthTextureFormat = WGPUTextureFormat_Depth24Plus;
 
-	uint32_t StrideDynamicBuffers;
-	uint32_t StrideStorageBuffers;
-	uint32_t MaxAllowedStorageBufferSize;
-
   WGPUSwapChainDescriptor m_swapChainDesc;
 
-	std::unordered_map<UUID, MaterialEngine> Materials;
+	friend class RenderContext;
 };
