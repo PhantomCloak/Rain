@@ -2,6 +2,39 @@
 #include "render/RenderContext.h"
 
 // In some environments (such as Emscriptten) underlying implementation details of the WebGPU API might require HEAP pointers
+
+WGPUVertexFormat ConvertWGPUVertexFormat(ShaderDataType type) {
+  switch (type) {
+    case ShaderDataType::Float:
+      return WGPUVertexFormat_Float32;
+    case ShaderDataType::Float2:
+      return WGPUVertexFormat_Float32x2;
+    case ShaderDataType::Float3:
+      return WGPUVertexFormat_Float32x3;
+    case ShaderDataType::Float4:
+      return WGPUVertexFormat_Float32x4;
+    case ShaderDataType::Mat3:
+      RN_CORE_ASSERT("Vertex format cannot be matrix.");
+    case ShaderDataType::Mat4:
+      RN_CORE_ASSERT("Vertex format cannot be matrix.");
+    case ShaderDataType::Int:
+      return WGPUVertexFormat_Uint32;
+    case ShaderDataType::Int2:
+      return WGPUVertexFormat_Uint32x2;
+    case ShaderDataType::Int3:
+      return WGPUVertexFormat_Uint32x3;
+    case ShaderDataType::Int4:
+      return WGPUVertexFormat_Uint32x4;
+    case ShaderDataType::Bool:
+      RN_CORE_ASSERT("Vertex format cannot be boolean");
+    case ShaderDataType::None:
+      RN_CORE_ASSERT("Invalid Vertex Format");
+      break;
+  }
+  RN_CORE_ASSERT("Undefined Vertex Format");
+  return WGPUVertexFormat_Undefined;
+}
+
 struct PipelineBundle {
   WGPURenderPipelineDescriptor pipelineDescriptor;
   WGPUColorTargetState colorTargetState;
@@ -16,11 +49,12 @@ struct PipelineBundle {
   WGPURenderPipeline pipeline;
 };
 
-RenderPipeline::RenderPipeline(std::string name, RenderPipelineProps props, const std::vector<WGPUVertexBufferLayout>& vertexLayout, std::map<int, GroupLayout>& groupLayout) {
+RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& props, Ref<Texture> colorAttachment, Ref<Texture> depthAttachment)
+    : m_PipelineProps(props), m_ColorAttachment(colorAttachment), m_DepthAttachment(depthAttachment) {
   WGPUTextureFormat swapChainFormat = WGPUTextureFormat_Undefined;
 
 #if __EMSCRIPTEN__
-  swapChainFormat = wgpuSurfaceGetPreferredFormat(surface, adapter);
+  swapChainFormat = wgpuSurfaceGetPreferredFormat(RenderContext::GetSurface(), RenderContext::GetAdapter());
 #else
   swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 #endif
@@ -28,15 +62,49 @@ RenderPipeline::RenderPipeline(std::string name, RenderPipelineProps props, cons
   static std::map<std::string, PipelineBundle> pipelineBundle = {};
 
   PipelineBundle& bundle = pipelineBundle[name];
-	m_PipelineProps = props;
+  m_PipelineProps = props;
 
   WGPURenderPipelineDescriptor& pipelineDesc = bundle.pipelineDescriptor;
 
   pipelineDesc.label = name.c_str();
 
+  std::vector<WGPUVertexAttribute> vertexAttributes;
+  std::vector<WGPUVertexAttribute> instanceAttributes;
+
+  const auto& vertexLayout = m_PipelineProps.VertexLayout;
+  const auto& instanceLayout = m_PipelineProps.InstanceLayout;
+
+  for (const auto& element : vertexLayout) {
+    vertexAttributes.push_back({.format = ConvertWGPUVertexFormat(element.Type),
+                                .offset = element.Offset,
+                                .shaderLocation = element.Location});
+  }
+
+  for (const auto& element : instanceLayout) {
+    instanceAttributes.push_back({.format = ConvertWGPUVertexFormat(element.Type),
+                                  .offset = element.Offset,
+                                  .shaderLocation = element.Location});
+  }
+
+  WGPUVertexBufferLayout vblVertex = {};
+  vblVertex.attributeCount = vertexAttributes.size();
+  vblVertex.attributes = vertexAttributes.data();
+  vblVertex.arrayStride = vertexLayout.GetStride();
+  vblVertex.stepMode = WGPUVertexStepMode_Vertex;
+
+  WGPUVertexBufferLayout vblInstance = {};
+  vblInstance.attributeCount = instanceAttributes.size();
+  vblInstance.attributes = instanceAttributes.data();
+  vblInstance.arrayStride = instanceLayout.GetStride();
+  vblInstance.stepMode = WGPUVertexStepMode_Instance;
+
+  std::vector<WGPUVertexBufferLayout> vertexLayouts;
+  vertexLayouts.push_back(vblVertex);
+  vertexLayouts.push_back(vblInstance);
+
   // TODO: Inspect memory for emscriptten
-  pipelineDesc.vertex.bufferCount = vertexLayout.size();
-  pipelineDesc.vertex.buffers = vertexLayout.data();
+  pipelineDesc.vertex.bufferCount = vertexLayouts.size();
+  pipelineDesc.vertex.buffers = vertexLayouts.data();
 
   pipelineDesc.vertex.module = props.VertexShader;
   pipelineDesc.vertex.entryPoint = "vs_main";  // let be constant for now
@@ -86,12 +154,6 @@ RenderPipeline::RenderPipeline(std::string name, RenderPipelineProps props, cons
   }
 
   pipelineDesc.fragment = &fragmentState;
-
-  // The Depth Stencil State defines how the pipeline will handle depth testing
-  // and stencil testing. Use cases:
-  // - Depth Testing for 3D Scenes
-  // - Stencil Operations such as Shadow-Mapping
-
   if (props.DepthFormat == TextureFormat::Undefined) {
     pipelineDesc.depthStencil = nullptr;
   } else {
@@ -117,8 +179,6 @@ RenderPipeline::RenderPipeline(std::string name, RenderPipelineProps props, cons
     depthStencilState.depthCompare = WGPUCompareFunction_Less;
     depthStencilState.depthWriteEnabled = true;
 
-    // Resetting stencil masks to 0, which might be a mistake. Usually, you would
-    // leave these as 0xFFFFFFFF unless you have a specific reason to change them.
     depthStencilState.stencilReadMask = 0xFFFFFFFF;
     depthStencilState.stencilWriteMask = 0xFFFFFFFF;
 
@@ -131,7 +191,9 @@ RenderPipeline::RenderPipeline(std::string name, RenderPipelineProps props, cons
 
   std::vector<WGPUBindGroupLayout>& bindGroupLayouts = bundle.bindGroupLayouts;
 
-	auto device = RenderContext::GetDevice();
+  auto device = RenderContext::GetDevice();
+  auto& groupLayout = m_PipelineProps.groupLayout;
+
   for (int i = 0; i < groupLayout.size(); i++) {
     WGPUBindGroupLayout layout = LayoutUtils::CreateBindGroup("bgl_" + name + std::to_string(i), device, groupLayout[i]);
     bindGroupLayouts.push_back(layout);
@@ -146,5 +208,5 @@ RenderPipeline::RenderPipeline(std::string name, RenderPipelineProps props, cons
   pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &layoutDesc);
   pipelineDesc.layout = pipelineLayout;
 
-	m_Pipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
+  m_Pipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
 }

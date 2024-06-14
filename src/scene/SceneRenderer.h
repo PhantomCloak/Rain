@@ -69,8 +69,10 @@ struct SceneCamera {
 };
 
 struct SceneUniform {
-  glm::mat4x4 projectionMatrix;
-  glm::mat4x4 viewMatrix;
+  glm::mat4x4 viewProjection;
+  glm::mat4x4 shadowViewProjection;
+	glm::vec3 lightPos;
+	float _pad;
 };
 
 class SceneRenderer {
@@ -93,9 +95,15 @@ class SceneRenderer {
   Ref<GPUBuffer> m_TransformBuffer;
   Ref<GPUBuffer> m_SceneUniformBuffer;
   WGPUBindGroup m_SceneBindGroup;
+	WGPUBindGroup m_ShadowPassBindGroup;
 	SceneUniform m_SceneUniform;
   std::map<MeshKey, DrawCommand> m_DrawList;
   std::map<MeshKey, TransformMapData> m_MeshTransformMap;
-  std::map<std::string, Ref<RenderPipeline>> m_RenderPipelines;
+
+	Ref<Texture> m_ShadowMapTexture;
+	Ref<Texture> m_LitDepthTexture;
+
+	Ref<RenderPipeline> m_LitPipeline;
+	Ref<RenderPipeline> m_ShadowPipeline;
   Ref<ShaderManager> m_ShaderManager;
 };

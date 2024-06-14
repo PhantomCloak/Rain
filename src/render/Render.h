@@ -30,6 +30,8 @@ class Render {
 
   std::unordered_map<UUID, Material> Materials;
 
+	Ref<Texture> GetCurrentSwapChainTexture();
+
  private:
   WGPURequiredLimits GetRequiredLimits(WGPUAdapter adapter);
   WGPUAdapter RequestAdapter(WGPUInstance instance, WGPURequestAdapterOptions const* options);

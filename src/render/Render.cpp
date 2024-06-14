@@ -14,7 +14,7 @@ Render* Render::Instance = nullptr;
 
 WGPUInstance Render::CreateInstance() {
   WGPUInstanceDescriptor instanceDesc;
-	static WGPUInstance instance;
+  static WGPUInstance instance;
 
 #if !__EMSCRIPTEN__
   static std::vector<const char*> enabledToggles = {
@@ -37,9 +37,9 @@ WGPUInstance Render::CreateInstance() {
 
   instance = wgpuCreateInstance(&instanceDesc);
 
-	RN_CORE_ASSERT(instance, "An error occured while acquiring the WebGPU instance.");
+  RN_CORE_ASSERT(instance, "An error occured while acquiring the WebGPU instance.");
 
-	return instance;
+  return instance;
 }
 
 bool Render::Init(void* window, WGPUInstance instance) {
@@ -70,7 +70,7 @@ bool Render::Init(void* window, WGPUInstance instance) {
 
   RN_CORE_ASSERT(m_queue, "An error occured while acquiring the queue. this might indicate unsupported browser/device.");
 
-	m_RenderContext = CreateRef<RenderContext>(m_device, m_queue);
+  m_RenderContext = CreateRef<RenderContext>(m_adapter, m_surface, m_device, m_queue);
 
   int width, height;
   glfwGetFramebufferSize((GLFWwindow*)window, &width, &height);
@@ -138,10 +138,10 @@ WGPUAdapter Render::RequestAdapter(WGPUInstance instance,
                                   void* pUserData) {
     UserData& userData = *reinterpret_cast<UserData*>(pUserData);
 
-		RN_CORE_ASSERT(status == WGPURequestAdapterStatus_Success, "An error occured while acquiring WebGPU adapter");
+    RN_CORE_ASSERT(status == WGPURequestAdapterStatus_Success, "An error occured while acquiring WebGPU adapter");
 
-		userData.adapter = adapter;
-		userData.requestEnded = true;
+    userData.adapter = adapter;
+    userData.requestEnded = true;
   };
 
   wgpuInstanceRequestAdapter(instance /* equivalent of navigator.gpu */,
@@ -170,7 +170,7 @@ WGPUDevice Render::RequestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const
                                  void* pUserData) {
     UserData& userData = *reinterpret_cast<UserData*>(pUserData);
 
-		RN_CORE_ASSERT(status == WGPURequestDeviceStatus_Success, "An error occured while acquiring WebGPU adapter");
+    RN_CORE_ASSERT(status == WGPURequestDeviceStatus_Success, "An error occured while acquiring WebGPU adapter");
 
     userData.device = device;
     userData.requestEnded = true;
@@ -316,4 +316,13 @@ void Render::RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
 
   auto& subMesh = mesh->m_SubMeshes[submeshIndex];
   wgpuRenderPassEncoderDrawIndexed(renderCommandBuffer, subMesh.IndexCount, instanceCount, subMesh.BaseIndex, subMesh.BaseVertex, 0);
+}
+
+Ref<Texture> Render::GetCurrentSwapChainTexture() {
+  static auto textureRef = CreateRef<Texture>();
+
+  WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(m_swapChain);
+  textureRef->View = nextTexture;
+
+  return textureRef;
 }

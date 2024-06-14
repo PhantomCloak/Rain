@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <set>
 #include <webgpu/webgpu.h>
+#include <cstdint>
+#include <set>
+#include <string>
 
 enum class ShaderDataType {
   None = 0,
@@ -52,17 +52,55 @@ static uint32_t ShaderDataTypeSize(ShaderDataType type) {
   return 0;
 }
 
+static uint32_t ShaderDataTypeAlignment(ShaderDataType type) {
+  switch (type) {
+    case ShaderDataType::Float:
+      return 4;
+    case ShaderDataType::Float2:
+      return 4 * 2;
+    case ShaderDataType::Float3:
+      return 4 * 3;
+    case ShaderDataType::Float4:
+      return 4 * 4;
+    case ShaderDataType::Mat3:
+      return 4 * 3 * 3;
+    case ShaderDataType::Mat4:
+      return 4 * 4 * 4;
+    case ShaderDataType::Int:
+      return 4;
+    case ShaderDataType::Int2:
+      return 4 * 2;
+    case ShaderDataType::Int3:
+      return 4 * 3;
+    case ShaderDataType::Int4:
+      return 4 * 4;
+    case ShaderDataType::Bool:
+      return 1;
+    case ShaderDataType::None:
+      break;
+  }
+
+  // TOOD Assert
+  return 0;
+}
+
 struct BufferElement {
   std::string Name;
   ShaderDataType Type;
+  uint32_t Location;
   uint32_t Size;
   size_t Offset;
-  bool Normalized;
 
   BufferElement() = default;
 
-  BufferElement(ShaderDataType type, const std::string& name, bool normalized = false)
-      : Name(name), Type(type), Size(ShaderDataTypeSize(type)), Offset(0), Normalized(normalized) {
+  // Since we have no shader translation stuff at the moment thus we cannot get locations / types from shader
+  // We have to supply them manually
+  BufferElement(uint32_t location, ShaderDataType type, const std::string& name, uint32_t offset)
+      : Name(name), Type(type), Location(location), Size(ShaderDataTypeSize(type)), Offset(offset) {
+  }
+
+  BufferElement(ShaderDataType type, const std::string& name)
+      : Name(name), Type(type), Location(0), Size(ShaderDataTypeSize(type)), Offset(0) {
   }
 
   uint32_t GetComponentCount() const {
@@ -98,14 +136,11 @@ struct BufferElement {
   }
 };
 
-class BufferLayout {
+class VertexBufferLayout {
  public:
-  BufferLayout() {
-  }
 
-  BufferLayout(std::initializer_list<BufferElement> elements)
-      : m_Elements(elements) {
-    CalculateOffsetsAndStride();
+  VertexBufferLayout(uint32_t stride, std::initializer_list<BufferElement> elements)
+      : m_Stride(stride), m_Elements(elements) {
   }
 
   uint32_t GetStride() const {
@@ -134,17 +169,6 @@ class BufferLayout {
   }
 
  private:
-  void CalculateOffsetsAndStride() {
-    size_t offset = 0;
-    m_Stride = 0;
-    for (auto& element : m_Elements) {
-      element.Offset = offset;
-      offset += element.Size;
-      m_Stride += element.Size;
-    }
-  }
-
- private:
   std::vector<BufferElement> m_Elements;
   uint32_t m_Stride = 0;
 };
@@ -158,13 +182,13 @@ enum class GroupLayoutVisibility {
 enum class GroupLayoutType {
   Uniform,
   UniformDynamic,
-	Storage,
-	StorageReadOnly,
-	StorageReadOnlyDynamic,
+  Storage,
+  StorageReadOnly,
+  StorageReadOnlyDynamic,
   Sampler,
   SamplerCompare,
   Texture,
-	TextureDepth
+  TextureDepth
 };
 
 struct LayoutElement {
@@ -228,10 +252,10 @@ class GroupLayout {
 };
 
 class LayoutUtils {
-	public:
-	static void SetVisibility(WGPUBindGroupLayoutEntry& entry, GroupLayoutVisibility visibility);
-	static void SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type);
-	static std::vector<WGPUBindGroupLayoutEntry> ParseGroupLayout(GroupLayout layout);
-	static WGPUBindGroupLayout CreateBindGroup(std::string label, WGPUDevice device, GroupLayout layout);
-	static uint32_t CeilToNextMultiple(uint32_t value, uint32_t step);
+ public:
+  static void SetVisibility(WGPUBindGroupLayoutEntry& entry, GroupLayoutVisibility visibility);
+  static void SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type);
+  static std::vector<WGPUBindGroupLayoutEntry> ParseGroupLayout(GroupLayout layout);
+  static WGPUBindGroupLayout CreateBindGroup(std::string label, WGPUDevice device, GroupLayout layout);
+  static uint32_t CeilToNextMultiple(uint32_t value, uint32_t step);
 };

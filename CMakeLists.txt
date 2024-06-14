@@ -60,7 +60,7 @@ if(EMSCRIPTEN)
 
 	target_link_options(PhysX PRIVATE -sALLOW_BLOCKING_ON_MAIN_THREAD=1)
 
-	target_link_libraries(MyApp PRIVATE assimp PhysX PhysXCooking PhysXCommon PhysXExtensions)
+	target_link_libraries(MyApp PRIVATE assimp flecs spdlog PhysX PhysXCooking PhysXCommon PhysXExtensions)
 	target_link_options(MyApp PRIVATE
 		-sUSE_GLFW=3
 		-sUSE_WEBGPU=1

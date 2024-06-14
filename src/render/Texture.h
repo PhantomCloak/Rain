@@ -6,7 +6,7 @@
 
 enum TextureFormat {
 	RGBA,
-	Dept,
+	Depth,
 	Undefined
 };
 
