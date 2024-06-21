@@ -2,6 +2,8 @@
 #include "Application.h"
 #include "render/Render.h"
 
+SceneRenderer* SceneRenderer::instance;
+
 glm::mat4 GetViewMatrix(glm::vec3 pos, glm::vec3 rot) {
   glm::vec3 shadowCameraPos = pos;
   glm::vec3 shadowCameraRot = rot;
@@ -240,6 +242,7 @@ void SceneRenderer::SetScene(Scene* scene) {
 
 void SceneRenderer::BeginScene(const SceneCamera& camera) {
   m_SceneUniform.viewProjection = camera.Projection * camera.ViewMatrix;
+  m_SceneUniform.cameraViewMatrix = camera.ViewMatrix;
   m_SceneUniformBuffer->SetData(&m_SceneUniform, sizeof(SceneUniform));
 }
 

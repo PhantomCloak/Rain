@@ -2,19 +2,11 @@
 #include <iostream>
 #include <ostream>
 #include "render/GPUAllocator.h"
-#include "render/Render.h"
-#include "render/RenderUtils.h"
 #include "render/ResourceManager.h"
 
-void Material::CreateMaterial(Ref<Material> mat) {
-  static Ref<Texture> def = Rain::ResourceManager::GetTexture("T_Default");
-  RN_ASSERT(def->View != 0, "Material: Default texture couldn't found.");
-
-  static GroupLayout materialGroup = {
-      {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
-      {1, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler},
-      {2, GroupLayoutVisibility::Both, GroupLayoutType::Uniform}};
-  static WGPUBindGroupLayout bglMaterial = LayoutUtils::CreateBindGroup("bgl_mesh_mat", Render::Instance->m_device, materialGroup);
+void Material::CreateMaterial(Ref<Material> mat, Ref<Shader> shader) {
+  static Ref<Texture> defaultTexture = Rain::ResourceManager::GetTexture("T_Default");
+  RN_ASSERT(defaultTexture->View != 0, "Material: Default texture couldn't found.");
 
   if (mat->m_diffuseTextures.size() <= 0 || mat->m_diffuseTextures[0]->View == 0) {
     std::cout << "Diffuse texture is not exist." << std::endl;
@@ -22,29 +14,20 @@ void Material::CreateMaterial(Ref<Material> mat) {
   }
 
   mat->materialUniformBuffer = GPUAllocator::GAlloc(mat->name, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(MaterialUniform));
-
-  static std::vector<WGPUBindGroupEntry> bindingsMaterial(3);
-
-  bindingsMaterial[0].binding = 0;
-  bindingsMaterial[0].offset = 0;
-  bindingsMaterial[0].textureView = mat->m_diffuseTextures[0]->View;
-
-  bindingsMaterial[1].binding = 1;
-  bindingsMaterial[1].offset = 0;
-  bindingsMaterial[1].sampler = Render::Instance->m_sampler;  // Default sampler
-
-  bindingsMaterial[2].binding = 2;
-  bindingsMaterial[2].buffer = mat->materialUniformBuffer->Buffer;
-  bindingsMaterial[2].offset = 0;
-  bindingsMaterial[2].size = sizeof(MaterialUniform);
-
-  WGPUBindGroupDescriptor bgMaterialDesc = {.label = "bg_mesh_mat"};
-  bgMaterialDesc.layout = bglMaterial;
-  bgMaterialDesc.entryCount = (uint32_t)bindingsMaterial.size();
-  bgMaterialDesc.entries = bindingsMaterial.data();
-
-  mat->bgMaterial = wgpuDeviceCreateBindGroup(Render::Instance->m_device, &bgMaterialDesc);
   mat->materialUniformBuffer->SetData(&mat->properties, sizeof(MaterialUniform));
+
+	static Ref<Sampler> s_MaterialSampler = Sampler::Create(Sampler::GetDefaultProps());
+
+	const BindingSpec spec = {
+		.Shader = shader
+	};
+
+	mat->bindingManager = new BindingManager(spec);
+
+	mat->bindingManager->Set("gradientTexture", mat->m_diffuseTextures[0]);
+	mat->bindingManager->Set("textureSampler", s_MaterialSampler);
+	mat->bindingManager->Set("uMaterial", mat->materialUniformBuffer);
+	mat->bindingManager->Bake();
 };
 
 void Material::SetDiffuseTexture(const std::string& name, const Ref<Texture> value) {

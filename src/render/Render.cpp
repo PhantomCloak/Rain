@@ -311,7 +311,7 @@ void Render::RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
                                        transformOffset,
                                        transformBuffer->Size - transformOffset);
   if (material) {
-    wgpuRenderPassEncoderSetBindGroup(renderCommandBuffer, 1, material->bgMaterial, 0, 0);
+    wgpuRenderPassEncoderSetBindGroup(renderCommandBuffer, 1, material->bindingManager->GetBindGroup(1), 0, 0);
   }
 
   auto& subMesh = mesh->m_SubMeshes[submeshIndex];

@@ -4,39 +4,39 @@
 #include <vector>
 #include "../stb_image.h"
 #include "core/Assert.h"
+#include "render/RenderContext.h"
 
-std::shared_ptr<WGPUDevice> Rain::ResourceManager::m_device;
 
 std::unordered_map<std::string, std::shared_ptr<Texture>> Rain::ResourceManager::_loadedTextures;
-std::unordered_map<std::string, std::shared_ptr<WGPUShaderModule>> Rain::ResourceManager::_loadedShaders;
+//std::unordered_map<std::string, std::shared_ptr<WGPUShaderModule>> Rain::ResourceManager::_loadedShaders;
 std::unordered_map<AssetHandle, Ref<MeshSource>> Rain::ResourceManager::m_LoadedMeshSources;
 
 static UUID nextUUID = 0;
 
-WGPUShaderModule loadShaderModule(const std::string& path, WGPUDevice m_device) {
-  std::cout << "SSS: " << path;
-  std::ifstream file(path);
-  if (!file.is_open()) {
-    std::cerr << "Error opening file '" << path << "': ";
-    std::cerr << strerror(errno) << std::endl;
-    return nullptr;
-  }
-  file.seekg(0, std::ios::end);
-  size_t size = file.tellg();
-  std::string shaderSource(size, ' ');
-  file.seekg(0);
-  file.read(shaderSource.data(), size);
-
-  std::cout << "shader src: " << shaderSource.c_str();
-  WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
-  shaderCodeDesc.chain.next = nullptr;
-  shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-  shaderCodeDesc.code = shaderSource.c_str();
-  WGPUShaderModuleDescriptor shaderDesc;
-  shaderDesc.nextInChain = &shaderCodeDesc.chain;
-
-  return wgpuDeviceCreateShaderModule(m_device, &shaderDesc);
-}
+//WGPUShaderModule loadShaderModule(const std::string& path, WGPUDevice m_device) {
+//  std::cout << "SSS: " << path;
+//  std::ifstream file(path);
+//  if (!file.is_open()) {
+//    std::cerr << "Error opening file '" << path << "': ";
+//    std::cerr << strerror(errno) << std::endl;
+//    return nullptr;
+//  }
+//  file.seekg(0, std::ios::end);
+//  size_t size = file.tellg();
+//  std::string shaderSource(size, ' ');
+//  file.seekg(0);
+//  file.read(shaderSource.data(), size);
+//
+//  std::cout << "shader src: " << shaderSource.c_str();
+//  WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
+//  shaderCodeDesc.chain.next = nullptr;
+//  shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
+//  shaderCodeDesc.code = shaderSource.c_str();
+//  WGPUShaderModuleDescriptor shaderDesc;
+//  shaderDesc.nextInChain = &shaderCodeDesc.chain;
+//
+//  return wgpuDeviceCreateShaderModule(m_device, &shaderDesc);
+//}
 
 void writeMipMaps(
     WGPUDevice m_device,
@@ -106,7 +106,7 @@ static uint32_t bit_width(uint32_t m) {
   }
 }
 
-WGPUTexture loadTexture(const char* path, std::shared_ptr<WGPUDevice> m_device, WGPUTextureView* pTextureView) {
+WGPUTexture loadTexture(const char* path, WGPUDevice m_device, WGPUTextureView* pTextureView) {
   int width, height, channels;
   unsigned char* pixelData = stbi_load(path, &width, &height, &channels, 4 /* force RGBA */);
   if (pixelData == NULL) {
@@ -125,11 +125,11 @@ WGPUTexture loadTexture(const char* path, std::shared_ptr<WGPUDevice> m_device, 
   textureDesc.sampleCount = 1;
   textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
 
-  WGPUTexture m_texture = wgpuDeviceCreateTexture(*m_device.get(), &textureDesc);
+  WGPUTexture m_texture = wgpuDeviceCreateTexture(m_device, &textureDesc);
 
   // Upload Data to Texture
   // Note: Implement writeMipMaps function compatible with Dawn's C API
-  writeMipMaps(*m_device, m_texture, textureDesc.size, textureDesc.mipLevelCount, pixelData);
+  writeMipMaps(m_device, m_texture, textureDesc.size, textureDesc.mipLevelCount, pixelData);
 
   // Free image data
   stbi_image_free(pixelData);
@@ -151,16 +151,16 @@ WGPUTexture loadTexture(const char* path, std::shared_ptr<WGPUDevice> m_device, 
   return m_texture;
 }
 
-void Rain::ResourceManager::Init(std::shared_ptr<WGPUDevice> device) {
-  m_device = device;
-}
+//void Rain::ResourceManager::Init(std::shared_ptr<WGPUDevice> device) {
+  //m_device = device;
+//}
 
 bool Rain::ResourceManager::IsTextureExist(std::string id) {
 	return _loadedTextures.find(id) != _loadedTextures.end();
 }
 std::shared_ptr<Texture> Rain::ResourceManager::LoadTexture(std::string id, std::string path) {
   auto tex = std::make_shared<Texture>();
-  tex->Buffer = loadTexture(path.c_str(), m_device, &tex->View);
+  tex->Buffer = loadTexture(path.c_str(), RenderContext::GetDevice(), &tex->View);
 
   _loadedTextures[id] = tex;
   return tex;
@@ -192,17 +192,17 @@ Ref<MeshSource> Rain::ResourceManager::LoadMeshSource(std::string path) {
 	return meshSource;
 }
 
-std::shared_ptr<WGPUShaderModule> Rain::ResourceManager::GetShader(std::string id) {
-  if (_loadedShaders.find(id) != _loadedShaders.end()) {
-    std::cout << "GetShader for id " << id << " does not exist" << std::endl;
-    return nullptr;
-  }
-
-  std::shared_ptr<WGPUShaderModule>& shader = _loadedShaders[id];
-
-  if (!shader) {
-    std::cout << "Shader is invalid" << std::endl;
-  }
-
-  return shader;
-}
+//std::shared_ptr<WGPUShaderModule> Rain::ResourceManager::GetShader(std::string id) {
+//  if (_loadedShaders.find(id) != _loadedShaders.end()) {
+//    std::cout << "GetShader for id " << id << " does not exist" << std::endl;
+//    return nullptr;
+//  }
+//
+//  std::shared_ptr<WGPUShaderModule>& shader = _loadedShaders[id];
+//
+//  if (!shader) {
+//    std::cout << "Shader is invalid" << std::endl;
+//  }
+//
+//  return shader;
+//}

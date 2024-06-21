@@ -1,18 +1,21 @@
 #pragma once
+#include "render/Shader.h"
 #include <webgpu/webgpu.h>
 #include <string>
 #include <map>
 
 class ShaderManager {
  public:
-  ShaderManager(WGPUDevice& device)
-      : _device(device) {
-  }
-
+	ShaderManager() {
+		m_Instance = this;
+	};
   void LoadShader(const std::string& shaderId, const std::string& shaderPath);
-  WGPUShaderModule GetShader(const std::string& shaderId);
+  Ref<Shader> GetShader(const std::string& shaderId);
+
+	// TODO: Make better API
+	static ShaderManager* Get() { return m_Instance; }
 
  private:
-  WGPUDevice& _device;
-  std::map<std::string, WGPUShaderModule> _shaders;
+	static ShaderManager* m_Instance;
+  std::map<std::string, Ref<Shader>> m_Shaders;
 };

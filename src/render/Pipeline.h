@@ -2,6 +2,7 @@
 
 #include <map>
 #include "render/RenderUtils.h"
+#include "render/Shader.h"
 #include "render/Texture.h"
 #include "webgpu/webgpu.h"
 
@@ -15,8 +16,8 @@ struct RenderPipelineProps {
   VertexBufferLayout VertexLayout;
   VertexBufferLayout InstanceLayout;
   PipelineCullingMode CullingMode;
-  WGPUShaderModule VertexShader;
-  WGPUShaderModule FragmentShader;
+  Ref<Shader> VertexShader;
+  Ref<Shader> FragmentShader;
   TextureFormat ColorFormat;
   TextureFormat DepthFormat;
   std::map<int, GroupLayout> groupLayout;  // We should get it from the shader but there is no translation lib atm

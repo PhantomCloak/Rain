@@ -1,8 +1,13 @@
 #pragma once
+#include <iostream>
 #include "core/Assert.h"
+#include "render/BindingManager.h"
+#include "render/Shader.h"
 #include "scene/Components.h"
 #include "scene/Entity.h"
 #include "scene/Scene.h"
+#include "src/tint/lang/wgsl/ast/module.h"
+#include "src/tint/lang/wgsl/sem/function.h"
 #define RN_DEBUG
 #include <GLFW/glfw3.h>
 #include <unistd.h>
@@ -17,11 +22,14 @@
 
 #include "core/Log.h"
 #include "io/cursor.h"
+#include "io/filesystem.h"
 #include "io/keyboard.h"
 #include "render/GPUAllocator.h"
 #include "render/Render.h"
 #include "render/ResourceManager.h"
 
+#include <tint/tint.h>
+#include <iostream>
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -35,6 +43,7 @@ Application* Application::m_Instance;
 std::shared_ptr<PlayerCamera> Player;
 
 Scene* scene;
+
 void Application::OnStart() {
   m_Instance = this;
   render = std::make_unique<Render>();
@@ -52,7 +61,7 @@ void Application::OnStart() {
 #endif
 
   if (render->m_surface == nullptr) {
-		//RN_ERROR("Failed to create a rendering surface. The surface returned is null.");
+    // RN_ERROR("Failed to create a rendering surface. The surface returned is null.");
     exit(-1);
   }
 
@@ -62,14 +71,12 @@ void Application::OnStart() {
   m_Renderer = CreateRef<SceneRenderer>();
   m_Renderer->Init();
 
-
-  Rain::ResourceManager::Init(std::make_shared<WGPUDevice>(render->m_device));
+  //Rain::ResourceManager::Init(std::make_shared<WGPUDevice>(render->m_device));
   Rain::ResourceManager::LoadTexture("T_Default", RESOURCE_DIR "/textures/placeholder.jpeg");
 
   Player = std::make_shared<PlayerCamera>();
   Player->Position.y = 0;
   Player->Position.z = 0;
-
 
   // Prep. ImgGui
   // =======================================================
@@ -90,11 +97,11 @@ void Application::OnStart() {
   // =======================================================
 
   Ref<MeshSource> boxModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/SponzaExp5.gltf");
+  // Ref<MeshSource> boxModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/bonzer2.gltf");
 
   Entity entityBox = scene->CreateEntity("Box");
   entityBox.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 10, 0);
   scene->BuildMeshEntityHierarchy(entityBox, boxModel);
-
 
   Cursor::Setup(render->m_window);
   Keyboard::Setup(render->m_window);
@@ -136,7 +143,7 @@ void Application::OnUpdate() {
   glfwPollEvents();
   MoveControls();
 
-	scene->m_SceneCamera = Player.get();
+  scene->m_SceneCamera = Player.get();
   scene->OnUpdate();
   scene->OnRender(m_Renderer);
 }
@@ -197,12 +204,12 @@ void Application::drawImgui(WGPURenderPassEncoder renderPass) {
 
   ImGui::Spacing();
 
-  //physx::PxU32 version = PX_PHYSICS_VERSION;
-  //physx::PxU32 major = (version >> 24) & 0xFF;
-  //physx::PxU32 minor = (version >> 16) & 0xFF;
-  //physx::PxU32 bugfix = (version >> 8) & 0xFF;
+  // physx::PxU32 version = PX_PHYSICS_VERSION;
+  // physx::PxU32 major = (version >> 24) & 0xFF;
+  // physx::PxU32 minor = (version >> 16) & 0xFF;
+  // physx::PxU32 bugfix = (version >> 8) & 0xFF;
 
-  //ImGui::Text("PhysX Version: %d.%d.%d", major, minor, bugfix);
+  // ImGui::Text("PhysX Version: %d.%d.%d", major, minor, bugfix);
 
   ImGui::Spacing();
 
@@ -220,7 +227,7 @@ void Application::drawImgui(WGPURenderPassEncoder renderPass) {
 #ifdef RN_DEBUG
   ImGui::Begin("Statistics");
   ImGui::Text("Render pass duration on GPU: %s", m_perf.summary().c_str());
-  //ImGui::Text("Physics simulation duration %.3f ms", simElapsed);
+  // ImGui::Text("Physics simulation duration %.3f ms", simElapsed);
   ImGui::End();
 #endif
 

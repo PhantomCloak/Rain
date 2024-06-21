@@ -106,7 +106,7 @@ RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& prop
   pipelineDesc.vertex.bufferCount = vertexLayouts.size();
   pipelineDesc.vertex.buffers = vertexLayouts.data();
 
-  pipelineDesc.vertex.module = props.VertexShader;
+  pipelineDesc.vertex.module = props.VertexShader->GetNativeShaderModule();
   pipelineDesc.vertex.entryPoint = "vs_main";  // let be constant for now
 
   pipelineDesc.vertex.constantCount = 0;
@@ -128,7 +128,7 @@ RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& prop
   pipelineDesc.primitive.cullMode = mode;
 
   WGPUFragmentState& fragmentState = bundle.fragmentState;
-  fragmentState.module = props.FragmentShader;
+  fragmentState.module = props.FragmentShader->GetNativeShaderModule();
   fragmentState.entryPoint = "fs_main";
   fragmentState.constantCount = 0;
   fragmentState.constants = NULL;

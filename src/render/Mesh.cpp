@@ -1,6 +1,8 @@
 #include "Mesh.h"
+#include <iostream>
 #include "ResourceManager.h"
 #include "io/filesystem.h"
+#include "render/ShaderManager.h"
 
 glm::mat4 convertToGLM(const aiMatrix4x4& from) {
   glm::mat4 to;
@@ -97,9 +99,10 @@ MeshSource::MeshSource(std::string path) {
       printf("");
     }
 
-    for (int j = 0; j < mat->GetTextureCount(aiTextureType_BASE_COLOR); j++) {
+
+    for (int j = 0; j < mat->GetTextureCount(aiTextureType_DIFFUSE); j++) {
       if (mat->GetTexture(aiTextureType_DIFFUSE, j, &texturePath) != aiReturn_SUCCESS) {
-        // std::cout << "An error occured while loading texture" << std::endl;
+         std::cout << "An error occured while loading texture" << std::endl;
         continue;
       }
 
@@ -114,7 +117,8 @@ MeshSource::MeshSource(std::string path) {
       currentMaterial->SetDiffuseTexture("texture_diffuse" + std::to_string(j), matTexture);
     }
 
-    Material::CreateMaterial(currentMaterial);
+		auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
+    Material::CreateMaterial(currentMaterial, defaultShader);
 
     m_Materials[i] = currentMaterial;
   }

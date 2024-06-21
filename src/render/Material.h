@@ -1,6 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
 #include "core/UUID.h"
+#include "render/BindingManager.h"
 #include "render/GPUAllocator.h"
 #include "render/Texture.h"
 
@@ -28,10 +29,12 @@ class Material {
 
   std::vector<Ref<Texture>> m_diffuseTextures;
 
-  WGPUBindGroup bgMaterial;
+  //WGPUBindGroup bgMaterial;
+	BindingManager* bindingManager;
   Ref<GPUBuffer> materialUniformBuffer;
 
   void SetDiffuseTexture(const std::string& name, const Ref<Texture> value);
 
-  static void CreateMaterial(Ref<Material> mat);
+  //static void CreateMaterial(Ref<Material> mat);
+  static void CreateMaterial(Ref<Material> mat, Ref<Shader> shader);
 };

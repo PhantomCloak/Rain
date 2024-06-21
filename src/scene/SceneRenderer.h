@@ -71,6 +71,7 @@ struct SceneCamera {
 struct SceneUniform {
   glm::mat4x4 viewProjection;
   glm::mat4x4 shadowViewProjection;
+  glm::mat4x4 cameraViewMatrix;
 	glm::vec3 lightPos;
 	float _pad;
 };
@@ -78,13 +79,15 @@ struct SceneUniform {
 class SceneRenderer {
  public:
   SceneRenderer()
-      : m_ShaderManager(CreateRef<ShaderManager>(RenderContext::GetDevice())) {};
+      : m_ShaderManager(CreateRef<ShaderManager>()) { instance = this;};
 
   void Init();
   void SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, uint32_t materialIndex, glm::mat4& transform);
   void BeginScene(const SceneCamera& camera);
   void EndScene();
 	void SetScene(Scene* scene);
+	static SceneRenderer* instance;
+  Ref<ShaderManager> m_ShaderManager;
 
  private:
   void PreRender();
@@ -105,5 +108,4 @@ class SceneRenderer {
 
 	Ref<RenderPipeline> m_LitPipeline;
 	Ref<RenderPipeline> m_ShadowPipeline;
-  Ref<ShaderManager> m_ShaderManager;
 };
