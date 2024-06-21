@@ -142,7 +142,7 @@ void SceneRenderer::Init() {
 
   groupLayoutsShadow.insert({0, sceneGroup});
 
-  auto defaultShader = m_ShaderManager->LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/default_basic_batch.wgsl");
+  auto defaultShader = m_ShaderManager->LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/default.wgsl");
   auto shadowShader = m_ShaderManager->LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
 
   RenderPipelineProps litPipeProps = {

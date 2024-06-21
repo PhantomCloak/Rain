@@ -4,27 +4,37 @@ struct VertexInput {
 	@location(2) uv: vec2f,
 };
 
+struct InstanceInput {
+	@location(4) a_MRow0: vec4<f32>,
+	@location(5) a_MRow1: vec4<f32>,
+	@location(6) a_MRow2: vec4<f32>,
+}
+
 struct VertexOutput {
 	@builtin(position) position: vec4f,
 };
 
-struct Camera {
-    projectionMatrix: mat4x4f,
-    viewMatrix: mat4x4f,
+struct SceneData {
+	viewProjection: mat4x4f,
+	shadowViewProjection: mat4x4f,
+	cameraViewMatrix: mat4x4f,
+	lightPos: vec3<f32>,
 };
 
-struct SceneUniform {
-    modelMatrix: mat4x4f,
-    color: vec4f,
-};
-
-@group(0) @binding(0) var<uniform> uSceneUniform: SceneUniform;
-@group(1) @binding(0) var<uniform> uCam: Camera;
+@group(0) @binding(0) var<uniform> u_scene: SceneData;
 
 @vertex
-fn vs_main(in: VertexInput) -> VertexOutput {
+fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
 	var out: VertexOutput;
-	out.position = uCam.projectionMatrix * uCam.viewMatrix * uSceneUniform.modelMatrix * vec4f(in.position, 1.0);
+
+	let transform = mat4x4<f32>(
+			vec4<f32>(instance.a_MRow0.x, instance.a_MRow1.x, instance.a_MRow2.x, 0.0),
+			vec4<f32>(instance.a_MRow0.y, instance.a_MRow1.y, instance.a_MRow2.y, 0.0),
+			vec4<f32>(instance.a_MRow0.z, instance.a_MRow1.z, instance.a_MRow2.z, 0.0),
+			vec4<f32>(instance.a_MRow0.w, instance.a_MRow1.w, instance.a_MRow2.w, 1.0)
+	);
+
+	out.position = u_scene.shadowViewProjection * transform * vec4f(in.position, 1.0);
 	return out;
 }
 

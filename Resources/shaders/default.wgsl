@@ -1,26 +1,30 @@
 struct VertexInput {
-	@location(0) position: vec3f,
-	@location(1) normal: vec3f,
-	@location(2) uv: vec2f,
-	@location(3) tangent: vec3f,
+	@location(0) a_position: vec3f,
+	@location(1) a_normal: vec3f,
+	@location(2) a_uv: vec2f,
 };
 
-struct VertexOutput {
-    @builtin(position) position: vec4f, 
-    @location(1) uv: vec2f,              
-    @location(2) TangentLightPos: vec3f,   
-    @location(3) TangentFragPos: vec3f,     
-    @location(4) FragPosLightSpace: vec4f,
+struct InstanceInput {
+	@location(4) a_MRow0: vec4<f32>,
+	@location(5) a_MRow1: vec4<f32>,
+	@location(6) a_MRow2: vec4<f32>,
 }
 
-struct Camera {
-    projectionMatrix: mat4x4f,
-    viewMatrix: mat4x4f,
+struct VertexOutput {
+	@builtin(position) position: vec4f,
+	@location(2) Normal: vec3f,
+	@location(3) Uv: vec2f,
+	@location(4) LightPos: vec3f,
+	@location(5) FragPos: vec3f,
+	@location(6) FragPosLightSpace: vec4f,
 };
 
-struct SceneUniform {
-    modelMatrix: mat4x4f,
-    color: vec4f,
+struct SceneData {
+	viewProjection: mat4x4f,
+	shadowViewProjection: mat4x4f,
+	cameraViewMatrix: mat4x4f,
+	lightPos: vec3<f32>,
+
 };
 
 struct MaterialUniform {
@@ -30,49 +34,36 @@ struct MaterialUniform {
 	shininess: f32
 };
 
-struct ShadowUniform {
-    lightProjection: mat4x4f,
-    lightView: mat4x4f,
-    lightPos: vec3<f32>,
-};
+@group(0) @binding(0) var<uniform> u_scene: SceneData;
 
-@group(0) @binding(0) var<uniform> uScene: SceneUniform;
-
-@group(0) @binding(1) var gradientTexture: texture_2d<f32>;
-@group(0) @binding(2) var textureSampler: sampler;
-@group(0) @binding(3) var heightTexture: texture_2d<f32>;
-@group(0) @binding(4) var<uniform> uMaterial: MaterialUniform;
-
-@group(1) @binding(0) var<uniform> uCam: Camera;
+@group(1) @binding(0) var gradientTexture: texture_2d<f32>;
+@group(1) @binding(1) var textureSampler: sampler;
+@group(1) @binding(2) var<uniform> uMaterial: MaterialUniform;
 
 @group(2) @binding(0) var shadowMap: texture_depth_2d;
 @group(2) @binding(1) var shadowSampler: sampler_comparison;
-@group(2) @binding(2) var<uniform> shadowUniform: ShadowUniform;
 
 @vertex
-fn vs_main(in: VertexInput) -> VertexOutput {
+fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
 	var out: VertexOutput;
 
-	let fragPos = (uScene.modelMatrix * vec4f(in.position, 1.0)).xyz;
+	let transform = mat4x4<f32>(
+			vec4<f32>(instance.a_MRow0.x, instance.a_MRow1.x, instance.a_MRow2.x, 0.0),
+			vec4<f32>(instance.a_MRow0.y, instance.a_MRow1.y, instance.a_MRow2.y, 0.0),
+			vec4<f32>(instance.a_MRow0.z, instance.a_MRow1.z, instance.a_MRow2.z, 0.0),
+			vec4<f32>(instance.a_MRow0.w, instance.a_MRow1.w, instance.a_MRow2.w, 1.0)
+	);
 
-	out.position = uCam.projectionMatrix * uCam.viewMatrix * uScene.modelMatrix * vec4f(in.position, 1.0);
-	out.uv = in.uv;
+	let fragPos = (transform * vec4f(in.a_position, 1.0)).xyz;
+	out.position = u_scene.viewProjection * transform * vec4f(in.a_position, 1.0);
+	//out.Normal = in.a_normal;
+	out.Normal = (u_scene.cameraViewMatrix * transform * vec4f(in.a_normal, 0.0)).xyz;
 
-	let fragPos2 =  (uCam.viewMatrix * vec4f(fragPos, 1.0)).xyz;
+	out.Uv = in.a_uv;
 
-	let normalMatrix = uCam.viewMatrix * uScene.modelMatrix;
-
-	var T = normalize((normalMatrix * vec4f(in.tangent, 0.0)).xyz);
-	let N = normalize((normalMatrix * vec4f(in.normal, 0.0)).xyz);
-
-	T = normalize(T - dot(T, N) * N);
-	let B = cross(N, T);
-
-	let TBN: mat3x3f = transpose(mat3x3f(T, B, N));
-	
-	out.TangentLightPos = TBN * (uCam.viewMatrix * vec4f(shadowUniform.lightPos, 1.0)).xyz;
-	out.TangentFragPos = TBN * fragPos2;
-	out.FragPosLightSpace = (shadowUniform.lightProjection * shadowUniform.lightView) * vec4f(fragPos, 1.0);
+	out.LightPos = (u_scene.cameraViewMatrix * vec4f(u_scene.lightPos, 1.0)).xyz;
+	out.FragPos = (u_scene.cameraViewMatrix * vec4f(fragPos, 1.0)).xyz;
+	out.FragPosLightSpace = u_scene.shadowViewProjection * vec4f(fragPos, 1.0);
 
 	return out;
 }
@@ -86,7 +77,8 @@ fn ShadowCalculation(
     projCoords = vec3(projCoords.xy * vec2(0.5, -0.5) + vec2(0.5), projCoords.z);
 
     let currentDepth: f32 = projCoords.z;
-    let bias: f32 = max(0.005 * (1.0 - dot(normal, lightDir)), 0.001);
+    //let bias: f32 = max(0.005 * (1.0 - dot(normal, lightDir)), 0.001);
+    let bias: f32 = max(0.0005 * (1.0 - dot(normal, lightDir)), 0.0001);
 
     var shadow: f32 = 0.0;
 
@@ -105,28 +97,23 @@ fn ShadowCalculation(
     return shadow;
 }
 
-
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-	let textureColor = textureSample(gradientTexture, textureSampler, in.uv).rgba;
-	var normal = textureSample(heightTexture, textureSampler, in.uv).rgb;
-	normal =  normalize(normal * 2.0 - 1.0);
-
-	// Ambient
-	var ambient = uMaterial.ambientColor;
+	let textureColor = textureSample(gradientTexture, textureSampler, in.Uv).rgba;
+	var ambient = vec3f(0.1);
 
 	// Diffuse
-	let lightDir = normalize(in.TangentLightPos - in.TangentFragPos);
-	var diffuse = max(dot(normal, lightDir), 0.0) * uMaterial.diffuseColor;
+	let norm = normalize(in.Normal);
+	let lightDir = normalize(in.LightPos - in.FragPos);
+	var diffuse = vec3f(max(dot(norm, lightDir), 0.0)) * uMaterial.diffuseColor;
 
 	// Specular
-	let viewDir = normalize(-in.TangentFragPos);
+	let viewDir = normalize(-in.FragPos);
 	let halfwayDir = normalize(lightDir + viewDir);
-	var specular = pow(max(dot(normal, halfwayDir), 0.0), uMaterial.shininess) * uMaterial.specularColor;
+	var specular = vec3f(pow(max(dot(norm, halfwayDir), 0.0), uMaterial.shininess));
 
-	var shadow = ShadowCalculation(in.FragPosLightSpace, normal , lightDir);
+	var shadow = ShadowCalculation(in.FragPosLightSpace, in.Normal , lightDir);
 	let finalColor = (ambient + (shadow)  * (diffuse + specular)) * textureColor.rgb;
-
+	//let finalColor = (ambient + diffuse + specular) * textureColor.rgb;
 	return vec4f(finalColor, 1.0);
 }
-
