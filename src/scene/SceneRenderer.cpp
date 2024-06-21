@@ -2,7 +2,66 @@
 #include "Application.h"
 #include "render/Render.h"
 
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_wgpu.h"
+#include "imgui.h"
+
 SceneRenderer* SceneRenderer::instance;
+
+void drawImgui(WGPURenderPassEncoder renderPass) {
+  ImGui_ImplWGPU_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
+
+  ImGui::Begin("Scene Settings");
+
+  ImGuiIO& io = ImGui::GetIO();
+  ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+
+  ImGui::Spacing();
+
+  // physx::PxU32 version = PX_PHYSICS_VERSION;
+  // physx::PxU32 major = (version >> 24) & 0xFF;
+  // physx::PxU32 minor = (version >> 16) & 0xFF;
+  // physx::PxU32 bugfix = (version >> 8) & 0xFF;
+
+  // ImGui::Text("PhysX Version: %d.%d.%d", major, minor, bugfix);
+
+  ImGui::Spacing();
+
+  ImGui::Spacing();
+  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+  ImGui::Text("PRESS F TO SHOOT'EM UP");
+  ImGui::PopStyleColor();
+  ImGui::Spacing();
+  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.0f, 1.0f));
+  ImGui::Text("PRESS ESC TO UNLOCK MOUSE");
+  ImGui::PopStyleColor();
+
+  ImGui::End();
+
+#ifdef RN_DEBUG
+  ImGui::Begin("Statistics");
+  ImGui::Text("Render pass duration on GPU: %s", m_perf.summary().c_str());
+  // ImGui::Text("Physics simulation duration %.3f ms", simElapsed);
+  ImGui::End();
+#endif
+
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("File")) {
+      if (ImGui::MenuItem("Save Map")) {
+      }
+      if (ImGui::MenuItem("Load Map")) {
+      }
+      ImGui::EndMenu();
+    }
+  }
+  ImGui::EndMainMenuBar();
+
+  ImGui::EndFrame();
+  ImGui::Render();
+  ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass);
+}
 
 glm::mat4 GetViewMatrix(glm::vec3 pos, glm::vec3 rot) {
   glm::vec3 shadowCameraPos = pos;
@@ -81,17 +140,17 @@ void SceneRenderer::Init() {
   groupLayouts.insert({1, materialGroup});
   groupLayouts.insert({2, shadowGroup});
 
-	groupLayoutsShadow.insert({0, sceneGroup});
+  groupLayoutsShadow.insert({0, sceneGroup});
 
-  m_ShaderManager->LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/default_basic_batch.wgsl");
-  m_ShaderManager->LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
+  auto defaultShader = m_ShaderManager->LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/default_basic_batch.wgsl");
+  auto shadowShader = m_ShaderManager->LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
 
   RenderPipelineProps litPipeProps = {
       .VertexLayout = vertexLayout,
       .InstanceLayout = instanceLayout,
       .CullingMode = PipelineCullingMode::NONE,
-      .VertexShader = m_ShaderManager->GetShader("SH_DefaultBasicBatch"),
-      .FragmentShader = m_ShaderManager->GetShader("SH_DefaultBasicBatch"),
+      .VertexShader = defaultShader,
+      .FragmentShader = defaultShader,
       .ColorFormat = TextureFormat::RGBA,
       .DepthFormat = TextureFormat::Depth,
       .groupLayout = groupLayouts};
@@ -100,8 +159,8 @@ void SceneRenderer::Init() {
       .VertexLayout = vertexLayout,
       .InstanceLayout = instanceLayout,
       .CullingMode = PipelineCullingMode::BACK,
-      .VertexShader = m_ShaderManager->GetShader("SH_Shadow"),
-      .FragmentShader = m_ShaderManager->GetShader("SH_Shadow"),
+      .VertexShader = shadowShader,
+      .FragmentShader = shadowShader,
       .ColorFormat = TextureFormat::Undefined,
       .DepthFormat = TextureFormat::Depth,
       .groupLayout = groupLayoutsShadow};
@@ -120,59 +179,23 @@ void SceneRenderer::Init() {
 
   m_SceneUniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(SceneUniform));
 
-  std::vector<WGPUBindGroupEntry> bgEntriesScene(1);
+  m_SceneBinding = BindingManager::Create({.Name = "SceneBinding", .Shader = defaultShader});
+  m_SceneBinding->Set("u_scene", m_SceneUniformBuffer);
+  m_SceneBinding->Bake();
 
-  bgEntriesScene[0].binding = 0;
-  bgEntriesScene[0].buffer = m_SceneUniformBuffer->Buffer;
-  bgEntriesScene[0].offset = 0;
-  bgEntriesScene[0].size = sizeof(SceneUniform);
+  m_ShadowSampler = Sampler::Create({.Name = "ShadowSampler",
+                                     .WrapFormat = TextureWrappingFormat::ClampToEdges,
+                                     .MagFilterFormat = FilterMode::Linear,
+                                     .MinFilterFormat = FilterMode::Nearest,
+                                     .MipFilterFormat = FilterMode::Nearest,
+                                     .Compare = CompareMode::Less,
+                                     .LodMinClamp = 0.0f,
+                                     .LodMaxClamp = 1.0f});
 
-  static WGPUBindGroupDescriptor bgDescScene = {};
-  bgDescScene.label = "bg_cam";
-  bgDescScene.layout = bglCamera;
-  bgDescScene.entryCount = (uint32_t)bgEntriesScene.size();
-  bgDescScene.entries = bgEntriesScene.data();
-
-  m_SceneBindGroup = wgpuDeviceCreateBindGroup(renderContext->GetDevice(), &bgDescScene);
-
-  WGPUSamplerDescriptor shadowSamplerDesc = {};  // Zero-initialize the struct
-
-  // Set the properties
-  shadowSamplerDesc.addressModeU = WGPUAddressMode_ClampToEdge;
-  shadowSamplerDesc.addressModeV = WGPUAddressMode_ClampToEdge;
-  shadowSamplerDesc.addressModeW = WGPUAddressMode_ClampToEdge;
-
-  shadowSamplerDesc.minFilter = WGPUFilterMode_Nearest;
-  shadowSamplerDesc.magFilter = WGPUFilterMode_Linear;
-
-  shadowSamplerDesc.compare = WGPUCompareFunction_Less;
-  shadowSamplerDesc.mipmapFilter = WGPUMipmapFilterMode_Nearest;
-  shadowSamplerDesc.compare = WGPUCompareFunction_Less,
-  shadowSamplerDesc.lodMinClamp = 0.0f;
-  shadowSamplerDesc.lodMaxClamp = 1.0f;
-  shadowSamplerDesc.maxAnisotropy = 1;
-
-  WGPUSampler shadowSampler = wgpuDeviceCreateSampler(RenderContext::GetDevice(), &shadowSamplerDesc);
-
-  WGPUBindGroupLayout bglShadow = wgpuRenderPipelineGetBindGroupLayout(m_LitPipeline->GetPipeline(), 2);
-
-  std::vector<WGPUBindGroupEntry> bgEntriesShadowMap(2);
-
-  bgEntriesShadowMap[0].binding = 0;
-  bgEntriesShadowMap[0].offset = 0;
-  bgEntriesShadowMap[0].textureView = m_ShadowPipeline->GetDepthAttachment()->View;
-
-  bgEntriesShadowMap[1].binding = 1;
-  bgEntriesShadowMap[1].offset = 0;
-  bgEntriesShadowMap[1].sampler = shadowSampler;
-
-  static WGPUBindGroupDescriptor bgDescShadow = {};
-  bgDescShadow.label = "bg_shadow";
-  bgDescShadow.layout = bglShadow;
-  bgDescShadow.entryCount = (uint32_t)bgEntriesShadowMap.size();
-  bgDescShadow.entries = bgEntriesShadowMap.data();
-
-  m_ShadowPassBindGroup = wgpuDeviceCreateBindGroup(renderContext->GetDevice(), &bgDescShadow);
+  m_ShadowBinding = BindingManager::Create({.Name = "ShadowBinding", .Shader = defaultShader});
+  m_ShadowBinding->Set("shadowMap", m_ShadowMapTexture);
+  m_ShadowBinding->Set("shadowSampler", m_ShadowSampler);
+  m_ShadowBinding->Bake();
 
   const float shadowFrustum = 200;
   m_SceneUniform.shadowViewProjection = glm::ortho(-shadowFrustum,
@@ -184,6 +207,19 @@ void SceneRenderer::Init() {
                                         GetViewMatrix(glm::vec3(212, 852, 71), glm::vec3(-107, 35, 0));
 
   m_SceneUniformBuffer->SetData(&m_SceneUniform, sizeof(SceneUniform));
+
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGui::GetIO();
+
+  ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
+
+  ImGui_ImplWGPU_InitInfo initInfo;
+  initInfo.Device = RenderContext::GetDevice();
+  // initInfo.RenderTargetFormat = render->m_swapChainFormat;
+  initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
+  initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
+  ImGui_ImplWGPU_Init(&initInfo);
 }
 
 void SceneRenderer::PreRender() {
@@ -257,7 +293,7 @@ void SceneRenderer::FlushDrawList() {
   auto encoder = wgpuDeviceCreateCommandEncoder(renderContext->GetDevice(), &commandEncoderDesc);
 
   auto shadowPass = BeginRenderPass(m_ShadowPipeline, encoder);
-  wgpuRenderPassEncoderSetBindGroup(shadowPass, 0, m_SceneBindGroup, 0, nullptr);
+  wgpuRenderPassEncoderSetBindGroup(shadowPass, 0, m_SceneBinding->GetBindGroup(0), 0, nullptr);
   for (auto& [mk, dc] : m_DrawList) {
     Ref<Material> mat = dc.Mesh->m_Materials[dc.MaterialIndex];
     Render::Instance->RenderMesh(shadowPass, m_ShadowPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, mat, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
@@ -266,12 +302,13 @@ void SceneRenderer::FlushDrawList() {
 
   m_LitPipeline->SetColorAttachment(Render::Instance->GetCurrentSwapChainTexture());
   auto litPass = BeginRenderPass(m_LitPipeline, encoder);
-  wgpuRenderPassEncoderSetBindGroup(litPass, 0, m_SceneBindGroup, 0, nullptr);
-  wgpuRenderPassEncoderSetBindGroup(litPass, 2, m_ShadowPassBindGroup, 0, nullptr);
+  wgpuRenderPassEncoderSetBindGroup(litPass, 0, m_SceneBinding->GetBindGroup(0), 0, nullptr);
+  wgpuRenderPassEncoderSetBindGroup(litPass, 2, m_ShadowBinding->GetBindGroup(2), 0, nullptr);
   for (auto& [mk, dc] : m_DrawList) {
     Ref<Material> mat = dc.Mesh->m_Materials[dc.MaterialIndex];
     Render::Instance->RenderMesh(litPass, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, mat, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
   }
+  drawImgui(litPass);
   EndRenderPass(litPass);
 
   WGPUCommandBufferDescriptor cmdBufferDescriptor = {.label = "Command Buffer"};

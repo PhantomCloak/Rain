@@ -4,6 +4,7 @@
 #include <tint/tint.h>
 #include "core/Assert.h"
 #include "render/RenderContext.h"
+#include "src/tint/lang/core/type/depth_texture.h"
 #include "src/tint/lang/wgsl/ast/identifier.h"
 #include "src/tint/lang/wgsl/ast/module.h"
 #include "src/tint/lang/wgsl/sem/function.h"
@@ -26,19 +27,19 @@ WGPUTextureSampleType GetSampleType(tint::inspector::ResourceBinding::SampledKin
 WGPUTextureViewDimension GetDimensionType(tint::inspector::ResourceBinding::TextureDimension type) {
   switch (type) {
     case tint::inspector::ResourceBinding::TextureDimension::k1d:
-			return WGPUTextureViewDimension_1D;
+      return WGPUTextureViewDimension_1D;
     case tint::inspector::ResourceBinding::TextureDimension::k2d:
-			return WGPUTextureViewDimension_2D;
+      return WGPUTextureViewDimension_2D;
     case tint::inspector::ResourceBinding::TextureDimension::k2dArray:
-			return WGPUTextureViewDimension_2DArray;
+      return WGPUTextureViewDimension_2DArray;
     case tint::inspector::ResourceBinding::TextureDimension::k3d:
-			return WGPUTextureViewDimension_3D;
+      return WGPUTextureViewDimension_3D;
     case tint::inspector::ResourceBinding::TextureDimension::kCube:
-			return WGPUTextureViewDimension_Cube;
+      return WGPUTextureViewDimension_Cube;
     case tint::inspector::ResourceBinding::TextureDimension::kCubeArray:
-			return WGPUTextureViewDimension_CubeArray;
+      return WGPUTextureViewDimension_CubeArray;
     case tint::inspector::ResourceBinding::TextureDimension::kNone:
-			return WGPUTextureViewDimension_Undefined;
+      return WGPUTextureViewDimension_Undefined;
       break;
   }
 }
@@ -58,7 +59,12 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
 
   for (auto& entryPoint : inspector.GetEntryPoints()) {
     auto textureBindings = inspector.GetSampledTextureResourceBindings(entryPoint.name);
+    auto depthTextureBindings = inspector.GetDepthTextureResourceBindings(entryPoint.name);
+
     for (auto& entry : textureBindings) {
+      inspectorResourceBindings[entry.bind_group][entry.binding] = entry;
+    }
+    for (auto& entry : depthTextureBindings) {
       inspectorResourceBindings[entry.bind_group][entry.binding] = entry;
     }
   }
@@ -90,6 +96,21 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
       auto dec = var->Declaration();
       ResourceDeclaration info;
       info.Type = BindingType::TextureBindingType;
+      info.Name = var->Declaration()->name->symbol.Name();
+      info.GroupIndex = binding_info.group;
+      info.LocationIndex = binding_info.binding;
+      info.Size = unwrapped_type->Size();
+
+      resourceBindings[info.GroupIndex].push_back(info);
+    }
+    for (auto& ruv : func_sem->TransitivelyReferencedVariablesOfType(&tint::TypeInfo::Of<tint::core::type::DepthTexture>())) {
+      auto* var = ruv.first;
+      auto binding_info = ruv.second;
+      auto* unwrapped_type = var->Type()->UnwrapRef();
+
+      auto dec = var->Declaration();
+      ResourceDeclaration info;
+      info.Type = BindingType::TextureDepthBindingType;
       info.Name = var->Declaration()->name->symbol.Name();
       info.GroupIndex = binding_info.group;
       info.LocationIndex = binding_info.binding;
@@ -149,7 +170,12 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
           break;
         case TextureBindingType:
           groupEntry.texture.sampleType = GetSampleType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].sampled_kind);
-					groupEntry.texture.viewDimension = GetDimensionType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].dim);
+          groupEntry.texture.viewDimension = GetDimensionType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].dim);
+          groupEntry.visibility = WGPUShaderStage_Fragment;
+          break;
+        case TextureDepthBindingType:
+          groupEntry.texture.sampleType = WGPUTextureSampleType_Depth;
+          groupEntry.texture.viewDimension = GetDimensionType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].dim);
           groupEntry.visibility = WGPUShaderStage_Fragment;
           break;
         case SamplerBindingType:
@@ -165,8 +191,10 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
       layoutEntries.push_back(groupEntry);
     }
 
+		std::string label = shader->GetName() + std::to_string(groupIndex);
+
     WGPUBindGroupLayoutDescriptor layoutDesc = {};
-    layoutDesc.label = ("dbg_layout_desc-" + std::to_string(groupIndex)).c_str();
+		layoutDesc.label = label.c_str();
     layoutDesc.entries = layoutEntries.data();
     layoutDesc.entryCount = layoutEntries.size();
 
@@ -177,13 +205,15 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
   return reflectionInfo;
 }
 
-void ShaderManager::LoadShader(const std::string& shaderId,
-                               const std::string& shaderPath) {
+Ref<Shader> ShaderManager::LoadShader(const std::string& shaderId,
+                                      const std::string& shaderPath) {
   Ref<Shader> shader = Shader::Create(shaderId, shaderPath);
   auto reflectionInfo = ReflectShader(shader);
 
   shader->SetReflectionInfo(reflectionInfo);
   m_Shaders[shaderId] = shader;
+
+  return shader;
 };
 
 Ref<Shader> ShaderManager::GetShader(const std::string& shaderId) {

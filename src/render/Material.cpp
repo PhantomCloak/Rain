@@ -16,9 +16,10 @@ void Material::CreateMaterial(Ref<Material> mat, Ref<Shader> shader) {
   mat->materialUniformBuffer = GPUAllocator::GAlloc(mat->name, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(MaterialUniform));
   mat->materialUniformBuffer->SetData(&mat->properties, sizeof(MaterialUniform));
 
-	static Ref<Sampler> s_MaterialSampler = Sampler::Create(Sampler::GetDefaultProps());
+	static Ref<Sampler> s_MaterialSampler = Sampler::Create(Sampler::GetDefaultProps("MaterialSampler"));
 
 	const BindingSpec spec = {
+		.Name = mat->name,
 		.Shader = shader
 	};
 

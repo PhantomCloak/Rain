@@ -3,7 +3,6 @@
 #define NDEBUG
 #endif
 
-
 #include <webgpu/webgpu.h>
 #include <glm/glm.hpp>
 #include "TinyTimer.h"
@@ -29,20 +28,24 @@ class Application : public AppWindow {
  public:
   Application(const Rain::WindowProps& props)
       : AppWindow(props) {
+    m_Instance = this;
   }
 
   bool isRunning();
 
   void OnUpdate() override;
   void OnStart() override;
-	void fetchTimestamps();
-	TinyTimer::PerformanceCounter m_perf;
-	static Application* Get();
+  void fetchTimestamps();
+  TinyTimer::PerformanceCounter m_perf;
+  static Application* Get();
 
-	glm::vec2 GetWindowSize();
+  glm::vec2 GetWindowSize();
+
  private:
-	Ref<SceneRenderer> m_Renderer;
-	static Application* m_Instance;
+  Ref<SceneRenderer> m_Renderer;
+  Scene* m_Scene;
+  static Application* m_Instance;
+
  private:
   void updateDragInertia();
 

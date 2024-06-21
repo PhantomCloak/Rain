@@ -8,6 +8,7 @@
 #include "render/Texture.h"
 
 struct BindingSpec {
+	std::string Name;
   Ref<Shader> Shader;
 };
 
@@ -23,6 +24,7 @@ class BindingManager {
   BindingManager() {};
   BindingManager(const BindingSpec& spec)
       : m_BindingSpec(spec) {};
+  static Ref<BindingManager> Create(const BindingSpec& spec) { return CreateRef<BindingManager>(spec); }
 
   WGPUBindGroup GetBindGroup(int group) { return m_BindGroups[group]; }
   void Set(const std::string& name, Ref<Texture> texture);

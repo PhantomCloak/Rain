@@ -9,7 +9,7 @@ class ShaderManager {
 	ShaderManager() {
 		m_Instance = this;
 	};
-  void LoadShader(const std::string& shaderId, const std::string& shaderPath);
+  Ref<Shader> LoadShader(const std::string& shaderId, const std::string& shaderPath);
   Ref<Shader> GetShader(const std::string& shaderId);
 
 	// TODO: Make better API

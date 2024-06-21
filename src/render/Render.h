@@ -10,13 +10,8 @@ class Render {
   static Render* Instance;
   WGPUInstance CreateInstance();
   bool Init(void* window, WGPUInstance instance);
-  void OnFrameStart();
-  void OnFrameEnd();
 
   WGPUSwapChain BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface);
-  WGPUTexture GetDepthBufferTexture(WGPUDevice device, WGPUTextureFormat format, int width, int height, bool dbg = false);
-  WGPUTextureView GetDepthBufferTextureView(std::string label, WGPUTexture& depthTexture, WGPUTextureFormat depthTextureFormat);
-
   Ref<RenderContext> GetRenderContext() { return m_RenderContext; }
 
   void RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
@@ -30,7 +25,9 @@ class Render {
 
   std::unordered_map<UUID, Material> Materials;
 
-	Ref<Texture> GetCurrentSwapChainTexture();
+  Ref<Texture> GetCurrentSwapChainTexture();
+
+  WGPUSurface GetActiveSurface() { return m_surface; }
 
  private:
   WGPURequiredLimits GetRequiredLimits(WGPUAdapter adapter);
@@ -44,14 +41,11 @@ class Render {
   WGPUAdapter m_adapter = nullptr;
   WGPUDevice m_device = nullptr;
   WGPUQueue m_queue = nullptr;
-  WGPUTexture m_depthTexture = nullptr;
-  WGPUTextureView m_depthTextureView = nullptr;
   WGPUSwapChain m_swapChain = nullptr;
-  WGPUSampler m_sampler = nullptr;
   WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_Undefined;
   WGPUTextureFormat m_depthTextureFormat = WGPUTextureFormat_Depth24Plus;
 
   WGPUSwapChainDescriptor m_swapChainDesc;
 
-	friend class RenderContext;
+  friend class RenderContext;
 };

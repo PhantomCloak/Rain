@@ -1,5 +1,4 @@
 #include "Render.h"
-#include <map>
 #include "Mesh.h"
 #include "core/Assert.h"
 
@@ -8,7 +7,6 @@
 #else
 #include <dawn/dawn_proc.h>
 #endif
-#include <iostream>
 
 Render* Render::Instance = nullptr;
 
@@ -96,24 +94,6 @@ bool Render::Init(void* window, WGPUInstance instance) {
   }
 
   m_swapChain = BuildSwapChain(m_swapChainDesc, m_device, m_surface);
-  m_depthTexture = GetDepthBufferTexture(m_device, m_depthTextureFormat, m_swapChainDesc.width, m_swapChainDesc.height);
-  m_depthTextureView = GetDepthBufferTextureView("T_Depth_Default", m_depthTexture, m_depthTextureFormat);
-
-  WGPUSamplerDescriptor samplerDesc = {};  // Zero-initialize the struct
-
-  // Set the properties
-  samplerDesc.addressModeU = WGPUAddressMode_Repeat;
-  samplerDesc.addressModeV = WGPUAddressMode_Repeat;
-  samplerDesc.addressModeW = WGPUAddressMode_Repeat;
-  samplerDesc.magFilter = WGPUFilterMode_Linear;
-  samplerDesc.minFilter = WGPUFilterMode_Linear;
-  samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Linear;
-  samplerDesc.lodMinClamp = 0.0f;
-  samplerDesc.lodMaxClamp = 80.0f;
-  samplerDesc.compare = WGPUCompareFunction_Undefined;
-  samplerDesc.maxAnisotropy = 1;
-
-  m_sampler = wgpuDeviceCreateSampler(m_device, &samplerDesc);
 
   wgpuDeviceSetUncapturedErrorCallback(
       m_device, [](WGPUErrorType errorType, const char* message, void* userdata) {
@@ -192,17 +172,17 @@ WGPUDevice Render::RequestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const
 }
 
 WGPURequiredLimits Render::GetRequiredLimits(WGPUAdapter adapter) {
-  static WGPUSupportedLimits supportedLimits = {};  // Zero-initialize the struct
+  static WGPUSupportedLimits supportedLimits = {};
 
 #ifdef __EMSCRIPTEN__
-                                                    // Error in Chrome handling
+  // Error in Chrome handling
   supportedLimits.limits.minStorageBufferOffsetAlignment = 256;
   supportedLimits.limits.minUniformBufferOffsetAlignment = 256;
 #else
   wgpuAdapterGetLimits(adapter, &supportedLimits);
 #endif
 
-  static WGPURequiredLimits requiredLimits = {};  // Assuming this is how the default is defined
+  static WGPURequiredLimits requiredLimits = {};
   requiredLimits.limits.maxVertexAttributes = supportedLimits.limits.maxVertexAttributes;
   requiredLimits.limits.maxVertexBuffers = supportedLimits.limits.maxVertexBuffers;
   requiredLimits.limits.maxBufferSize = 150000 * sizeof(VertexAttribute);
@@ -231,56 +211,6 @@ WGPUSwapChain Render::BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDev
   }
 
   return wgpuDeviceCreateSwapChain(m_device, surface, &m_swapChainDesc);
-}
-
-WGPUTexture Render::GetDepthBufferTexture(WGPUDevice device, WGPUTextureFormat format, int width, int height, bool dbg) {
-  // Create the depth texture
-  WGPUTextureDescriptor depthTextureDesc = {};
-  depthTextureDesc.dimension = WGPUTextureDimension_2D;
-  depthTextureDesc.format = format;
-  depthTextureDesc.mipLevelCount = 1;
-  depthTextureDesc.sampleCount = 1;
-  depthTextureDesc.size.width = width;
-  depthTextureDesc.size.height = height;
-  depthTextureDesc.size.depthOrArrayLayers = 1;
-
-  if (dbg) {
-    depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding;
-  } else {
-    depthTextureDesc.usage = WGPUTextureUsage_RenderAttachment;
-  }
-
-  depthTextureDesc.viewFormatCount = 1;
-  depthTextureDesc.viewFormats = &m_depthTextureFormat;
-
-  WGPUTexture depthTexture = wgpuDeviceCreateTexture(device, &depthTextureDesc);
-
-  return depthTexture;
-}
-
-WGPUTextureView Render::GetDepthBufferTextureView(std::string label, WGPUTexture& depthTexture, WGPUTextureFormat depthTextureFormat) {
-  static std::map<std::string, WGPUTextureViewDescriptor> depthTextureDesc;
-
-  if (depthTextureDesc.find(label) == depthTextureDesc.end()) {
-    depthTextureDesc[label] = {};
-  }
-
-  WGPUTextureViewDescriptor& depthTextureViewDesc = depthTextureDesc[label];
-  depthTextureViewDesc.label = label.c_str();
-  depthTextureViewDesc.aspect = WGPUTextureAspect_DepthOnly;
-  depthTextureViewDesc.baseArrayLayer = 0;
-  depthTextureViewDesc.arrayLayerCount = 1;
-  depthTextureViewDesc.baseMipLevel = 0;
-  depthTextureViewDesc.mipLevelCount = 1;
-  depthTextureViewDesc.dimension = WGPUTextureViewDimension_2D;
-  depthTextureViewDesc.format = depthTextureFormat;
-
-  WGPUTextureView depthTextureView =
-      wgpuTextureCreateView(depthTexture, &depthTextureViewDesc);
-
-  std::cout << "Depth texture view: " << depthTextureView << std::endl;
-
-  return depthTextureView;
 }
 
 void Render::RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,

@@ -25,7 +25,7 @@ const ResourceDeclaration& BindingManager::GetInfo(const std::string& name) {
     }
   }
 
-  RN_ASSERT("Binding entry couldn't found");
+  RN_ASSERT(false, "Binding entry couldn't found");
   return {};
 }
 
@@ -57,6 +57,9 @@ void BindingManager::Bake() {
       case CompareSamplerBindingType:
         entry.sampler = *input.SamplerInput->GetNativeSampler();
         break;
+      case TextureDepthBindingType:
+        entry.textureView = input.TextureInput->View;
+        break;
     }
 
     shaderEntries[bindingInfo.GroupIndex].push_back(entry);
@@ -67,8 +70,8 @@ void BindingManager::Bake() {
       return first.binding < other.binding;
     });
 
-    std::string boo = "bg_mesh_mat" + std::to_string(debugBake);
-    WGPUBindGroupDescriptor bgDesc = {.label = boo.c_str()};
+		std::string label = m_BindingSpec.Name + std::to_string(debugBake);
+    WGPUBindGroupDescriptor bgDesc = {.label = label.c_str()};
     bgDesc.layout = m_BindingSpec.Shader->GetReflectionInfo().LayoutDescriptors[groupIndex];
     bgDesc.entryCount = (uint32_t)entries.size();
     bgDesc.entries = entries.data();
