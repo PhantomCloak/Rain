@@ -72,21 +72,21 @@ struct SceneUniform {
   glm::mat4x4 viewProjection;
   glm::mat4x4 shadowViewProjection;
   glm::mat4x4 cameraViewMatrix;
-	glm::vec3 lightPos;
-	float _pad;
+  glm::vec3 lightPos;
+  float _pad;
 };
 
 class SceneRenderer {
  public:
   SceneRenderer()
-      : m_ShaderManager(CreateRef<ShaderManager>()) { instance = this;};
+      : m_ShaderManager(CreateRef<ShaderManager>()) { instance = this; };
 
   void Init();
   void SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, uint32_t materialIndex, glm::mat4& transform);
   void BeginScene(const SceneCamera& camera);
   void EndScene();
-	void SetScene(Scene* scene);
-	static SceneRenderer* instance;
+  void SetScene(Scene* scene);
+  static SceneRenderer* instance;
   Ref<ShaderManager> m_ShaderManager;
 
  private:
@@ -94,20 +94,20 @@ class SceneRenderer {
   void FlushDrawList();
 
  private:
-	Scene* m_Scene;
+  Scene* m_Scene;
   Ref<GPUBuffer> m_TransformBuffer;
   Ref<GPUBuffer> m_SceneUniformBuffer;
   Ref<BindingManager> m_SceneBinding;
   Ref<BindingManager> m_ShadowBinding;
-	SceneUniform m_SceneUniform;
+  SceneUniform m_SceneUniform;
   std::map<MeshKey, DrawCommand> m_DrawList;
   std::map<MeshKey, TransformMapData> m_MeshTransformMap;
 
-	Ref<Texture> m_ShadowMapTexture;
-	Ref<Texture> m_LitDepthTexture;
+  Ref<Texture> m_ShadowMapTexture;
+  Ref<Texture> m_LitDepthTexture;
 
-	Ref<Sampler> m_ShadowSampler;
+  Ref<Sampler> m_ShadowSampler;
 
-	Ref<RenderPipeline> m_LitPipeline;
-	Ref<RenderPipeline> m_ShadowPipeline;
+  Ref<RenderPipeline> m_LitPipeline;
+  Ref<RenderPipeline> m_ShadowPipeline;
 };

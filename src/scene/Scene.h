@@ -27,7 +27,7 @@ class Scene {
   Entity TryGetEntityWithUUID(UUID id) const;
   glm::mat4 GetWorldSpaceTransformMatrix(Entity entity);
 
-	PlayerCamera* m_SceneCamera;
+  PlayerCamera* m_SceneCamera;
 
  private:
   std::unordered_map<UUID, Entity> m_EntityMap;
