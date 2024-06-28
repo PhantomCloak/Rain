@@ -8,8 +8,7 @@
 class Render {
  public:
   static Render* Instance;
-  WGPUInstance CreateInstance();
-  bool Init(void* window, WGPUInstance instance);
+  bool Init(void* window);
 
   WGPUSwapChain BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface);
   Ref<RenderContext> GetRenderContext() { return m_RenderContext; }
@@ -30,6 +29,7 @@ class Render {
   WGPUSurface GetActiveSurface() { return m_surface; }
 
  private:
+  WGPUInstance CreateGPUInstance();
   WGPURequiredLimits GetRequiredLimits(WGPUAdapter adapter);
   WGPUAdapter RequestAdapter(WGPUInstance instance, WGPURequestAdapterOptions const* options);
   WGPUDevice RequestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor);

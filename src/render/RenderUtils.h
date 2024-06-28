@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <set>
 #include <string>
+#include "render/Sampler.h"
+#include "render/Texture.h"
 
 enum class ShaderDataType {
   None = 0,
@@ -258,4 +260,15 @@ class LayoutUtils {
   static std::vector<WGPUBindGroupLayoutEntry> ParseGroupLayout(GroupLayout layout);
   static WGPUBindGroupLayout CreateBindGroup(std::string label, WGPUDevice device, GroupLayout layout);
   static uint32_t CeilToNextMultiple(uint32_t value, uint32_t step);
+};
+
+class RenderTypeUtils {
+	public:
+		static TextureFormat FromRenderType(WGPUTextureFormat format);
+		static TextureWrappingFormat FromRenderType(WGPUAddressMode format);
+		static FilterMode FromRenderType(WGPUFilterMode format);
+
+		static WGPUTextureFormat  ToRenderType(TextureFormat format);
+		static WGPUAddressMode ToRenderType(TextureWrappingFormat format);
+		static WGPUFilterMode ToRenderType(FilterMode format);
 };

@@ -27,11 +27,13 @@ class Scene {
   Entity TryGetEntityWithUUID(UUID id) const;
   glm::mat4 GetWorldSpaceTransformMatrix(Entity entity);
 
-  PlayerCamera* m_SceneCamera;
+
+	void OnMouseMove(double xPos, double yPos);
+	void ScanKeyPress();
 
  private:
   std::unordered_map<UUID, Entity> m_EntityMap;
-
+  std::unique_ptr<PlayerCamera> m_SceneCamera;
   flecs::world m_World;
   std::string m_Name;
 

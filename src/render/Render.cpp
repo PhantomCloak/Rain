@@ -9,8 +9,9 @@
 #endif
 
 Render* Render::Instance = nullptr;
+extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
 
-WGPUInstance Render::CreateInstance() {
+WGPUInstance Render::CreateGPUInstance() {
   WGPUInstanceDescriptor instanceDesc;
   static WGPUInstance instance;
 
@@ -40,8 +41,17 @@ WGPUInstance Render::CreateInstance() {
   return instance;
 }
 
-bool Render::Init(void* window, WGPUInstance instance) {
+bool Render::Init(void* window) {
   Instance = this;
+
+  auto instance = CreateGPUInstance();
+  m_window = static_cast<GLFWwindow*>(window);
+
+#if __EMSCRIPTEN__
+  m_surface = htmlGetCanvasSurface(instance, "canvas");
+#else
+  m_surface = glfwGetWGPUSurface(instance, m_window);
+#endif
 
   static WGPURequestAdapterOptions adapterOpts{};
   adapterOpts.compatibleSurface = m_surface;

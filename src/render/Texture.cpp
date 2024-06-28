@@ -1,13 +1,14 @@
 #include "Texture.h"
 #include "render/Render.h"
 #include "render/RenderContext.h"
+#include "render/RenderUtils.h"
 
 Ref<Texture> Texture::Create(TextureProps props) {
   WGPUTextureDescriptor textureDesc = {
       .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
       .dimension = WGPUTextureDimension_2D,
       .size = {static_cast<uint32_t>(props.Dimensions.x), static_cast<uint32_t>(props.Dimensions.y), 1},
-      .format = props.Format == TextureFormat::RGBA ? WGPUTextureFormat_BGRA8Unorm : WGPUTextureFormat_Depth24Plus,
+      .format = RenderTypeUtils::ToRenderType(props.Format),
       .mipLevelCount = 1,
       .sampleCount = 1,
   };

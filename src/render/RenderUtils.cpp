@@ -35,18 +35,18 @@ void LayoutUtils::SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type)
       entry.sampler.type = WGPUSamplerBindingType_Comparison;
       break;
     case GroupLayoutType::UniformDynamic:
-			entry.buffer.type = WGPUBufferBindingType_Uniform;
-			entry.buffer.hasDynamicOffset = true;
+      entry.buffer.type = WGPUBufferBindingType_Uniform;
+      entry.buffer.hasDynamicOffset = true;
       break;
     case GroupLayoutType::Storage:
-			entry.buffer.type = WGPUBufferBindingType_Storage;
+      entry.buffer.type = WGPUBufferBindingType_Storage;
       break;
     case GroupLayoutType::StorageReadOnly:
-			entry.buffer.type = WGPUBufferBindingType_ReadOnlyStorage ;
+      entry.buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
       break;
     case GroupLayoutType::StorageReadOnlyDynamic:
-			entry.buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
-			entry.buffer.hasDynamicOffset = true;
+      entry.buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
+      entry.buffer.hasDynamicOffset = true;
       break;
   }
 }
@@ -69,21 +69,63 @@ std::vector<WGPUBindGroupLayoutEntry> LayoutUtils::ParseGroupLayout(GroupLayout 
   return groups;
 }
 
-
 WGPUBindGroupLayout LayoutUtils::CreateBindGroup(std::string label, WGPUDevice device, GroupLayout layout) {
-	std::vector<WGPUBindGroupLayoutEntry> entries = ParseGroupLayout(layout);
+  std::vector<WGPUBindGroupLayoutEntry> entries = ParseGroupLayout(layout);
 
-	// TODO(memory): We need to introduce custom allocator in the future
-	// or alternatively use callbacks to handle release
-	WGPUBindGroupLayoutDescriptor* descriptor = new WGPUBindGroupLayoutDescriptor{};
-	descriptor->label = label.c_str();
-	descriptor->entries = entries.data();
-	descriptor->entryCount = entries.size();
+  // TODO(memory): We need to introduce custom allocator in the future
+  // or alternatively use callbacks to handle release
+  WGPUBindGroupLayoutDescriptor* descriptor = new WGPUBindGroupLayoutDescriptor{};
+  descriptor->label = label.c_str();
+  descriptor->entries = entries.data();
+  descriptor->entryCount = entries.size();
 
-	return wgpuDeviceCreateBindGroupLayout(device, descriptor);
+  return wgpuDeviceCreateBindGroupLayout(device, descriptor);
 }
 
 uint32_t LayoutUtils::CeilToNextMultiple(uint32_t value, uint32_t step) {
-	uint32_t divide_and_ceil = value / step + (value % step == 0 ? 0 : 1);
+  uint32_t divide_and_ceil = value / step + (value % step == 0 ? 0 : 1);
   return step * divide_and_ceil;
+}
+
+TextureFormat RenderTypeUtils::FromRenderType(WGPUTextureFormat format) {
+}
+
+TextureWrappingFormat RenderTypeUtils::FromRenderType(WGPUAddressMode format) {
+}
+
+FilterMode RenderTypeUtils::FromRenderType(WGPUFilterMode format) {
+}
+
+WGPUTextureFormat RenderTypeUtils::ToRenderType(TextureFormat format) {
+  switch (format) {
+    case RGBA:
+      return WGPUTextureFormat_BGRA8Unorm;
+    case Depth:
+      return WGPUTextureFormat_Depth24Plus;
+    case Undefined:
+      return WGPUTextureFormat_Undefined;
+    default:
+      RN_ASSERT(false, "Format conversion for TextureFormat not exist.")
+  };
+}
+WGPUAddressMode RenderTypeUtils::ToRenderType(TextureWrappingFormat format) {
+  switch (format) {
+    case ClampToEdges:
+      return WGPUAddressMode_ClampToEdge;
+    case Repeat:
+      return WGPUAddressMode_Repeat;
+      break;
+    default:
+      RN_ASSERT(false, "Format conversion for TextureWrappingFormat not exist.")
+  }
+}
+WGPUFilterMode RenderTypeUtils::ToRenderType(FilterMode format) {
+  switch (format) {
+    case Nearest:
+      return WGPUFilterMode_Nearest;
+    case Linear:
+      return WGPUFilterMode_Linear;
+    default:
+      RN_ASSERT(false, "Format conversion for FilterMode not exist.")
+  }
 }

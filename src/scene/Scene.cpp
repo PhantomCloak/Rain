@@ -3,6 +3,8 @@
 #include "Components.h"
 #include "Entity.h"
 #include "SceneRenderer.h"
+#include "io/cursor.h"
+#include "io/keyboard.h"
 #include "render/ResourceManager.h"
 
 Scene::Scene(std::string sceneName)
@@ -10,6 +12,17 @@ Scene::Scene(std::string sceneName)
 
 Entity Scene::CreateEntity(std::string name) {
   return CreateChildEntity({}, name);
+}
+
+void Scene::Init() {
+  m_SceneCamera = std::make_unique<PlayerCamera>();
+  m_SceneCamera->Position.y = 0;
+  m_SceneCamera->Position.z = 0;
+
+  Ref<MeshSource> exampleModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/SponzaExp5.gltf");
+  Entity sampleEntity = CreateEntity("Box");
+  sampleEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 10, 0);
+  BuildMeshEntityHierarchy(sampleEntity, exampleModel);
 }
 
 Entity Scene::CreateChildEntity(Entity parent, std::string name) {
@@ -42,6 +55,7 @@ Entity Scene::TryGetEntityWithUUID(UUID id) const {
 }
 
 void Scene::OnUpdate() {
+	ScanKeyPress();
 }
 
 void Scene::OnRender(Ref<SceneRenderer> renderer) {
@@ -89,4 +103,36 @@ glm::mat4 Scene::GetWorldSpaceTransformMatrix(Entity entity) {
   }
 
   return transform * entity.GetComponent<TransformComponent>()->GetTransform();
+}
+
+void Scene::ScanKeyPress() {
+  float speed = 1.1f;
+
+  if (Keyboard::IsKeyPressing(Rain::Key::W)) {
+    m_SceneCamera->ProcessKeyboard(FORWARD, speed);
+  } else if (Keyboard::IsKeyPressing(Rain::Key::S)) {
+    m_SceneCamera->ProcessKeyboard(BACKWARD, speed);
+  } else if (Keyboard::IsKeyPressing(Rain::Key::A)) {
+    m_SceneCamera->ProcessKeyboard(LEFT, speed);
+  } else if (Keyboard::IsKeyPressing(Rain::Key::D)) {
+    m_SceneCamera->ProcessKeyboard(RIGHT, speed);
+  } else if (Keyboard::IsKeyPressing(Rain::Key::Space)) {
+    m_SceneCamera->ProcessKeyboard(UP, speed);
+  } else if (Keyboard::IsKeyPressing(Rain::Key::LeftShift)) {
+    m_SceneCamera->ProcessKeyboard(DOWN, speed);
+  } else {
+    return;
+  }
+}
+
+void Scene::OnMouseMove(double xPos, double yPos) {
+  static glm::vec2 prevCursorPos = Cursor::GetCursorPosition();
+
+  if (!Cursor::IsMouseCaptured()) {
+    return;
+  }
+
+  glm::vec2 cursorPos = Cursor::GetCursorPosition();
+  m_SceneCamera->ProcessMouseMovement(cursorPos.x - prevCursorPos.x, cursorPos.y - prevCursorPos.y);
+	prevCursorPos = cursorPos;
 }

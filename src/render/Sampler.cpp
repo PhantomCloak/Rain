@@ -1,5 +1,6 @@
 #include "Sampler.h"
 #include "render/RenderContext.h"
+#include "render/RenderUtils.h"
 
 Ref<Sampler> Sampler::Create(SamplerProps props) {
   WGPUSamplerDescriptor samplerDesc = {};
@@ -8,18 +9,9 @@ Ref<Sampler> Sampler::Create(SamplerProps props) {
     samplerDesc.label = props.Name.c_str();
   }
 
-  switch (props.WrapFormat) {
-    case ClampToEdges:
-      samplerDesc.addressModeU = WGPUAddressMode_ClampToEdge;
-      samplerDesc.addressModeV = WGPUAddressMode_ClampToEdge;
-      samplerDesc.addressModeW = WGPUAddressMode_ClampToEdge;
-      break;
-    case Repeat:
-      samplerDesc.addressModeU = WGPUAddressMode_Repeat;
-      samplerDesc.addressModeV = WGPUAddressMode_Repeat;
-      samplerDesc.addressModeW = WGPUAddressMode_Repeat;
-      break;
-  }
+	samplerDesc.addressModeU = RenderTypeUtils::ToRenderType(props.WrapFormat);
+	samplerDesc.addressModeV = RenderTypeUtils::ToRenderType(props.WrapFormat);
+	samplerDesc.addressModeW = RenderTypeUtils::ToRenderType(props.WrapFormat);
 
   switch (props.MagFilterFormat) {
     case Nearest:
