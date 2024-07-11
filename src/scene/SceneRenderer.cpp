@@ -284,44 +284,6 @@ void SceneRenderer::PreRender() {
   m_TransformBuffer->SetData(submeshTransforms, offset * sizeof(TransformVertexData));
 }
 
-WGPURenderPassEncoder BeginRenderPass(Ref<RenderPipeline> pipe, WGPUCommandEncoder encoder) {
-  WGPURenderPassDescriptor passDesc{.label = pipe->GetName().c_str()};
-
-  if (pipe->HasColorAttachment()) {
-    WGPURenderPassColorAttachment colorAttachment{};
-    colorAttachment.loadOp = WGPULoadOp_Clear;
-    colorAttachment.storeOp = WGPUStoreOp_Store;
-    colorAttachment.clearValue = WGPUColor{0.52, 0.80, 0.92, 1};
-    colorAttachment.resolveTarget = nullptr;
-    colorAttachment.view = pipe->GetColorAttachment()->View;
-
-    passDesc.colorAttachmentCount = 1;
-    passDesc.colorAttachments = &colorAttachment;
-  } else {
-    passDesc.colorAttachmentCount = 0;
-    passDesc.colorAttachments = nullptr;
-  }
-
-  if (pipe->HasDepthAttachment()) {
-    WGPURenderPassDepthStencilAttachment depthAttachment;
-    depthAttachment.view = pipe->GetDepthAttachment()->View;
-    depthAttachment.depthClearValue = 1.0f;
-    depthAttachment.depthLoadOp = WGPULoadOp_Clear;
-    depthAttachment.depthStoreOp = WGPUStoreOp_Store;
-    depthAttachment.depthReadOnly = false;
-    depthAttachment.stencilClearValue = 0;
-    depthAttachment.stencilLoadOp = WGPULoadOp_Undefined;
-    depthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
-    depthAttachment.stencilReadOnly = true;
-
-    passDesc.depthStencilAttachment = &depthAttachment;
-  } else {
-    passDesc.depthStencilAttachment = nullptr;
-  }
-
-  return wgpuCommandEncoderBeginRenderPass(encoder, &passDesc);
-}
-
 void SceneRenderer::SetScene(Scene* scene) {
   RN_ASSERT(scene != nullptr, "Scene cannot be null");
   m_Scene = scene;
@@ -331,10 +293,6 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
   m_SceneUniform.viewProjection = camera.Projection * camera.ViewMatrix;
   m_SceneUniform.cameraViewMatrix = camera.ViewMatrix;
   m_SceneUniformBuffer->SetData(&m_SceneUniform, sizeof(SceneUniform));
-}
-
-void EndRenderPass(WGPURenderPassEncoder encoder) {
-  wgpuRenderPassEncoderEnd(encoder);
 }
 
 void SceneRenderer::FlushDrawList() {
