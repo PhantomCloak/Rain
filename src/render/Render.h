@@ -4,6 +4,7 @@
 #include "GLFW/glfw3.h"
 #include "Material.h"
 #include "render/Mesh.h"
+#include "render/RenderPass.h"
 
 class Render {
  public:
@@ -13,7 +14,10 @@ class Render {
   WGPUSwapChain BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface);
   Ref<RenderContext> GetRenderContext() { return m_RenderContext; }
 
-  void RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
+  static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
+  static void EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder);
+
+  static void RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
                   WGPURenderPipeline pipeline,
                   Ref<MeshSource> mesh,
                   uint32_t submeshIndex,
@@ -21,6 +25,7 @@ class Render {
                   Ref<GPUBuffer> transformBuffer,
                   uint32_t transformOffset,
                   uint32_t instanceCount);
+  static void SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WGPURenderPipeline pipeline);
 
   std::unordered_map<UUID, Material> Materials;
 
@@ -29,6 +34,7 @@ class Render {
   WGPUSurface GetActiveSurface() { return m_surface; }
 
  private:
+  void RendererPostInit();
   WGPUInstance CreateGPUInstance();
   WGPURequiredLimits GetRequiredLimits(WGPUAdapter adapter);
   WGPUAdapter RequestAdapter(WGPUInstance instance, WGPURequestAdapterOptions const* options);

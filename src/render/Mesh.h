@@ -38,6 +38,7 @@ class MeshNode {
   inline bool IsRoot() const { return Parent == 0xffffffff; }
 };
 
+// TODO: At the moment we pack everything into MeshSource class, in the future we should seperate import, materials etc.
 class MeshSource {
  public:
   UUID Id = 0;
@@ -48,6 +49,7 @@ class MeshSource {
   std::string m_Directory;
   std::vector<Ref<Material>> m_Materials;
 
+  MeshSource(const std::vector<glm::vec3>& vertices, const std::vector<glm::vec3>& indices);
   MeshSource(std::string path);
 
   const Ref<MeshNode> GetRootNode() const { return m_Nodes[0]; }

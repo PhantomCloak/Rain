@@ -2,6 +2,7 @@
 #include "Cam.h"
 #include "Scene.h"
 #include "render/Pipeline.h"
+#include "render/RenderPass.h"
 #include "render/ShaderManager.h"
 
 struct MeshKey {
@@ -97,17 +98,23 @@ class SceneRenderer {
   Scene* m_Scene;
   Ref<GPUBuffer> m_TransformBuffer;
   Ref<GPUBuffer> m_SceneUniformBuffer;
-  Ref<BindingManager> m_SceneBinding;
-  Ref<BindingManager> m_ShadowBinding;
   SceneUniform m_SceneUniform;
   std::map<MeshKey, DrawCommand> m_DrawList;
   std::map<MeshKey, TransformMapData> m_MeshTransformMap;
 
-  Ref<Texture> m_ShadowMapTexture;
+  Ref<Texture> m_ShadowDepthTexture;
   Ref<Texture> m_LitDepthTexture;
+  Ref<Texture> m_LitPassTexture;
 
   Ref<Sampler> m_ShadowSampler;
+  Ref<Sampler> m_PpfxSampler;
+
+	Ref<RenderPass> m_ShadowPass;
+	Ref<RenderPass> m_LitPass;
+	Ref<RenderPass> m_PpfxPass;
 
   Ref<RenderPipeline> m_LitPipeline;
   Ref<RenderPipeline> m_ShadowPipeline;
+  Ref<RenderPipeline> m_DebugPipeline;
+  Ref<RenderPipeline> m_PpfxPipeline;
 };

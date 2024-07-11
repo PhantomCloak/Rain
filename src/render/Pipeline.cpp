@@ -49,8 +49,8 @@ struct PipelineBundle {
   WGPURenderPipeline pipeline;
 };
 
-RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& props, Ref<Texture> colorAttachment, Ref<Texture> depthAttachment)
-    : m_PipelineProps(props), m_ColorAttachment(colorAttachment), m_DepthAttachment(depthAttachment) {
+RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& props)
+    : m_PipelineProps(props) {
   WGPUTextureFormat swapChainFormat = WGPUTextureFormat_Undefined;
 
 #if __EMSCRIPTEN__
@@ -71,6 +71,8 @@ RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& prop
   std::vector<WGPUVertexAttribute> vertexAttributes;
   std::vector<WGPUVertexAttribute> instanceAttributes;
 
+  std::vector<WGPUVertexBufferLayout> vertexLayouts;
+
   const auto& vertexLayout = m_PipelineProps.VertexLayout;
   const auto& instanceLayout = m_PipelineProps.InstanceLayout;
 
@@ -80,27 +82,29 @@ RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& prop
                                 .shaderLocation = element.Location});
   }
 
-  for (const auto& element : instanceLayout) {
-    instanceAttributes.push_back({.format = ConvertWGPUVertexFormat(element.Type),
-                                  .offset = element.Offset,
-                                  .shaderLocation = element.Location});
-  }
-
   WGPUVertexBufferLayout vblVertex = {};
   vblVertex.attributeCount = vertexAttributes.size();
   vblVertex.attributes = vertexAttributes.data();
   vblVertex.arrayStride = vertexLayout.GetStride();
   vblVertex.stepMode = WGPUVertexStepMode_Vertex;
 
-  WGPUVertexBufferLayout vblInstance = {};
-  vblInstance.attributeCount = instanceAttributes.size();
-  vblInstance.attributes = instanceAttributes.data();
-  vblInstance.arrayStride = instanceLayout.GetStride();
-  vblInstance.stepMode = WGPUVertexStepMode_Instance;
-
-  std::vector<WGPUVertexBufferLayout> vertexLayouts;
   vertexLayouts.push_back(vblVertex);
-  vertexLayouts.push_back(vblInstance);
+
+  if (instanceLayout.GetElementCount()) {
+    for (const auto& element : instanceLayout) {
+      instanceAttributes.push_back({.format = ConvertWGPUVertexFormat(element.Type),
+                                    .offset = element.Offset,
+                                    .shaderLocation = element.Location});
+    }
+
+    WGPUVertexBufferLayout vblInstance = {};
+    vblInstance.attributeCount = instanceAttributes.size();
+    vblInstance.attributes = instanceAttributes.data();
+    vblInstance.arrayStride = instanceLayout.GetStride();
+    vblInstance.stepMode = WGPUVertexStepMode_Instance;
+
+    vertexLayouts.push_back(vblInstance);
+  }
 
   // TODO: Inspect memory for emscriptten
   pipelineDesc.vertex.bufferCount = vertexLayouts.size();

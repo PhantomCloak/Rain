@@ -9,6 +9,14 @@
 #endif
 
 Render* Render::Instance = nullptr;
+
+struct WGPURendererData {
+  Ref<GPUBuffer> QuadVertexBuffer;
+  Ref<GPUBuffer> QuadIndexBuffer;
+};
+
+static WGPURendererData* s_Data = nullptr;
+
 extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
 
 WGPUInstance Render::CreateGPUInstance() {
@@ -112,7 +120,52 @@ bool Render::Init(void* window) {
       },
       nullptr);
 
+  RendererPostInit();
   return true;
+}
+
+void Render::RendererPostInit() {
+  s_Data = new WGPURendererData();
+
+  float x = -1;
+  float y = -1;
+  float width = 2, height = 2;
+  struct QuadVertex {
+    glm::vec3 Position;
+    float _pad0 = 0;
+    glm::vec2 TexCoord;
+    float _pad1[2] = {0, 0};
+  };
+
+  QuadVertex* data = new QuadVertex[4];
+
+  data[0].Position = glm::vec3(x, y, 0.0f);  // Bottom-left
+  data[0].TexCoord = glm::vec2(0, 1);
+
+  data[1].Position = glm::vec3(x + width, y, 0.0f);  // Bottom-right
+  data[1].TexCoord = glm::vec2(1, 1);
+
+  data[2].Position = glm::vec3(x + width, y + height, 0.0f);  // Top-right
+  data[2].TexCoord = glm::vec2(1, 0);
+
+  data[3].Position = glm::vec3(x, y + height, 0.0f);  // Top-left
+  data[3].TexCoord = glm::vec2(0, 0);
+
+  // TODO: Consider static buffers, immediately mapped buffers etc.
+  s_Data->QuadVertexBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst, sizeof(QuadVertex) * 4);
+  s_Data->QuadVertexBuffer->SetData(data, sizeof(QuadVertex) * 4);
+
+  static uint32_t indices[6] = {
+      0,
+      1,
+      2,
+      2,
+      3,
+      0,
+  };
+
+  s_Data->QuadIndexBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_Index | WGPUBufferUsage_CopyDst, sizeof(uint32_t) * 6);
+  s_Data->QuadIndexBuffer->SetData(indices, sizeof(uint32_t) * 6);
 }
 
 WGPUAdapter Render::RequestAdapter(WGPUInstance instance,
@@ -223,6 +276,67 @@ WGPUSwapChain Render::BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDev
   return wgpuDeviceCreateSwapChain(m_device, surface, &m_swapChainDesc);
 }
 
+WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder) {
+  auto& pipe = pass->GetProps().Pipeline;
+
+  WGPURenderPassDescriptor passDesc{.label = pipe->GetName().c_str()};
+
+  if (pipe->HasColorAttachment()) {
+    WGPURenderPassColorAttachment colorAttachment{};
+    colorAttachment.loadOp = WGPULoadOp_Clear;
+    colorAttachment.storeOp = WGPUStoreOp_Store;
+    colorAttachment.clearValue = WGPUColor{0.52, 0.80, 0.92, 1};
+    colorAttachment.resolveTarget = nullptr;
+    colorAttachment.view = pipe->GetColorAttachment()->View;
+
+    passDesc.colorAttachmentCount = 1;
+    passDesc.colorAttachments = &colorAttachment;
+  } else if (!pipe->HasDepthAttachment()) {
+    WGPURenderPassColorAttachment colorAttachment{};
+    colorAttachment.loadOp = WGPULoadOp_Clear;
+    colorAttachment.storeOp = WGPUStoreOp_Store;
+    colorAttachment.clearValue = WGPUColor{0.52, 0.80, 0.92, 1};
+    colorAttachment.resolveTarget = nullptr;
+    colorAttachment.view = Instance->GetCurrentSwapChainTexture()->View;
+
+    passDesc.colorAttachmentCount = 1;
+    passDesc.colorAttachments = &colorAttachment;
+  } else {
+    passDesc.colorAttachmentCount = 0;
+    passDesc.colorAttachments = nullptr;
+  }
+
+  if (pipe->HasDepthAttachment()) {
+    WGPURenderPassDepthStencilAttachment depthAttachment;
+    depthAttachment.view = pipe->GetDepthAttachment()->View;
+    depthAttachment.depthClearValue = 1.0f;
+    depthAttachment.depthLoadOp = WGPULoadOp_Clear;
+    depthAttachment.depthStoreOp = WGPUStoreOp_Store;
+    depthAttachment.depthReadOnly = false;
+    depthAttachment.stencilClearValue = 0;
+    depthAttachment.stencilLoadOp = WGPULoadOp_Undefined;
+    depthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
+    depthAttachment.stencilReadOnly = true;
+
+    passDesc.depthStencilAttachment = &depthAttachment;
+  } else {
+    passDesc.depthStencilAttachment = nullptr;
+  }
+
+  auto renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &passDesc);
+  auto bindings = pass->GetBindManager();
+
+  for (auto& [index, bindGroup] : bindings->GetBindGroups()) {
+    wgpuRenderPassEncoderSetBindGroup(renderPass, index, bindGroup, 0, 0);
+  }
+
+  return renderPass;
+}
+
+void Render::EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder) {
+  wgpuRenderPassEncoderEnd(encoder);
+}
+
 void Render::RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
                         WGPURenderPipeline pipeline,
                         Ref<MeshSource> mesh,
@@ -256,6 +370,23 @@ void Render::RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
 
   auto& subMesh = mesh->m_SubMeshes[submeshIndex];
   wgpuRenderPassEncoderDrawIndexed(renderCommandBuffer, subMesh.IndexCount, instanceCount, subMesh.BaseIndex, subMesh.BaseVertex, 0);
+}
+
+void Render::SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WGPURenderPipeline pipeline) {
+  wgpuRenderPassEncoderSetPipeline(renderCommandBuffer, pipeline);
+
+  wgpuRenderPassEncoderSetVertexBuffer(renderCommandBuffer,
+                                       0,
+                                       s_Data->QuadVertexBuffer->Buffer,
+                                       0,
+                                       s_Data->QuadVertexBuffer->Size);
+
+  wgpuRenderPassEncoderSetIndexBuffer(renderCommandBuffer,
+                                      s_Data->QuadIndexBuffer->Buffer,
+                                      WGPUIndexFormat_Uint32,
+                                      0,
+                                      s_Data->QuadIndexBuffer->Size);
+  wgpuRenderPassEncoderDrawIndexed(renderCommandBuffer, 6, 1, 0, 0, 0);
 }
 
 Ref<Texture> Render::GetCurrentSwapChainTexture() {

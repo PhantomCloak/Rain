@@ -99,10 +99,9 @@ MeshSource::MeshSource(std::string path) {
       printf("");
     }
 
-
     for (int j = 0; j < mat->GetTextureCount(aiTextureType_DIFFUSE); j++) {
       if (mat->GetTexture(aiTextureType_DIFFUSE, j, &texturePath) != aiReturn_SUCCESS) {
-         std::cout << "An error occured while loading texture" << std::endl;
+        std::cout << "An error occured while loading texture" << std::endl;
         continue;
       }
 
@@ -117,7 +116,7 @@ MeshSource::MeshSource(std::string path) {
       currentMaterial->SetDiffuseTexture("texture_diffuse" + std::to_string(j), matTexture);
     }
 
-		auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
+    auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
     Material::CreateMaterial(currentMaterial, defaultShader);
 
     m_Materials[i] = currentMaterial;
@@ -192,6 +191,31 @@ MeshSource::MeshSource(std::string path) {
   }
 
   TraverseNode(scene->mRootNode, scene);
+}
+
+MeshSource::MeshSource(const std::vector<glm::vec3>& vertices, const std::vector<glm::vec3>& indices) {
+  Ref<Material> currentMaterial = CreateRef<Material>();
+	currentMaterial->properties.diffuseColor = glm::vec3(1, 0, 0);
+
+	auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
+	Material::CreateMaterial(currentMaterial, defaultShader);
+	m_Materials.push_back(currentMaterial);
+
+  m_VertexBuffer = GPUAllocator::GAlloc("v_buffer_dynamic", WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex, (vertices.size() * sizeof(VertexAttribute) + 3) & ~3);
+  m_IndexBuffer = GPUAllocator::GAlloc("i_buffer_dynamic", WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index, (indices.size() * sizeof(unsigned int) + 3) & ~3);
+
+  m_VertexBuffer->SetData(vertices.data(), 0, vertices.size() * sizeof(VertexAttribute));
+  m_IndexBuffer->SetData(indices.data(), 0, indices.size() * sizeof(unsigned int));
+
+  SubMesh subMesh;
+  subMesh.MaterialIndex = 0;
+  subMesh.BaseVertex = 0;
+  subMesh.VertexCount = vertices.size();
+
+  subMesh.BaseIndex = 0;
+  subMesh.IndexCount = indices.size();
+
+  m_SubMeshes.push_back(subMesh);
 }
 
 void MeshSource::TraverseNode(aiNode* node, const aiScene* scene) {

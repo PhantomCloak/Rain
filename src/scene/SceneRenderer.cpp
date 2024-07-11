@@ -112,10 +112,15 @@ void SceneRenderer::Init() {
 			{2, ShaderDataType::Float2, "uv", 32},
 			{3, ShaderDataType::Float3, "tangent", 48}}};
 
+	VertexBufferLayout vertexLayoutQuad = {32, {
+			{0, ShaderDataType::Float3, "position", 0},
+			{1, ShaderDataType::Float2, "uv", 16}}};
+
   VertexBufferLayout instanceLayout = {48, {
       {4, ShaderDataType::Float4, "a_MRow0", 0},
       {5, ShaderDataType::Float4, "a_MRow1", 16},
       {6, ShaderDataType::Float4, "a_MRow2", 32}}};
+
   // clang-format on
 
   GroupLayout sceneGroup = {
@@ -134,55 +139,25 @@ void SceneRenderer::Init() {
       {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
       {1, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler}};
 
-  static std::map<int, GroupLayout> groupLayouts, groupLayoutsShadow;
+  static std::map<int, GroupLayout> groupLayouts, groupLayoutsShadow, groupLayoutsDebug, groupLayoutPpfx;
 
   groupLayouts.insert({0, sceneGroup});
   groupLayouts.insert({1, materialGroup});
   groupLayouts.insert({2, shadowGroup});
 
   groupLayoutsShadow.insert({0, sceneGroup});
+  groupLayoutPpfx.insert({0, ppfxGroup});
 
   auto defaultShader = m_ShaderManager->LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/default.wgsl");
   auto shadowShader = m_ShaderManager->LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
-
-  RenderPipelineProps litPipeProps = {
-      .VertexLayout = vertexLayout,
-      .InstanceLayout = instanceLayout,
-      .CullingMode = PipelineCullingMode::NONE,
-      .VertexShader = defaultShader,
-      .FragmentShader = defaultShader,
-      .ColorFormat = TextureFormat::RGBA,
-      .DepthFormat = TextureFormat::Depth,
-      .groupLayout = groupLayouts};
-
-  RenderPipelineProps shadowPipeProps = {
-      .VertexLayout = vertexLayout,
-      .InstanceLayout = instanceLayout,
-      .CullingMode = PipelineCullingMode::BACK,
-      .VertexShader = shadowShader,
-      .FragmentShader = shadowShader,
-      .ColorFormat = TextureFormat::Undefined,
-      .DepthFormat = TextureFormat::Depth,
-      .groupLayout = groupLayoutsShadow};
+  auto ppfxShader = m_ShaderManager->LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
 
   glm::vec2 screenSize = Application::Get()->GetWindowSize();
 
   m_LitDepthTexture = Texture::Create({screenSize, TextureFormat::Depth});
-  m_ShadowMapTexture = Texture::Create({{4096, 4096}, TextureFormat::Depth});
+  m_LitDepthTexture = Texture::Create({screenSize, TextureFormat::Depth});
 
-  m_LitPipeline = CreateRef<RenderPipeline>("RP_Lit", litPipeProps, nullptr, m_LitDepthTexture);
-  m_ShadowPipeline = CreateRef<RenderPipeline>("RP_Shadow", shadowPipeProps, nullptr, m_ShadowMapTexture);
-
-  Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
-
-  WGPUBindGroupLayout bglCamera = wgpuRenderPipelineGetBindGroupLayout(m_LitPipeline->GetPipeline(), 0);
-
-  m_SceneUniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(SceneUniform));
-
-  m_SceneBinding = BindingManager::Create({.Name = "SceneBinding", .Shader = defaultShader});
-  m_SceneBinding->Set("u_scene", m_SceneUniformBuffer);
-  m_SceneBinding->Bake();
-
+  m_ShadowDepthTexture = Texture::Create({{4096, 4096}, TextureFormat::Depth});
   m_ShadowSampler = Sampler::Create({.Name = "ShadowSampler",
                                      .WrapFormat = TextureWrappingFormat::ClampToEdges,
                                      .MagFilterFormat = FilterMode::Linear,
@@ -192,10 +167,52 @@ void SceneRenderer::Init() {
                                      .LodMinClamp = 0.0f,
                                      .LodMaxClamp = 1.0f});
 
-  m_ShadowBinding = BindingManager::Create({.Name = "ShadowBinding", .Shader = defaultShader});
-  m_ShadowBinding->Set("shadowMap", m_ShadowMapTexture);
-  m_ShadowBinding->Set("shadowSampler", m_ShadowSampler);
-  m_ShadowBinding->Bake();
+  m_LitPassTexture = Texture::Create({screenSize, TextureFormat::RGBA});
+  m_PpfxSampler = Sampler::Create({.Name = "PpfxSampler",
+                                   .WrapFormat = TextureWrappingFormat::ClampToEdges,
+                                   .MagFilterFormat = FilterMode::Linear,
+                                   .MinFilterFormat = FilterMode::Linear,
+                                   .MipFilterFormat = FilterMode::Linear,
+                                   .Compare = CompareMode::CompareUndefined,
+                                   .LodMinClamp = 0.0f,
+                                   .LodMaxClamp = 1.0f});
+
+  RenderPipelineProps shadowPipeProps = {
+      .VertexLayout = vertexLayout,
+      .InstanceLayout = instanceLayout,
+      .CullingMode = PipelineCullingMode::BACK,
+      .VertexShader = shadowShader,
+      .FragmentShader = shadowShader,
+      .ColorFormat = TextureFormat::Undefined,
+      .DepthFormat = TextureFormat::Depth,
+      .TargetDepthBuffer = m_ShadowDepthTexture,
+      .groupLayout = groupLayoutsShadow};
+
+  RenderPipelineProps litPipeProps = {
+      .VertexLayout = vertexLayout,
+      .InstanceLayout = instanceLayout,
+      .CullingMode = PipelineCullingMode::NONE,
+      .VertexShader = defaultShader,
+      .FragmentShader = defaultShader,
+      .ColorFormat = TextureFormat::RGBA,
+      .DepthFormat = TextureFormat::Depth,
+      .TargetFrameBuffer = m_LitPassTexture,
+      .TargetDepthBuffer = m_LitDepthTexture,
+      .groupLayout = groupLayouts};
+
+  RenderPipelineProps ppfxPipeProps = {
+      .VertexLayout = vertexLayoutQuad,
+      .InstanceLayout = {},
+      .CullingMode = PipelineCullingMode::NONE,
+      .VertexShader = ppfxShader,
+      .FragmentShader = ppfxShader,
+      .ColorFormat = TextureFormat::RGBA,
+      .DepthFormat = TextureFormat::Undefined,
+      .groupLayout = groupLayoutPpfx};
+
+  m_LitPipeline = RenderPipeline::Create("RP_Lit", litPipeProps);
+  m_ShadowPipeline = RenderPipeline::Create("RP_Shadow", shadowPipeProps);
+  m_PpfxPipeline = RenderPipeline::Create("RP_PPFX", ppfxPipeProps);
 
   const float shadowFrustum = 200;
   m_SceneUniform.shadowViewProjection = glm::ortho(-shadowFrustum,
@@ -206,7 +223,37 @@ void SceneRenderer::Init() {
                                                    1500.0f) *
                                         GetViewMatrix(glm::vec3(212, 852, 71), glm::vec3(-107, 35, 0));
 
+  m_SceneUniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(SceneUniform));
   m_SceneUniformBuffer->SetData(&m_SceneUniform, sizeof(SceneUniform));
+
+  RenderPassProps propShadowPass;
+  propShadowPass.DebugName = "ShadowPass";
+  propShadowPass.Pipeline = m_ShadowPipeline;
+
+  m_ShadowPass = RenderPass::Create(propShadowPass);
+  m_ShadowPass->Set("u_scene", m_SceneUniformBuffer);
+  m_ShadowPass->Bake();
+
+  RenderPassProps propLitPass;
+  propLitPass.DebugName = "LitPass";
+  propLitPass.Pipeline = m_LitPipeline;
+
+  m_LitPass = RenderPass::Create(propLitPass);
+  m_LitPass->Set("u_scene", m_SceneUniformBuffer);
+  m_LitPass->Set("shadowMap", m_ShadowPass->GetDepthOutput());
+  m_LitPass->Set("shadowSampler", m_ShadowSampler);
+  m_LitPass->Bake();
+
+  RenderPassProps propPpfxPass;
+  propPpfxPass.DebugName = "PpfxPass";
+  propPpfxPass.Pipeline = m_PpfxPipeline;
+
+  m_PpfxPass = RenderPass::Create(propPpfxPass);
+  m_PpfxPass->Set("renderTexture", m_LitPass->GetOutput(0));
+  m_PpfxPass->Set("textureSampler", m_PpfxSampler);
+  m_PpfxPass->Bake();
+
+  auto renderContext = Render::Instance->GetRenderContext();
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -255,18 +302,22 @@ WGPURenderPassEncoder BeginRenderPass(Ref<RenderPipeline> pipe, WGPUCommandEncod
     passDesc.colorAttachments = nullptr;
   }
 
-  WGPURenderPassDepthStencilAttachment depthAttachment;
-  depthAttachment.view = pipe->GetDepthAttachment()->View;
-  depthAttachment.depthClearValue = 1.0f;
-  depthAttachment.depthLoadOp = WGPULoadOp_Clear;
-  depthAttachment.depthStoreOp = WGPUStoreOp_Store;
-  depthAttachment.depthReadOnly = false;
-  depthAttachment.stencilClearValue = 0;
-  depthAttachment.stencilLoadOp = WGPULoadOp_Undefined;
-  depthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
-  depthAttachment.stencilReadOnly = true;
+  if (pipe->HasDepthAttachment()) {
+    WGPURenderPassDepthStencilAttachment depthAttachment;
+    depthAttachment.view = pipe->GetDepthAttachment()->View;
+    depthAttachment.depthClearValue = 1.0f;
+    depthAttachment.depthLoadOp = WGPULoadOp_Clear;
+    depthAttachment.depthStoreOp = WGPUStoreOp_Store;
+    depthAttachment.depthReadOnly = false;
+    depthAttachment.stencilClearValue = 0;
+    depthAttachment.stencilLoadOp = WGPULoadOp_Undefined;
+    depthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
+    depthAttachment.stencilReadOnly = true;
 
-  passDesc.depthStencilAttachment = &depthAttachment;
+    passDesc.depthStencilAttachment = &depthAttachment;
+  } else {
+    passDesc.depthStencilAttachment = nullptr;
+  }
 
   return wgpuCommandEncoderBeginRenderPass(encoder, &passDesc);
 }
@@ -290,34 +341,33 @@ void SceneRenderer::FlushDrawList() {
   WGPUCommandEncoderDescriptor commandEncoderDesc = {.label = "Command Encoder"};
   Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
 
-  auto encoder = wgpuDeviceCreateCommandEncoder(renderContext->GetDevice(), &commandEncoderDesc);
+  auto commandEncoder = wgpuDeviceCreateCommandEncoder(renderContext->GetDevice(), &commandEncoderDesc);
 
-  auto shadowPass = BeginRenderPass(m_ShadowPipeline, encoder);
-  wgpuRenderPassEncoderSetBindGroup(shadowPass, 0, m_SceneBinding->GetBindGroup(0), 0, nullptr);
+  auto shadowPassEncoder = Render::BeginRenderPass(m_ShadowPass, commandEncoder);
   for (auto& [mk, dc] : m_DrawList) {
     Ref<Material> mat = dc.Mesh->m_Materials[dc.MaterialIndex];
-    Render::Instance->RenderMesh(shadowPass, m_ShadowPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, mat, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+    Render::Instance->RenderMesh(shadowPassEncoder, m_ShadowPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, mat, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
   }
-  EndRenderPass(shadowPass);
+  Render::EndRenderPass(m_ShadowPass, shadowPassEncoder);
 
-  m_LitPipeline->SetColorAttachment(Render::Instance->GetCurrentSwapChainTexture());
-  auto litPass = BeginRenderPass(m_LitPipeline, encoder);
-  wgpuRenderPassEncoderSetBindGroup(litPass, 0, m_SceneBinding->GetBindGroup(0), 0, nullptr);
-  wgpuRenderPassEncoderSetBindGroup(litPass, 2, m_ShadowBinding->GetBindGroup(2), 0, nullptr);
+  auto litPassEncoder = Render::BeginRenderPass(m_LitPass, commandEncoder);
   for (auto& [mk, dc] : m_DrawList) {
     Ref<Material> mat = dc.Mesh->m_Materials[dc.MaterialIndex];
-    Render::Instance->RenderMesh(litPass, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, mat, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+    Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, mat, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
   }
-  drawImgui(litPass);
-  EndRenderPass(litPass);
+  Render::EndRenderPass(m_LitPass, litPassEncoder);
+
+  auto ppfxPassEncoder = Render::BeginRenderPass(m_PpfxPass, commandEncoder);
+  Render::Instance->SubmitFullscreenQuad(ppfxPassEncoder, m_PpfxPipeline->GetPipeline());
+  Render::EndRenderPass(m_PpfxPass, ppfxPassEncoder);
 
   WGPUCommandBufferDescriptor cmdBufferDescriptor = {.label = "Command Buffer"};
-  WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(encoder, &cmdBufferDescriptor);
+  WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(commandEncoder, &cmdBufferDescriptor);
 
   wgpuQueueSubmit(*renderContext->GetQueue(), 1, &commandBuffer);
 
-  wgpuCommandEncoderRelease(encoder);
-  wgpuTextureViewRelease(m_LitPipeline->GetColorAttachment()->View);
+  wgpuCommandEncoderRelease(commandEncoder);
+  wgpuTextureViewRelease(Render::Instance->GetCurrentSwapChainTexture()->View);
 
 #ifndef __EMSCRIPTEN__
   wgpuSwapChainPresent(Render::Instance->m_swapChain);

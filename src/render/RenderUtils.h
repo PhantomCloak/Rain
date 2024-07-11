@@ -141,6 +141,8 @@ struct BufferElement {
 class VertexBufferLayout {
  public:
 
+  VertexBufferLayout() : m_Stride(0), m_Elements() {};
+
   VertexBufferLayout(uint32_t stride, std::initializer_list<BufferElement> elements)
       : m_Stride(stride), m_Elements(elements) {
   }

@@ -34,7 +34,7 @@ class Sampler {
  public:
   Ref<WGPUSampler> GetNativeSampler() { return m_Sampler; }
   static Ref<Sampler> Create(SamplerProps props);
-  static SamplerProps GetDefaultProps(std::string name = "") {
+	static SamplerProps GetDefaultProps(std::string name = "", float lodMinClamp = 0.0f, float lodMaxClamp = 80.0f) {
     return SamplerProps{
 				.Name = name,
         .WrapFormat = TextureWrappingFormat::Repeat,
@@ -42,8 +42,8 @@ class Sampler {
         .MinFilterFormat = FilterMode::Linear,
 				.MipFilterFormat = FilterMode::Linear,
         .Compare = CompareMode::CompareUndefined,
-        .LodMinClamp = 0.0f,
-        .LodMaxClamp = 80.0f};
+        .LodMinClamp = lodMinClamp,
+        .LodMaxClamp = lodMaxClamp};
   }
 
   Sampler(Ref<WGPUSampler> sampler)

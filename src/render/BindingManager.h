@@ -26,6 +26,7 @@ class BindingManager {
       : m_BindingSpec(spec) {};
   static Ref<BindingManager> Create(const BindingSpec& spec) { return CreateRef<BindingManager>(spec); }
 
+  std::map<int, WGPUBindGroup>& GetBindGroups() { return m_BindGroups; }
   WGPUBindGroup GetBindGroup(int group) { return m_BindGroups[group]; }
   void Set(const std::string& name, Ref<Texture> texture);
   void Set(const std::string& name, Ref<GPUBuffer> uniform);
