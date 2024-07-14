@@ -1,5 +1,3 @@
-#pragma once
-#include "scene/Components.h"
 #include "scene/Entity.h"
 #include "scene/Scene.h"
 #define RN_DEBUG
@@ -9,8 +7,6 @@
 #include <glm/glm.hpp>
 #include "Application.h"
 
-#include "Cam.h"
-
 #include "core/Log.h"
 #include "io/cursor.h"
 #include "io/keyboard.h"
@@ -18,11 +14,8 @@
 #include "render/Render.h"
 #include "render/ResourceManager.h"
 
-#include <tint/tint.h>
-
 #if __EMSCRIPTEN__
 #include <emscripten.h>
-#include "platform/web/web_window.h"
 #endif
 
 std::unique_ptr<Render> render;

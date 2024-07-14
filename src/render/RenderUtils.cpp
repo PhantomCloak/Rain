@@ -88,12 +88,15 @@ uint32_t LayoutUtils::CeilToNextMultiple(uint32_t value, uint32_t step) {
 }
 
 TextureFormat RenderTypeUtils::FromRenderType(WGPUTextureFormat format) {
+	RN_ASSERT(false, "Haven't implemented yet");
 }
 
 TextureWrappingFormat RenderTypeUtils::FromRenderType(WGPUAddressMode format) {
+	RN_ASSERT(false, "Haven't implemented yet");
 }
 
 FilterMode RenderTypeUtils::FromRenderType(WGPUFilterMode format) {
+	RN_ASSERT(false, "Haven't implemented yet");
 }
 
 WGPUTextureFormat RenderTypeUtils::ToRenderType(TextureFormat format) {

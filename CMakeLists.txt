@@ -47,9 +47,78 @@ endif()
 add_subdirectory(vendor/spdlog)
 add_subdirectory(vendor/assimp)
 add_subdirectory(vendor/flecs)
+add_subdirectory(vendor/tracy)
+
+target_include_directories(MyApp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/dawn/include/tint)
+
+set(TRACY_ENABLE TRUE)
 
 if(EMSCRIPTEN)
 
+# HACK: to provide dependet func to tint cmake file
+function(common_compile_options TARGET)
+  if (COMPILER_IS_LIKE_GNU)
+    target_compile_options(${TARGET} PRIVATE
+      -fno-exceptions
+      -fno-rtti
+
+      -Wno-deprecated-builtins
+      -Wno-unknown-warning-option
+    )
+
+    if (${DAWN_ENABLE_MSAN})
+      target_compile_options(${TARGET} PUBLIC -fsanitize=memory)
+      target_link_options(${TARGET} PUBLIC -fsanitize=memory)
+    elseif (${DAWN_ENABLE_ASAN})
+      target_compile_options(${TARGET} PUBLIC -fsanitize=address)
+      target_link_options(${TARGET} PUBLIC -fsanitize=address)
+    elseif (${DAWN_ENABLE_TSAN})
+      target_compile_options(${TARGET} PUBLIC -fsanitize=thread)
+      target_link_options(${TARGET} PUBLIC -fsanitize=thread)
+    elseif (${DAWN_ENABLE_UBSAN})
+      target_compile_options(${TARGET} PUBLIC -fsanitize=undefined -fsanitize=float-divide-by-zero)
+      target_link_options(${TARGET} PUBLIC -fsanitize=undefined -fsanitize=float-divide-by-zero)
+    endif()
+  endif(COMPILER_IS_LIKE_GNU)
+
+  if(MSVC)
+      target_compile_options(${TARGET} PUBLIC /utf-8)
+  endif()
+
+  if (DAWN_EMIT_COVERAGE)
+    target_compile_definitions(${TARGET} PRIVATE "DAWN_EMIT_COVERAGE")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        target_compile_options(${TARGET} PRIVATE "--coverage")
+        target_link_options(${TARGET} PRIVATE "gcov")
+    elseif(COMPILER_IS_CLANG OR COMPILER_IS_CLANG_CL)
+        target_compile_options(${TARGET} PRIVATE "-fprofile-instr-generate" "-fcoverage-mapping")
+        target_link_options(${TARGET} PRIVATE "-fprofile-instr-generate" "-fcoverage-mapping")
+    else()
+        message(FATAL_ERROR "Coverage generation not supported for the ${CMAKE_CXX_COMPILER_ID} toolchain")
+    endif()
+  endif(DAWN_EMIT_COVERAGE)
+endfunction()
+
+
+	set(TINT_BUILD_TESTS OFF)
+	set(TINT_BUILD_BENCHMARKS OFF)
+	set(TINT_BUILD_CMD_TOOLS   OFF)
+	set(TINT_BUILD_FUZZERS OFF)
+	set(TINT_BUILD_AS_OTHER_OS ON)
+	set(TINT_BUILD_MSL_WRITER  OFF)
+	set(TINT_ENABLE_BREAK_IN_DEBUGGER OFF)
+	set(TINT_ENABLE_INSTALL ON)
+
+	set(TINT_BUILD_WGSL_READER ON)
+
+	set(TINT_ROOT_SOURCE_DIR vendor/dawn)
+	include_directories(${TINT_ROOT_SOURCE_DIR})
+
+	add_subdirectory(vendor/dawn/third_party/abseil-cpp)
+  add_subdirectory(vendor/dawn/src/tint)
+
+	#target_include_directories(MyApp PUBLIC vendor/dawn/src)
+	#target_include_directories(MyApp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/dawn/src/tint)
 	# PhysX Needs It
 	#set(EMSCRIPTEN_PTHREADS_COMPILER_FLAGS "-pthread")
 	#set(EMSCRIPTEN_PTHREADS_LINKER_FLAGS "${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}") # -sPROXY_TO_PTHREAD
@@ -60,7 +129,7 @@ if(EMSCRIPTEN)
 
 	target_link_options(PhysX PRIVATE -sALLOW_BLOCKING_ON_MAIN_THREAD=1)
 
-	target_link_libraries(MyApp PRIVATE assimp flecs spdlog PhysX PhysXCooking PhysXCommon PhysXExtensions)
+	target_link_libraries(MyApp PRIVATE libtint tint_lang_wgsl_inspector assimp flecs spdlog PhysX PhysXCooking PhysXCommon PhysXExtensions)
 	target_link_options(MyApp PRIVATE
 		-sUSE_GLFW=3
 		-sUSE_WEBGPU=1

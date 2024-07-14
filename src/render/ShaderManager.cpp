@@ -1,8 +1,12 @@
 #include "ShaderManager.h"
 #include <iostream>
 
-#include <tint/tint.h>
-#include "core/Assert.h"
+//#include "src/tint/api/tint.h"
+#include "src/tint/lang/wgsl/inspector/inspector.h"
+#include "src/tint/lang/wgsl/reader/reader.h"
+
+#include <tint.h>
+
 #include "render/RenderContext.h"
 #include "src/tint/lang/core/type/depth_texture.h"
 #include "src/tint/lang/wgsl/ast/identifier.h"

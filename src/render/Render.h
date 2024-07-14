@@ -14,6 +14,9 @@ class Render {
   WGPUSwapChain BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface);
   Ref<RenderContext> GetRenderContext() { return m_RenderContext; }
 
+	static Ref<Texture> GetWhiteTexture();
+	static Ref<Sampler> GetDefaultSampler();
+
   static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
   static void EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder);
 
@@ -21,11 +24,14 @@ class Render {
                   WGPURenderPipeline pipeline,
                   Ref<MeshSource> mesh,
                   uint32_t submeshIndex,
-                  Ref<Material> material,
+                  Ref<MaterialTable> material,
                   Ref<GPUBuffer> transformBuffer,
                   uint32_t transformOffset,
                   uint32_t instanceCount);
   static void SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WGPURenderPipeline pipeline);
+
+	static void AddShaderDependency(Ref<Shader> shader, Ref<Material> material);
+	static void AddShaderDependency(Ref<Shader> shader, Ref<RenderPipeline> material);
 
   std::unordered_map<UUID, Material> Materials;
 

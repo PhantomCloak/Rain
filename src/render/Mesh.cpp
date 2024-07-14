@@ -34,10 +34,10 @@ MeshSource::MeshSource(std::string path) {
   const aiScene* scene = import.ReadFile(path,
                                          aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices);
 
-  // if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-  //   std::cout << "ERROR::ASSIMP::" << import.GetErrorString() << std::endl;
-  //   return;
-  // }
+  if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+    std::cout << "ERROR::ASSIMP::" << import.GetErrorString() << std::endl;
+    return;
+  }
 
   RN_CORE_ASSERT(scene && !(scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) || scene->mRootNode, "An error occured while loading the model %s", import.GetErrorString());
 
@@ -58,68 +58,68 @@ MeshSource::MeshSource(std::string path) {
 
   std::string fileName = FileSys::GetFileName(path);
   std::string fileDirectory = FileSys::GetParentDirectory(path);
+	Materials = CreateRef<MaterialTable>();
 
   m_VertexBuffer = GPUAllocator::GAlloc("v_buffer_" + fileName, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex, (verticesCount * sizeof(VertexAttribute) + 3) & ~3);
   m_IndexBuffer = GPUAllocator::GAlloc("i_buffer_" + fileName, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index, (indexCount * sizeof(unsigned int) + 3) & ~3);
 
   aiColor3D colorEmpty = {0, 0, 0};
-  m_Materials.resize(scene->mNumMaterials);
+  //m_Materials.resize(scene->mNumMaterials);
 
   for (int i = 0; i < scene->mNumMaterials; i++) {
-    aiMaterial* mat = scene->mMaterials[i];
+    aiMaterial* aiMat = scene->mMaterials[i];
 
     aiColor3D color;
     float shininess;
     aiReturn result = AI_FAILURE;
 
-    Ref<Material> currentMaterial = CreateRef<Material>();
+    std::string aiMatName(aiMat->GetName().C_Str());
 
-    if (mat->Get(AI_MATKEY_COLOR_AMBIENT, mat) == AI_SUCCESS) {
-      currentMaterial->properties.ambientColor = color != colorEmpty ? glm::vec3(color.r, color.g, color.b) : glm::vec3(0.1);
+    static auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
+
+    auto materialProps = MaterialProperties();
+    auto material = Material::CreateMaterial(aiMatName, defaultShader);
+
+    if (aiMat->Get(AI_MATKEY_COLOR_AMBIENT, aiMat) == AI_SUCCESS) {
+      materialProps.ambientColor = color != colorEmpty ? glm::vec3(color.r, color.g, color.b) : glm::vec3(0.1);
     }
 
-    if (mat->Get(AI_MATKEY_COLOR_SPECULAR, color) == AI_SUCCESS) {
-      currentMaterial->properties.diffuseColor = glm::vec3(color.r, color.g, color.b);
+    if (aiMat->Get(AI_MATKEY_COLOR_SPECULAR, color) == AI_SUCCESS) {
+      materialProps.diffuseColor = glm::vec3(color.r, color.g, color.b);
     }
 
-    if (mat->Get(AI_MATKEY_COLOR_SPECULAR, color) == AI_SUCCESS) {
-      currentMaterial->properties.specularColor = glm::vec3(color.r, color.g, color.b);
+    if (aiMat->Get(AI_MATKEY_COLOR_SPECULAR, color) == AI_SUCCESS) {
+      materialProps.specularColor = glm::vec3(color.r, color.g, color.b);
     }
 
-    if (mat->Get(AI_MATKEY_SHININESS, shininess) == AI_SUCCESS) {
-      currentMaterial->properties.shininess = (shininess / 10.0f) * 128.0f;
+    if (aiMat->Get(AI_MATKEY_SHININESS, shininess) == AI_SUCCESS) {
+      materialProps.shininess = (shininess / 10.0f) * 128.0f;
     }
 
-    Ref<Texture> matTexture;
-    aiString texturePath;
+    material->Set("uMaterial", materialProps);
 
-    for (int i = 0; i < mat->mNumProperties; i++) {
-      auto mm = mat->mProperties[i];
-      std::string decoded = std::string(mm->mData);
-      printf("");
-    }
-
-    for (int j = 0; j < mat->GetTextureCount(aiTextureType_DIFFUSE); j++) {
-      if (mat->GetTexture(aiTextureType_DIFFUSE, j, &texturePath) != aiReturn_SUCCESS) {
+    for (int j = 0; j < aiMat->GetTextureCount(aiTextureType_DIFFUSE); j++) {
+      aiString texturePath;
+      if (aiMat->GetTexture(aiTextureType_DIFFUSE, j, &texturePath) != aiReturn_SUCCESS) {
         std::cout << "An error occured while loading texture" << std::endl;
         continue;
       }
 
       std::string textureName = FileSys::GetFileName(texturePath.C_Str());
 
+      Ref<Texture> matTexture;
       if (Rain::ResourceManager::IsTextureExist(textureName)) {
         matTexture = Rain::ResourceManager::GetTexture(textureName);
       } else {
         matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
       }
 
-      currentMaterial->SetDiffuseTexture("texture_diffuse" + std::to_string(j), matTexture);
+      material->Set("gradientTexture", matTexture);
     }
 
-    auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
-    Material::CreateMaterial(currentMaterial, defaultShader);
-
-    m_Materials[i] = currentMaterial;
+    material->Bake();
+    //m_Materials[i] = material;
+		Materials->SetMaterial(i, material);
   }
 
   m_SubMeshes.resize(scene->mNumMeshes);
@@ -191,31 +191,6 @@ MeshSource::MeshSource(std::string path) {
   }
 
   TraverseNode(scene->mRootNode, scene);
-}
-
-MeshSource::MeshSource(const std::vector<glm::vec3>& vertices, const std::vector<glm::vec3>& indices) {
-  Ref<Material> currentMaterial = CreateRef<Material>();
-	currentMaterial->properties.diffuseColor = glm::vec3(1, 0, 0);
-
-	auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
-	Material::CreateMaterial(currentMaterial, defaultShader);
-	m_Materials.push_back(currentMaterial);
-
-  m_VertexBuffer = GPUAllocator::GAlloc("v_buffer_dynamic", WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex, (vertices.size() * sizeof(VertexAttribute) + 3) & ~3);
-  m_IndexBuffer = GPUAllocator::GAlloc("i_buffer_dynamic", WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index, (indices.size() * sizeof(unsigned int) + 3) & ~3);
-
-  m_VertexBuffer->SetData(vertices.data(), 0, vertices.size() * sizeof(VertexAttribute));
-  m_IndexBuffer->SetData(indices.data(), 0, indices.size() * sizeof(unsigned int));
-
-  SubMesh subMesh;
-  subMesh.MaterialIndex = 0;
-  subMesh.BaseVertex = 0;
-  subMesh.VertexCount = vertices.size();
-
-  subMesh.BaseIndex = 0;
-  subMesh.IndexCount = indices.size();
-
-  m_SubMeshes.push_back(subMesh);
 }
 
 void MeshSource::TraverseNode(aiNode* node, const aiScene* scene) {

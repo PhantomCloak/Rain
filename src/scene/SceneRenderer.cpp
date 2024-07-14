@@ -84,8 +84,11 @@ glm::mat4 GetViewMatrix(glm::vec3 pos, glm::vec3 rot) {
   return glm::lookAt(shadowCameraPos, shadowCameraPos + Front, up);
 }
 
-void SceneRenderer::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, uint32_t materialIndex, glm::mat4& transform) {
-  MeshKey meshKey = {meshSource->Id, materialIndex, submeshIndex};
+void SceneRenderer::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform) {
+  const auto& submesh = meshSource->m_SubMeshes[submeshIndex];
+	const auto materialHandle = materialTable->HasMaterial(submesh.MaterialIndex) ? materialTable->GetMaterial(submesh.MaterialIndex) : meshSource->Materials->GetMaterial(submesh.MaterialIndex);
+
+	MeshKey meshKey = {meshSource->Id, materialHandle->Id, submeshIndex};
 
   auto& transformStorage = m_MeshTransformMap[meshKey].Transforms.emplace_back();
 
@@ -97,7 +100,7 @@ void SceneRenderer::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex
 
   drawCommand.Mesh = meshSource;
   drawCommand.SubmeshIndex = submeshIndex;
-  drawCommand.MaterialIndex = materialIndex;
+  drawCommand.Materials = materialTable;
   drawCommand.InstanceCount++;
 }
 
@@ -255,18 +258,18 @@ void SceneRenderer::Init() {
 
   auto renderContext = Render::Instance->GetRenderContext();
 
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGui::GetIO();
+  // IMGUI_CHECKVERSION();
+  // ImGui::CreateContext();
+  // ImGui::GetIO();
 
-  ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
+  // ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
 
-  ImGui_ImplWGPU_InitInfo initInfo;
-  initInfo.Device = RenderContext::GetDevice();
-  // initInfo.RenderTargetFormat = render->m_swapChainFormat;
-  initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
-  initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
-  ImGui_ImplWGPU_Init(&initInfo);
+  // ImGui_ImplWGPU_InitInfo initInfo;
+  // initInfo.Device = RenderContext::GetDevice();
+  //// initInfo.RenderTargetFormat = render->m_swapChainFormat;
+  // initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
+  // initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
+  // ImGui_ImplWGPU_Init(&initInfo);
 }
 
 void SceneRenderer::PreRender() {
@@ -292,6 +295,7 @@ void SceneRenderer::SetScene(Scene* scene) {
 void SceneRenderer::BeginScene(const SceneCamera& camera) {
   m_SceneUniform.viewProjection = camera.Projection * camera.ViewMatrix;
   m_SceneUniform.cameraViewMatrix = camera.ViewMatrix;
+  m_SceneUniform.lightPos = m_Scene->SceneLightInfo.LightPos;
   m_SceneUniformBuffer->SetData(&m_SceneUniform, sizeof(SceneUniform));
 }
 
@@ -303,15 +307,13 @@ void SceneRenderer::FlushDrawList() {
 
   auto shadowPassEncoder = Render::BeginRenderPass(m_ShadowPass, commandEncoder);
   for (auto& [mk, dc] : m_DrawList) {
-    Ref<Material> mat = dc.Mesh->m_Materials[dc.MaterialIndex];
-    Render::Instance->RenderMesh(shadowPassEncoder, m_ShadowPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, mat, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+    Render::Instance->RenderMesh(shadowPassEncoder, m_ShadowPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
   }
   Render::EndRenderPass(m_ShadowPass, shadowPassEncoder);
 
   auto litPassEncoder = Render::BeginRenderPass(m_LitPass, commandEncoder);
   for (auto& [mk, dc] : m_DrawList) {
-    Ref<Material> mat = dc.Mesh->m_Materials[dc.MaterialIndex];
-    Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, mat, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+    Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
   }
   Render::EndRenderPass(m_LitPass, litPassEncoder);
 

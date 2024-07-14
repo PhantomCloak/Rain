@@ -1,7 +1,6 @@
 #pragma once
 
 #include <flecs/flecs.h>
-#include <map>
 #include <string>
 #include "Cam.h"
 #include "core/UUID.h"
@@ -10,6 +9,10 @@
 class Entity;
 
 class SceneRenderer;
+
+struct LightInfo {
+	glm::vec3 LightPos;
+};
 
 class Scene {
  public:
@@ -31,6 +34,7 @@ class Scene {
 	void OnMouseMove(double xPos, double yPos);
 	void ScanKeyPress();
 
+	LightInfo SceneLightInfo;
  private:
   std::unordered_map<UUID, Entity> m_EntityMap;
   std::unique_ptr<PlayerCamera> m_SceneCamera;

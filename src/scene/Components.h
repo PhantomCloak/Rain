@@ -2,8 +2,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/euler_angles.hpp>
 #include <string>
+#include "core/Ref.h"
 #include "core/UUID.h"
 #include "glm/ext/matrix_transform.hpp"
+#include "render/Material.h"
 
 struct IDComponent {
   UUID ID = 0;
@@ -73,10 +75,14 @@ struct RelationshipComponent {
 };
 
 struct MeshComponent {
+  Ref<MaterialTable> Materials = CreateRef<MaterialTable>();
   uint32_t MeshSourceId = -1;
   uint32_t SubMeshId = -1;
-  uint32_t MaterialId = -1;
 
   MeshComponent(uint32_t meshSourceId = -1, uint32_t subMeshId = -1, uint32_t materialId = -1)
-      : SubMeshId(subMeshId), MeshSourceId(meshSourceId), MaterialId(materialId) {}
+      : SubMeshId(subMeshId), MeshSourceId(meshSourceId) {}
+};
+
+struct DirectionalLightComponent {
+  float Intensity = 0.0f;
 };

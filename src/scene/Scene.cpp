@@ -19,10 +19,49 @@ void Scene::Init() {
   m_SceneCamera->Position.y = 0;
   m_SceneCamera->Position.z = 0;
 
-  Ref<MeshSource> exampleModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/SponzaExp5.gltf");
-  Entity sampleEntity = CreateEntity("Box");
-  sampleEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 10, 0);
-  BuildMeshEntityHierarchy(sampleEntity, exampleModel);
+  static auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
+
+  Ref<MeshSource>
+      boxModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/box.gltf");
+
+  auto redMat = Material::CreateMaterial("M_BoxRed", defaultShader);
+  auto matProps = MaterialProperties{
+      .ambientColor = glm::vec3(),
+      .diffuseColor = glm::vec3(1.0f, 0.0, 0),
+      .specularColor = glm::vec3(1),
+      .shininess = 64};
+  redMat->Set("uMaterial", matProps);
+  redMat->Bake();
+
+  auto greenMat = Material::CreateMaterial("M_BoxGreen", defaultShader);
+  auto matPropsGreen = MaterialProperties{
+      .ambientColor = glm::vec3(),
+      .diffuseColor = glm::vec3(0.0f, 1.0, 0),
+      .specularColor = glm::vec3(1),
+      .shininess = 64};
+  greenMat->Set("uMaterial", matPropsGreen);
+  greenMat->Bake();
+
+  Entity light = CreateEntity("DirectionalLight");
+  light.GetComponent<TransformComponent>()->Translation = glm::vec3(30, 50, 0);
+  light.AddComponent<DirectionalLightComponent>();
+
+  Entity sampleEntity = CreateEntity("Floor");
+  sampleEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 0, 0);
+  sampleEntity.GetComponent<TransformComponent>()->Scale = glm::vec3(20, 1, 20);
+
+  Entity sampleEntity2 = CreateEntity("Box");
+  sampleEntity2.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 5, 0);
+  sampleEntity2.GetComponent<TransformComponent>()->Scale = glm::vec3(1);
+
+  BuildMeshEntityHierarchy(sampleEntity, boxModel);
+  BuildMeshEntityHierarchy(sampleEntity2, boxModel);
+
+  auto childMesh = TryGetEntityWithUUID(sampleEntity.Children()[0]);
+  childMesh.GetComponent<MeshComponent>()->Materials->SetMaterial(0, redMat);
+
+  auto childMesh2 = TryGetEntityWithUUID(sampleEntity2.Children()[0]);
+  childMesh2.GetComponent<MeshComponent>()->Materials->SetMaterial(0, greenMat);
 }
 
 Entity Scene::CreateChildEntity(Entity parent, std::string name) {
@@ -55,7 +94,7 @@ Entity Scene::TryGetEntityWithUUID(UUID id) const {
 }
 
 void Scene::OnUpdate() {
-	ScanKeyPress();
+  ScanKeyPress();
 }
 
 void Scene::OnRender(Ref<SceneRenderer> renderer) {
@@ -71,9 +110,13 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
     Ref<MeshSource> meshSource = Rain::ResourceManager::GetMeshSource(meshComponent.MeshSourceId);
     glm::mat4 entityTransform = GetWorldSpaceTransformMatrix(e);
 
-    renderer->SubmitMesh(meshSource, meshComponent.SubMeshId, meshComponent.MaterialId, entityTransform);
+    renderer->SubmitMesh(meshSource, meshComponent.SubMeshId, meshComponent.Materials, entityTransform);
   });
 
+  static flecs::query<TransformComponent, DirectionalLightComponent> lightsQuery = m_World.query<TransformComponent, DirectionalLightComponent>();
+  lightsQuery.each([&](flecs::entity entity, TransformComponent& transform, DirectionalLightComponent& directionalLight) {
+    SceneLightInfo.LightPos = transform.Translation;
+  });
   renderer->EndScene();
 }
 
@@ -134,5 +177,5 @@ void Scene::OnMouseMove(double xPos, double yPos) {
 
   glm::vec2 cursorPos = Cursor::GetCursorPosition();
   m_SceneCamera->ProcessMouseMovement(cursorPos.x - prevCursorPos.x, cursorPos.y - prevCursorPos.y);
-	prevCursorPos = cursorPos;
+  prevCursorPos = cursorPos;
 }

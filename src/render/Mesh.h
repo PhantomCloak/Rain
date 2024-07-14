@@ -47,7 +47,8 @@ class MeshSource {
 
   std::string m_Path;
   std::string m_Directory;
-  std::vector<Ref<Material>> m_Materials;
+  //std::vector<Ref<Material>> m_Materials;
+	Ref<MaterialTable> Materials;
 
   MeshSource(const std::vector<glm::vec3>& vertices, const std::vector<glm::vec3>& indices);
   MeshSource(std::string path);

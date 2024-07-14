@@ -1,5 +1,4 @@
 #pragma once
-#include "Cam.h"
 #include "Scene.h"
 #include "render/Pipeline.h"
 #include "render/RenderPass.h"
@@ -46,7 +45,7 @@ struct MeshKey {
 struct DrawCommand {
   Ref<MeshSource> Mesh;
   uint32_t SubmeshIndex;
-  uint32_t MaterialIndex;
+  Ref<MaterialTable> Materials;
 
   uint32_t InstanceCount = 0;
   uint32_t InstanceOffset = 0;
@@ -83,7 +82,7 @@ class SceneRenderer {
       : m_ShaderManager(CreateRef<ShaderManager>()) { instance = this; };
 
   void Init();
-  void SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, uint32_t materialIndex, glm::mat4& transform);
+  void SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform);
   void BeginScene(const SceneCamera& camera);
   void EndScene();
   void SetScene(Scene* scene);

@@ -28,7 +28,10 @@ namespace Rain {
     static std::shared_ptr<spdlog::logger> GetClientLogger() { return s_ClientLogger; }
 
     template <typename... Args>
-    static void PrintMessage(Log::Type type, Log::Level level, std::string_view tag, Args&&... args);
+    static void PrintMessage(Log::Type type, std::string_view tag, Args&&... args) {
+      auto logger = (type == Log::Type::Core) ? GetCoreLogger() : GetClientLogger();
+      logger->info("{0}: {1}", tag, fmt::format(std::forward<Args>(args)...));
+    }
 
     template <typename... Args>
     static void PrintAssertMessage(Log::Type type, std::string_view prefix, Args&&... args);
@@ -49,5 +52,8 @@ namespace Rain {
     auto logger = (type == Log::Type::Core) ? GetCoreLogger() : GetClientLogger();
     logger->error("{0}", prefix);
   }
+
+#define RN_LOG(...) ::Rain::Log::PrintMessage(::Rain::Log::Type::Core, "STATUS: ", __VA_ARGS__)
+#define RN_LOG_ERR(...) ::Rain::Log::PrintMessage(::Rain::Log::Type::Core, "ERROR: ", __VA_ARGS__)
 
 }  // namespace Rain

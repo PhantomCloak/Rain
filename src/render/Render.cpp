@@ -1,9 +1,11 @@
 #include "Render.h"
 #include "Mesh.h"
+#include "ResourceManager.h"
 #include "core/Assert.h"
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
+#include "platform/web/web_window.h"
 #else
 #include <dawn/dawn_proc.h>
 #endif
@@ -14,6 +16,13 @@ struct WGPURendererData {
   Ref<GPUBuffer> QuadVertexBuffer;
   Ref<GPUBuffer> QuadIndexBuffer;
 };
+
+struct ShaderDependencies {
+  std::vector<Ref<RenderPipeline>> Pipelines;
+  std::vector<Ref<Material>> Materials;
+};
+
+static ShaderDependencies s_ShaderDependencies;
 
 static WGPURendererData* s_Data = nullptr;
 
@@ -276,6 +285,18 @@ WGPUSwapChain Render::BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDev
   return wgpuDeviceCreateSwapChain(m_device, surface, &m_swapChainDesc);
 }
 
+Ref<Texture> Render::GetWhiteTexture() {
+  static auto whiteTexture = Rain::ResourceManager::GetTexture("T_Default");
+  RN_ASSERT(whiteTexture->View != 0, "Material: Default texture couldn't found.");
+  return whiteTexture;
+}
+
+Ref<Sampler> Render::GetDefaultSampler() {
+  static auto sampler = Sampler::Create(Sampler::GetDefaultProps("S_DefaultSampler"));
+  RN_ASSERT(sampler != 0, "Material: Default sampler couldn't found.");
+  return sampler;
+}
+
 WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder) {
   auto& pipe = pass->GetProps().Pipeline;
 
@@ -341,7 +362,7 @@ void Render::RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
                         WGPURenderPipeline pipeline,
                         Ref<MeshSource> mesh,
                         uint32_t submeshIndex,
-                        Ref<Material> material,
+                        Ref<MaterialTable> materialTable,
                         Ref<GPUBuffer> transformBuffer,
                         uint32_t transformOffset,
                         uint32_t instanceCount) {
@@ -364,11 +385,11 @@ void Render::RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
                                        transformBuffer->Buffer,
                                        transformOffset,
                                        transformBuffer->Size - transformOffset);
-  if (material) {
-    wgpuRenderPassEncoderSetBindGroup(renderCommandBuffer, 1, material->bindingManager->GetBindGroup(1), 0, 0);
-  }
 
-  auto& subMesh = mesh->m_SubMeshes[submeshIndex];
+  const auto& subMesh = mesh->m_SubMeshes[submeshIndex];
+  auto material = materialTable->HasMaterial(subMesh.MaterialIndex) ? materialTable->GetMaterial(subMesh.MaterialIndex) : mesh->Materials->GetMaterial(subMesh.MaterialIndex);
+  wgpuRenderPassEncoderSetBindGroup(renderCommandBuffer, 1, material->GetBinding(1), 0, 0);
+
   wgpuRenderPassEncoderDrawIndexed(renderCommandBuffer, subMesh.IndexCount, instanceCount, subMesh.BaseIndex, subMesh.BaseVertex, 0);
 }
 
@@ -387,6 +408,9 @@ void Render::SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WG
                                       0,
                                       s_Data->QuadIndexBuffer->Size);
   wgpuRenderPassEncoderDrawIndexed(renderCommandBuffer, 6, 1, 0, 0, 0);
+}
+
+void Render::AddShaderDependency(Ref<Shader> shader, Ref<Material> material) {
 }
 
 Ref<Texture> Render::GetCurrentSwapChainTexture() {

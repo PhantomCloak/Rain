@@ -3,7 +3,6 @@
 #include "render/GPUAllocator.h"
 #include "render/Pipeline.h"
 #include "render/Sampler.h"
-#include "render/Shader.h"
 #include "render/Texture.h"
 
 struct RenderPassProps {
