@@ -84,7 +84,7 @@ MeshSource::MeshSource(std::string path) {
       materialProps.ambientColor = color != colorEmpty ? glm::vec3(color.r, color.g, color.b) : glm::vec3(0.1);
     }
 
-    if (aiMat->Get(AI_MATKEY_COLOR_SPECULAR, color) == AI_SUCCESS) {
+    if (aiMat->Get(AI_MATKEY_COLOR_DIFFUSE, color) == AI_SUCCESS) {
       materialProps.diffuseColor = glm::vec3(color.r, color.g, color.b);
     }
 
