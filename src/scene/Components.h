@@ -30,7 +30,7 @@ struct TransformComponent {
 
   glm::mat4 GetTransform() const {
     glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), Translation);
-    glm::mat4 rotationMatrix = glm::eulerAngleYXZ(RotationEuler.y, RotationEuler.x, RotationEuler.z);
+    glm::mat4 rotationMatrix = glm::eulerAngleYXZ(glm::radians(RotationEuler.y), glm::radians(RotationEuler.x), glm::radians(RotationEuler.z));
     glm::mat4 scaleMatrix = glm::scale(glm::mat4(1.0f), Scale);
     return translationMatrix * rotationMatrix * scaleMatrix;
   }
