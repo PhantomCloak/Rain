@@ -1,109 +1,71 @@
 #include "ResourceManager.h"
-#include <fstream>
+#include <stb_image.h>
+#include <stb_image_resize2.h>
 #include <iostream>
 #include <vector>
-#include "../stb_image.h"
 #include "core/Assert.h"
 #include "render/RenderContext.h"
 
-
 std::unordered_map<std::string, std::shared_ptr<Texture>> Rain::ResourceManager::_loadedTextures;
-//std::unordered_map<std::string, std::shared_ptr<WGPUShaderModule>> Rain::ResourceManager::_loadedShaders;
 std::unordered_map<AssetHandle, Ref<MeshSource>> Rain::ResourceManager::m_LoadedMeshSources;
-
-static UUID nextUUID = 0;
-
-//WGPUShaderModule loadShaderModule(const std::string& path, WGPUDevice m_device) {
-//  std::cout << "SSS: " << path;
-//  std::ifstream file(path);
-//  if (!file.is_open()) {
-//    std::cerr << "Error opening file '" << path << "': ";
-//    std::cerr << strerror(errno) << std::endl;
-//    return nullptr;
-//  }
-//  file.seekg(0, std::ios::end);
-//  size_t size = file.tellg();
-//  std::string shaderSource(size, ' ');
-//  file.seekg(0);
-//  file.read(shaderSource.data(), size);
-//
-//  std::cout << "shader src: " << shaderSource.c_str();
-//  WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
-//  shaderCodeDesc.chain.next = nullptr;
-//  shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-//  shaderCodeDesc.code = shaderSource.c_str();
-//  WGPUShaderModuleDescriptor shaderDesc;
-//  shaderDesc.nextInChain = &shaderCodeDesc.chain;
-//
-//  return wgpuDeviceCreateShaderModule(m_device, &shaderDesc);
-//}
 
 void writeMipMaps(
     WGPUDevice m_device,
     WGPUTexture m_texture,
     WGPUExtent3D textureSize,
-    uint32_t mipLevelCount,
-    const unsigned char* pixelData) {
-  WGPUQueue m_queue = wgpuDeviceGetQueue(m_device);
+    uint32_t mipLevelCount,	
+    const unsigned char* pixelData,
+		WGPUOrigin3D targetOrigin = {0, 0, 0}) {
+  auto m_queue = wgpuDeviceGetQueue(m_device);
 
-  // Arguments telling which part of the texture we upload to
-  WGPUImageCopyTexture destination = {};
-  destination.texture = m_texture;
-  destination.origin = {0, 0, 0};
-  destination.aspect = WGPUTextureAspect_All;
+  WGPUImageCopyTexture destination = {
+      .texture = m_texture,
+      .mipLevel = 0,
+      .origin = targetOrigin,
+      .aspect = WGPUTextureAspect_All};
 
-  // Arguments telling how the pixel memory is laid out
-  WGPUTextureDataLayout source = {};
-  source.offset = 0;
+  WGPUTextureDataLayout currentTextureLayout = {
+      .offset = 0,
+      .bytesPerRow = 4 * textureSize.width,
+      .rowsPerImage = textureSize.height};
 
-  WGPUExtent3D mipLevelSize = textureSize;
-  std::vector<unsigned char> previousLevelPixels;
-  WGPUExtent3D previousMipLevelSize;
-  for (uint32_t level = 0; level < mipLevelCount; ++level) {
-    std::vector<unsigned char> pixels(4 * mipLevelSize.width * mipLevelSize.height);
-    if (level == 0) {
-      std::memcpy(pixels.data(), pixelData, pixels.size());
-    } else {
-      for (uint32_t i = 0; i < mipLevelSize.width; ++i) {
-        for (uint32_t j = 0; j < mipLevelSize.height; ++j) {
-          unsigned char* p = &pixels[4 * (j * mipLevelSize.width + i)];
-          unsigned char* p00 = &previousLevelPixels[4 * ((2 * j + 0) * previousMipLevelSize.width + (2 * i + 0))];
-          unsigned char* p01 = &previousLevelPixels[4 * ((2 * j + 0) * previousMipLevelSize.width + (2 * i + 1))];
-          unsigned char* p10 = &previousLevelPixels[4 * ((2 * j + 1) * previousMipLevelSize.width + (2 * i + 0))];
-          unsigned char* p11 = &previousLevelPixels[4 * ((2 * j + 1) * previousMipLevelSize.width + (2 * i + 1))];
-          p[0] = (p00[0] + p01[0] + p10[0] + p11[0]) / 4;
-          p[1] = (p00[1] + p01[1] + p10[1] + p11[1]) / 4;
-          p[2] = (p00[2] + p01[2] + p10[2] + p11[2]) / 4;
-          p[3] = (p00[3] + p01[3] + p10[3] + p11[3]) / 4;
-        }
-      }
-    }
+  auto origSize = (4 * textureSize.width * textureSize.height);
+  wgpuQueueWriteTexture(m_queue, &destination, pixelData, origSize, &currentTextureLayout, &textureSize);
 
+  std::vector<unsigned char> prevPixelBuffer(origSize);
+  std::memcpy(prevPixelBuffer.data(), pixelData, origSize);
+
+  WGPUExtent3D currentWriteInfo = textureSize;
+  int prevWidth = textureSize.width, prevHeight = textureSize.height;
+
+  for (uint32_t level = 1; level < mipLevelCount; level++) {
+    currentWriteInfo.width = currentWriteInfo.width > 1 ? currentWriteInfo.width / 2 : 1;
+    currentWriteInfo.height = currentWriteInfo.height > 1 ? currentWriteInfo.height / 2 : 1;
+    std::vector<unsigned char> buffer(4 * currentWriteInfo.width * currentWriteInfo.height);
+
+    stbir_resize_uint8_linear(prevPixelBuffer.data(),
+                              prevWidth,
+                              prevHeight,
+                              0,
+                              buffer.data(),
+                              currentWriteInfo.width,
+                              currentWriteInfo.height,
+                              0,
+                              STBIR_RGBA);
+
+    currentTextureLayout.bytesPerRow = 4 * currentWriteInfo.width;
+    currentTextureLayout.rowsPerImage = currentWriteInfo.height;
     destination.mipLevel = level;
-    source.bytesPerRow = 4 * mipLevelSize.width;
-    source.rowsPerImage = mipLevelSize.height;
-    wgpuQueueWriteTexture(m_queue, &destination, pixels.data(), pixels.size(), &source, &mipLevelSize);
 
-    previousLevelPixels = std::move(pixels);
-    previousMipLevelSize = mipLevelSize;
-    mipLevelSize.width = mipLevelSize.width > 1 ? mipLevelSize.width / 2 : 1;
-    mipLevelSize.height = mipLevelSize.height > 1 ? mipLevelSize.height / 2 : 1;
+    wgpuQueueWriteTexture(m_queue, &destination, buffer.data(), buffer.size(), &currentTextureLayout, &currentWriteInfo);
+
+    prevWidth = currentWriteInfo.width;
+    prevHeight = currentWriteInfo.height;
+
+    prevPixelBuffer = std::move(buffer);
   }
 
   wgpuQueueRelease(m_queue);
-}
-
-// Equivalent of std::bit_width that is available from C++20 onward
-static uint32_t bit_width(uint32_t m) {
-  if (m == 0) {
-    return 0;
-  } else {
-    uint32_t w = 0;
-    while (m >>= 1) {
-      ++w;
-    }
-    return w;
-  }
 }
 
 WGPUTexture loadTexture(const char* path, WGPUDevice m_device, WGPUTextureView* pTextureView) {
@@ -120,15 +82,12 @@ WGPUTexture loadTexture(const char* path, WGPUDevice m_device, WGPUTextureView* 
   textureDesc.size.width = (uint32_t)width;
   textureDesc.size.height = (uint32_t)height;
   textureDesc.size.depthOrArrayLayers = 1;
-  textureDesc.mipLevelCount = bit_width(std::max(textureDesc.size.width, textureDesc.size.height));  // Implement bit_width
-  //textureDesc.mipLevelCount = 1;  // Implement bit_width
+  textureDesc.mipLevelCount = (uint32_t)(floor((float)(log2(glm::max(width, height))))) + 1;  // can be replaced with bit_width in C++ 20
   textureDesc.sampleCount = 1;
   textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
 
   WGPUTexture m_texture = wgpuDeviceCreateTexture(m_device, &textureDesc);
 
-  // Upload Data to Texture
-  // Note: Implement writeMipMaps function compatible with Dawn's C API
   writeMipMaps(m_device, m_texture, textureDesc.size, textureDesc.mipLevelCount, pixelData);
 
   // Free image data
@@ -151,13 +110,10 @@ WGPUTexture loadTexture(const char* path, WGPUDevice m_device, WGPUTextureView* 
   return m_texture;
 }
 
-//void Rain::ResourceManager::Init(std::shared_ptr<WGPUDevice> device) {
-  //m_device = device;
-//}
-
 bool Rain::ResourceManager::IsTextureExist(std::string id) {
-	return _loadedTextures.find(id) != _loadedTextures.end();
+  return _loadedTextures.find(id) != _loadedTextures.end();
 }
+
 std::shared_ptr<Texture> Rain::ResourceManager::LoadTexture(std::string id, std::string path) {
   auto tex = std::make_shared<Texture>();
   tex->Buffer = loadTexture(path.c_str(), RenderContext::GetDevice(), &tex->View);
@@ -182,27 +138,64 @@ std::shared_ptr<Texture> Rain::ResourceManager::GetTexture(std::string id) {
 }
 
 Ref<MeshSource> Rain::ResourceManager::GetMeshSource(UUID handle) {
-	RN_ASSERT(m_LoadedMeshSources.find(handle) != m_LoadedMeshSources.end());
-	return m_LoadedMeshSources[handle];
+  RN_ASSERT(m_LoadedMeshSources.find(handle) != m_LoadedMeshSources.end());
+  return m_LoadedMeshSources[handle];
 }
 
 Ref<MeshSource> Rain::ResourceManager::LoadMeshSource(std::string path) {
-	Ref<MeshSource> meshSource = CreateRef<MeshSource>(path);
-	m_LoadedMeshSources[meshSource->Id] = meshSource;
-	return meshSource;
+  Ref<MeshSource> meshSource = CreateRef<MeshSource>(path);
+  m_LoadedMeshSources[meshSource->Id] = meshSource;
+  return meshSource;
 }
 
-//std::shared_ptr<WGPUShaderModule> Rain::ResourceManager::GetShader(std::string id) {
-//  if (_loadedShaders.find(id) != _loadedShaders.end()) {
-//    std::cout << "GetShader for id " << id << " does not exist" << std::endl;
-//    return nullptr;
-//  }
-//
-//  std::shared_ptr<WGPUShaderModule>& shader = _loadedShaders[id];
-//
-//  if (!shader) {
-//    std::cout << "Shader is invalid" << std::endl;
-//  }
-//
-//  return shader;
-//}
+std::shared_ptr<Texture> Rain::ResourceManager::LoadCubeTexture(std::string id, const std::string (&paths)[6]) {
+  WGPUExtent3D cubemapSize = {0, 0, (uint32_t)paths->size()};
+  std::array<uint8_t*, 6> pixelData;
+
+  for (uint32_t layer = 0; layer < 6; ++layer) {
+    int width, height, channels;
+    pixelData[layer] = stbi_load(paths[layer].c_str(), &width, &height, &channels, 4);
+
+    RN_ASSERT(pixelData[layer] != nullptr, "Cubemap texture couldn't found at {}!", paths[layer]);
+
+    if (layer == 0) {
+      cubemapSize.width = (uint32_t)width;
+      cubemapSize.height = (uint32_t)height;
+    } else {
+      RN_ASSERT(cubemapSize.width == (uint32_t)width && cubemapSize.height == (uint32_t)height, "All cubemap texture faces should be in the same size.", paths[layer]);
+    }
+  }
+
+	WGPUTextureDescriptor textureDesc;
+  textureDesc.dimension = WGPUTextureDimension_2D;
+  textureDesc.format = WGPUTextureFormat_BGRA8Unorm;
+  textureDesc.size = cubemapSize;
+  textureDesc.mipLevelCount = (uint32_t)(floor((float)(log2(glm::max(textureDesc.size.width, textureDesc.size.height))))) + 1;  // can be replaced with bit_width in C++ 20
+  textureDesc.sampleCount = 1;
+  textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+  textureDesc.viewFormatCount = 0;
+  textureDesc.viewFormats = nullptr;
+  WGPUTexture texture = wgpuDeviceCreateTexture(RenderContext::GetDevice(), &textureDesc);
+
+  WGPUExtent3D cubemapLayerSize = {cubemapSize.width, cubemapSize.height, 1};
+  for (uint32_t layer = 0; layer < 6; ++layer) {
+    WGPUOrigin3D origin = {0, 0, layer};
+		writeMipMaps(RenderContext::GetDevice(), texture, cubemapLayerSize, textureDesc.mipLevelCount, pixelData[layer], origin);
+    stbi_image_free(pixelData[layer]);
+  }
+
+	auto tex = std::make_shared<Texture>();
+	tex->Buffer = texture;
+
+	WGPUTextureViewDescriptor textureViewDesc;
+	textureViewDesc.aspect = WGPUTextureAspect_All;
+	textureViewDesc.baseArrayLayer = 0;
+	textureViewDesc.arrayLayerCount = 6;
+	textureViewDesc.baseMipLevel = 0;
+	textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
+	textureViewDesc.dimension = WGPUTextureViewDimension_Cube;
+	textureViewDesc.format = textureDesc.format;
+	tex->View = wgpuTextureCreateView(texture, &textureViewDesc);
+
+  return tex;
+}

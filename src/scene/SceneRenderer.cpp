@@ -8,61 +8,6 @@
 
 SceneRenderer* SceneRenderer::instance;
 
-void drawImgui(WGPURenderPassEncoder renderPass) {
-  ImGui_ImplWGPU_NewFrame();
-  ImGui_ImplGlfw_NewFrame();
-  ImGui::NewFrame();
-
-  ImGui::Begin("Scene Settings");
-
-  ImGuiIO& io = ImGui::GetIO();
-  ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-
-  ImGui::Spacing();
-
-  // physx::PxU32 version = PX_PHYSICS_VERSION;
-  // physx::PxU32 major = (version >> 24) & 0xFF;
-  // physx::PxU32 minor = (version >> 16) & 0xFF;
-  // physx::PxU32 bugfix = (version >> 8) & 0xFF;
-
-  // ImGui::Text("PhysX Version: %d.%d.%d", major, minor, bugfix);
-
-  ImGui::Spacing();
-
-  ImGui::Spacing();
-  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
-  ImGui::Text("PRESS F TO SHOOT'EM UP");
-  ImGui::PopStyleColor();
-  ImGui::Spacing();
-  ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.0f, 1.0f));
-  ImGui::Text("PRESS ESC TO UNLOCK MOUSE");
-  ImGui::PopStyleColor();
-
-  ImGui::End();
-
-#ifdef RN_DEBUG
-  ImGui::Begin("Statistics");
-  ImGui::Text("Render pass duration on GPU: %s", m_perf.summary().c_str());
-  // ImGui::Text("Physics simulation duration %.3f ms", simElapsed);
-  ImGui::End();
-#endif
-
-  if (ImGui::BeginMainMenuBar()) {
-    if (ImGui::BeginMenu("File")) {
-      if (ImGui::MenuItem("Save Map")) {
-      }
-      if (ImGui::MenuItem("Load Map")) {
-      }
-      ImGui::EndMenu();
-    }
-  }
-  ImGui::EndMainMenuBar();
-
-  ImGui::EndFrame();
-  ImGui::Render();
-  ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPass);
-}
-
 glm::mat4 GetViewMatrix(glm::vec3 pos, glm::vec3 rot) {
   glm::vec3 shadowCameraPos = pos;
   glm::vec3 shadowCameraRot = rot;
@@ -86,9 +31,9 @@ glm::mat4 GetViewMatrix(glm::vec3 pos, glm::vec3 rot) {
 
 void SceneRenderer::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform) {
   const auto& submesh = meshSource->m_SubMeshes[submeshIndex];
-	const auto materialHandle = materialTable->HasMaterial(submesh.MaterialIndex) ? materialTable->GetMaterial(submesh.MaterialIndex) : meshSource->Materials->GetMaterial(submesh.MaterialIndex);
+  const auto materialHandle = materialTable->HasMaterial(submesh.MaterialIndex) ? materialTable->GetMaterial(submesh.MaterialIndex) : meshSource->Materials->GetMaterial(submesh.MaterialIndex);
 
-	MeshKey meshKey = {meshSource->Id, materialHandle->Id, submeshIndex};
+  MeshKey meshKey = {meshSource->Id, materialHandle->Id, submeshIndex};
 
   auto& transformStorage = m_MeshTransformMap[meshKey].Transforms.emplace_back();
 
@@ -125,31 +70,6 @@ void SceneRenderer::Init() {
       {6, ShaderDataType::Float4, "a_MRow2", 32}}};
 
   // clang-format on
-
-  GroupLayout sceneGroup = {
-      {0, GroupLayoutVisibility::Both, GroupLayoutType::Uniform}};
-
-  GroupLayout materialGroup = {
-      {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
-      {1, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler},
-      {2, GroupLayoutVisibility::Both, GroupLayoutType::Uniform}};
-
-  GroupLayout shadowGroup = {
-      {0, GroupLayoutVisibility::Fragment, GroupLayoutType::TextureDepth},
-      {1, GroupLayoutVisibility::Fragment, GroupLayoutType::SamplerCompare}};
-
-  GroupLayout ppfxGroup = {
-      {0, GroupLayoutVisibility::Fragment, GroupLayoutType::Texture},
-      {1, GroupLayoutVisibility::Fragment, GroupLayoutType::Sampler}};
-
-  static std::map<int, GroupLayout> groupLayouts, groupLayoutsShadow, groupLayoutsDebug, groupLayoutPpfx;
-
-  groupLayouts.insert({0, sceneGroup});
-  groupLayouts.insert({1, materialGroup});
-  groupLayouts.insert({2, shadowGroup});
-
-  groupLayoutsShadow.insert({0, sceneGroup});
-  groupLayoutPpfx.insert({0, ppfxGroup});
 
   auto defaultShader = m_ShaderManager->LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/default.wgsl");
   auto shadowShader = m_ShaderManager->LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
@@ -188,8 +108,7 @@ void SceneRenderer::Init() {
       .FragmentShader = shadowShader,
       .ColorFormat = TextureFormat::Undefined,
       .DepthFormat = TextureFormat::Depth,
-      .TargetDepthBuffer = m_ShadowDepthTexture,
-      .groupLayout = groupLayoutsShadow};
+      .TargetDepthBuffer = m_ShadowDepthTexture};
 
   RenderPipelineProps litPipeProps = {
       .VertexLayout = vertexLayout,
@@ -199,9 +118,9 @@ void SceneRenderer::Init() {
       .FragmentShader = defaultShader,
       .ColorFormat = TextureFormat::RGBA,
       .DepthFormat = TextureFormat::Depth,
-      .TargetFrameBuffer = m_LitPassTexture,
-      .TargetDepthBuffer = m_LitDepthTexture,
-      .groupLayout = groupLayouts};
+      .TargetDepthBuffer = m_LitDepthTexture};
+  //.TargetFrameBuffer = m_LitPassTexture,
+  //.TargetDepthBuffer = m_LitDepthTexture};
 
   RenderPipelineProps ppfxPipeProps = {
       .VertexLayout = vertexLayoutQuad,
@@ -210,8 +129,7 @@ void SceneRenderer::Init() {
       .VertexShader = ppfxShader,
       .FragmentShader = ppfxShader,
       .ColorFormat = TextureFormat::RGBA,
-      .DepthFormat = TextureFormat::Undefined,
-      .groupLayout = groupLayoutPpfx};
+      .DepthFormat = TextureFormat::Undefined};
 
   m_LitPipeline = RenderPipeline::Create("RP_Lit", litPipeProps);
   m_ShadowPipeline = RenderPipeline::Create("RP_Shadow", shadowPipeProps);
@@ -243,33 +161,33 @@ void SceneRenderer::Init() {
 
   m_LitPass = RenderPass::Create(propLitPass);
   m_LitPass->Set("u_scene", m_SceneUniformBuffer);
-  m_LitPass->Set("shadowMap", m_ShadowPass->GetDepthOutput());
-  m_LitPass->Set("shadowSampler", m_ShadowSampler);
+  // m_LitPass->Set("shadowMap", m_ShadowPass->GetDepthOutput());
+  // m_LitPass->Set("shadowSampler", m_ShadowSampler);
   m_LitPass->Bake();
 
   RenderPassProps propPpfxPass;
   propPpfxPass.DebugName = "PpfxPass";
   propPpfxPass.Pipeline = m_PpfxPipeline;
 
-  m_PpfxPass = RenderPass::Create(propPpfxPass);
-  m_PpfxPass->Set("renderTexture", m_LitPass->GetOutput(0));
-  m_PpfxPass->Set("textureSampler", m_PpfxSampler);
-  m_PpfxPass->Bake();
+  // m_PpfxPass = RenderPass::Create(propPpfxPass);
+  // m_PpfxPass->Set("renderTexture", m_LitPass->GetOutput(0));
+  // m_PpfxPass->Set("textureSampler", m_PpfxSampler);
+  // m_PpfxPass->Bake();
 
   auto renderContext = Render::Instance->GetRenderContext();
 
-  // IMGUI_CHECKVERSION();
-  // ImGui::CreateContext();
-  // ImGui::GetIO();
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGui::GetIO();
 
-  // ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
+  ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
 
-  // ImGui_ImplWGPU_InitInfo initInfo;
-  // initInfo.Device = RenderContext::GetDevice();
-  //// initInfo.RenderTargetFormat = render->m_swapChainFormat;
-  // initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
-  // initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
-  // ImGui_ImplWGPU_Init(&initInfo);
+  ImGui_ImplWGPU_InitInfo initInfo;
+  initInfo.Device = RenderContext::GetDevice();
+  // initInfo.RenderTargetFormat = render->m_swapChainFormat;
+  initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
+  initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
+  ImGui_ImplWGPU_Init(&initInfo);
 }
 
 void SceneRenderer::PreRender() {
@@ -293,10 +211,19 @@ void SceneRenderer::SetScene(Scene* scene) {
 }
 
 void SceneRenderer::BeginScene(const SceneCamera& camera) {
+  const glm::mat4 viewInverse = glm::inverse(camera.ViewMatrix);
+  const glm::vec3 cameraPosition = viewInverse[3];
+
   m_SceneUniform.viewProjection = camera.Projection * camera.ViewMatrix;
   m_SceneUniform.cameraViewMatrix = camera.ViewMatrix;
-  m_SceneUniform.lightPos = m_Scene->SceneLightInfo.LightPos;
+  m_SceneUniform.LightPosition = m_Scene->SceneLightInfo.LightPos;
+  m_SceneUniform.CameraPosition = cameraPosition;
+
   m_SceneUniformBuffer->SetData(&m_SceneUniform, sizeof(SceneUniform));
+
+  ImGui_ImplWGPU_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
 }
 
 void SceneRenderer::FlushDrawList() {
@@ -305,21 +232,22 @@ void SceneRenderer::FlushDrawList() {
 
   auto commandEncoder = wgpuDeviceCreateCommandEncoder(renderContext->GetDevice(), &commandEncoderDesc);
 
-  auto shadowPassEncoder = Render::BeginRenderPass(m_ShadowPass, commandEncoder);
-  for (auto& [mk, dc] : m_DrawList) {
-    Render::Instance->RenderMesh(shadowPassEncoder, m_ShadowPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
-  }
-  Render::EndRenderPass(m_ShadowPass, shadowPassEncoder);
+  // auto shadowPassEncoder = Render::BeginRenderPass(m_ShadowPass, commandEncoder);
+  // for (auto& [mk, dc] : m_DrawList) {
+  //   Render::Instance->RenderMesh(shadowPassEncoder, m_ShadowPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+  // }
+  // Render::EndRenderPass(m_ShadowPass, shadowPassEncoder);
 
   auto litPassEncoder = Render::BeginRenderPass(m_LitPass, commandEncoder);
   for (auto& [mk, dc] : m_DrawList) {
     Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
   }
+  ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
   Render::EndRenderPass(m_LitPass, litPassEncoder);
 
-  auto ppfxPassEncoder = Render::BeginRenderPass(m_PpfxPass, commandEncoder);
-  Render::Instance->SubmitFullscreenQuad(ppfxPassEncoder, m_PpfxPipeline->GetPipeline());
-  Render::EndRenderPass(m_PpfxPass, ppfxPassEncoder);
+  // auto ppfxPassEncoder = Render::BeginRenderPass(m_PpfxPass, commandEncoder);
+  // Render::Instance->SubmitFullscreenQuad(ppfxPassEncoder, m_PpfxPipeline->GetPipeline());
+  // Render::EndRenderPass(m_PpfxPass, ppfxPassEncoder);
 
   WGPUCommandBufferDescriptor cmdBufferDescriptor = {.label = "Command Buffer"};
   WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(commandEncoder, &cmdBufferDescriptor);
@@ -339,6 +267,8 @@ void SceneRenderer::FlushDrawList() {
 }
 
 void SceneRenderer::EndScene() {
+  ImGui::EndFrame();
+  ImGui::Render();
   PreRender();
   FlushDrawList();
 }

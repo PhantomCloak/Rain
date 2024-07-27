@@ -72,8 +72,10 @@ struct SceneUniform {
   glm::mat4x4 viewProjection;
   glm::mat4x4 shadowViewProjection;
   glm::mat4x4 cameraViewMatrix;
-  glm::vec3 lightPos;
-  float _pad;
+  glm::vec3 CameraPosition;
+	float _pad0;
+	glm::vec3 LightPosition;
+	float _pad1;
 };
 
 class SceneRenderer {

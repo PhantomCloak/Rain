@@ -2,19 +2,10 @@
 #include "render/Render.h"
 
 struct MaterialUniform {
-  glm::vec3 ambientColor;
-  float _pad0 = 0.0;
-  glm::vec3 diffuseColor;
-  float _pad1 = 0.0;
-  glm::vec3 specularColor;
-  float shininess;
-
-  MaterialUniform() {
-    ambientColor = glm::vec3(0);
-    diffuseColor = glm::vec3(0);
-    specularColor = glm::vec3(0);
-    shininess = -1;
-  }
+  float Metallic;  // at byte offset 0
+  float Rougness;  // at byte offset 4
+  float Ao;        // at byte offset 8
+  float _pad0;
 };
 
 Material::Material(const std::string& name, Ref<Shader> shader)
@@ -69,10 +60,9 @@ void Material::Set(const std::string& name, Ref<Sampler> sampler) {
 
 void Material::Set(const std::string& name, const MaterialProperties& props) {
   MaterialUniform un;
-  un.ambientColor = props.ambientColor,
-  un.diffuseColor = props.diffuseColor,
-  un.specularColor = props.specularColor,
-  un.shininess = props.shininess;
+  un.Metallic = props.Metallic,
+  un.Rougness = props.Roughness,
+  un.Ao = props.Ao,
 
   m_UBMaterial->SetData(&un, sizeof(MaterialUniform));
   m_BindManager->Set(name, m_UBMaterial);

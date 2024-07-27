@@ -50,6 +50,7 @@ class Entity {
   }
 
   Entity GetParent() const;
+  UUID GetChild(int index) { return Children()[index]; }
 
   bool RemoveChild(Entity child) {
     UUID childId = child.GetUUID();

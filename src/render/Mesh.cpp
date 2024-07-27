@@ -1,6 +1,8 @@
 #include "Mesh.h"
+#include <glm/gtx/matrix_decompose.hpp>
 #include <iostream>
 #include "ResourceManager.h"
+#include "core/KeyCode.h"
 #include "io/filesystem.h"
 #include "render/ShaderManager.h"
 
@@ -58,19 +60,20 @@ MeshSource::MeshSource(std::string path) {
 
   std::string fileName = FileSys::GetFileName(path);
   std::string fileDirectory = FileSys::GetParentDirectory(path);
-	Materials = CreateRef<MaterialTable>();
+  Materials = CreateRef<MaterialTable>();
 
   m_VertexBuffer = GPUAllocator::GAlloc("v_buffer_" + fileName, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex, (verticesCount * sizeof(VertexAttribute) + 3) & ~3);
   m_IndexBuffer = GPUAllocator::GAlloc("i_buffer_" + fileName, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index, (indexCount * sizeof(unsigned int) + 3) & ~3);
 
   aiColor3D colorEmpty = {0, 0, 0};
-  //m_Materials.resize(scene->mNumMaterials);
+  // m_Materials.resize(scene->mNumMaterials);
 
   for (int i = 0; i < scene->mNumMaterials; i++) {
     aiMaterial* aiMat = scene->mMaterials[i];
 
     aiColor3D color;
-    float shininess;
+		ai_real metallicFactor = 0.1f;
+		ai_real roughnessFactor = 0.1f;
     aiReturn result = AI_FAILURE;
 
     std::string aiMatName(aiMat->GetName().C_Str());
@@ -80,21 +83,21 @@ MeshSource::MeshSource(std::string path) {
     auto materialProps = MaterialProperties();
     auto material = Material::CreateMaterial(aiMatName, defaultShader);
 
-    if (aiMat->Get(AI_MATKEY_COLOR_AMBIENT, aiMat) == AI_SUCCESS) {
-      materialProps.ambientColor = color != colorEmpty ? glm::vec3(color.r, color.g, color.b) : glm::vec3(0.1);
-    }
+    //if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR,  metallicFactor) == AI_SUCCESS) {
+		//	materialProps.Metallic = metallicFactor;
+    //}
 
-    if (aiMat->Get(AI_MATKEY_COLOR_DIFFUSE, color) == AI_SUCCESS) {
-      materialProps.diffuseColor = glm::vec3(color.r, color.g, color.b);
-    }
+    //if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) == AI_SUCCESS) {
+		//	materialProps.Roughness = roughnessFactor;
+    //}
 
-    if (aiMat->Get(AI_MATKEY_COLOR_SPECULAR, color) == AI_SUCCESS) {
-      materialProps.specularColor = glm::vec3(color.r, color.g, color.b);
-    }
+    //if (aiMat->Get(AI_MATKEY_COLOR_SPECULAR, color) == AI_SUCCESS) {
+    //  //materialProps.specularColor = glm::vec3(color.r, color.g, color.b);
+    //}
 
-    if (aiMat->Get(AI_MATKEY_SHININESS, shininess) == AI_SUCCESS) {
-      materialProps.shininess = (shininess / 10.0f) * 128.0f;
-    }
+    //if (aiMat->Get(AI_MATKEY_SHININESS, shininess) == AI_SUCCESS) {
+    //  //materialProps.shininess = (shininess / 10.0f) * 128.0f;
+    //}
 
     material->Set("uMaterial", materialProps);
 
@@ -117,9 +120,46 @@ MeshSource::MeshSource(std::string path) {
       material->Set("gradientTexture", matTexture);
     }
 
+    if (aiMat->GetTextureCount(aiTextureType_NORMALS) > 0) {
+      aiString texturePath;
+      if (aiMat->GetTexture(aiTextureType_NORMALS, 0, &texturePath) != aiReturn_SUCCESS) {
+        std::cout << "An error occured while loading texture" << std::endl;
+        continue;
+      }
+
+      std::string textureName = FileSys::GetFileName(texturePath.C_Str());
+
+      Ref<Texture> matTexture;
+      if (Rain::ResourceManager::IsTextureExist(textureName)) {
+        matTexture = Rain::ResourceManager::GetTexture(textureName);
+      } else {
+        matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
+      }
+
+			material->Set("heightTexture", matTexture);
+    }
+
+    if (aiMat->GetTextureCount(aiTextureType_METALNESS) > 0) {
+      aiString texturePath;
+      if (aiMat->GetTexture(aiTextureType_METALNESS, 0, &texturePath) != aiReturn_SUCCESS) {
+        std::cout << "An error occured while loading texture" << std::endl;
+        continue;
+      }
+
+      std::string textureName = FileSys::GetFileName(texturePath.C_Str());
+
+      Ref<Texture> matTexture;
+      if (Rain::ResourceManager::IsTextureExist(textureName)) {
+        matTexture = Rain::ResourceManager::GetTexture(textureName);
+      } else {
+        matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
+      }
+			material->Set("metalicRoughnessTexture", matTexture);
+    }
+
     material->Bake();
-    //m_Materials[i] = material;
-		Materials->SetMaterial(i, material);
+    // m_Materials[i] = material;
+    Materials->SetMaterial(i, material);
   }
 
   m_SubMeshes.resize(scene->mNumMeshes);
@@ -192,6 +232,11 @@ MeshSource::MeshSource(std::string path) {
 
   TraverseNode(scene->mRootNode, scene);
 }
+void DecomposeTransform(const glm::mat4& transform, glm::vec3& outPosition, glm::quat& outRotation, glm::vec3& outScale) {
+  glm::vec3 skew;
+  glm::vec4 perspective;
+  glm::decompose(transform, outScale, outRotation, outPosition, skew, perspective);
+}
 
 void MeshSource::TraverseNode(aiNode* node, const aiScene* scene) {
   if (node->mNumMeshes > 0) {
@@ -202,6 +247,9 @@ void MeshSource::TraverseNode(aiNode* node, const aiScene* scene) {
     meshNode->LocalTransform = convertToGLM(node->mTransformation);
 
     // m_SubMeshes[meshNode->SubMeshId].DrawCount++;
+    glm::vec3 position, scale;
+    glm::quat rotation;
+    DecomposeTransform(meshNode->LocalTransform, position, rotation, scale);
     m_Nodes.push_back(meshNode);
   }
 

@@ -198,8 +198,7 @@ RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& prop
   auto device = RenderContext::GetDevice();
   auto& groupLayout = m_PipelineProps.groupLayout;
 
-  for (int i = 0; i < groupLayout.size(); i++) {
-    WGPUBindGroupLayout layout = LayoutUtils::CreateBindGroup("bgl_" + name + std::to_string(i), device, groupLayout[i]);
+  for (auto& [_, layout] : m_PipelineProps.VertexShader->GetReflectionInfo().LayoutDescriptors) {
     bindGroupLayouts.push_back(layout);
   }
 

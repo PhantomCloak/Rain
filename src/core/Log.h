@@ -34,6 +34,12 @@ namespace Rain {
     }
 
     template <typename... Args>
+    static void PrintMessageError(Log::Type type, std::string_view tag, Args&&... args) {
+      auto logger = (type == Log::Type::Core) ? GetCoreLogger() : GetClientLogger();
+      logger->error("{0}: {1}", tag, fmt::format(std::forward<Args>(args)...));
+    }
+
+    template <typename... Args>
     static void PrintAssertMessage(Log::Type type, std::string_view prefix, Args&&... args);
 
    private:
@@ -54,6 +60,6 @@ namespace Rain {
   }
 
 #define RN_LOG(...) ::Rain::Log::PrintMessage(::Rain::Log::Type::Core, "STATUS: ", __VA_ARGS__)
-#define RN_LOG_ERR(...) ::Rain::Log::PrintMessage(::Rain::Log::Type::Core, "ERROR: ", __VA_ARGS__)
+#define RN_LOG_ERR(...) ::Rain::Log::PrintMessageError(::Rain::Log::Type::Core, "ERROR: ", __VA_ARGS__)
 
 }  // namespace Rain

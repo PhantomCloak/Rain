@@ -19,8 +19,17 @@ RenderPassResourceType GetRenderPassTypeFromShaderDecl(BindingType type) {
   RN_ASSERT("Unkown type conversation");
 }
 
-bool IsInputEmpty(const RenderPassInput& input) {
-  return input.SamplerInput == nullptr && input.UniformIntput == nullptr && input.TextureInput == nullptr;
+bool IsInputValid(const RenderPassInput& input) {
+  switch (input.Type) {
+    case PT_Uniform:
+      return input.UniformIntput != NULL && input.UniformIntput->Buffer != NULL;
+    case PT_Texture:
+      return input.TextureInput != NULL && input.TextureInput->View != NULL;
+    case PT_Sampler:
+      return input.SamplerInput != NULL && input.SamplerInput->GetNativeSampler() != NULL;
+    default:
+      return false;
+  }
 }
 
 BindingManager::BindingManager(const BindingSpec& spec)
@@ -89,18 +98,30 @@ void BindingManager::Init() {
 }
 
 bool BindingManager::Validate() {
-  auto shaderDecls = m_BindingSpec.Shader->GetReflectionInfo().ResourceDeclarations;
+  auto& shaderName = m_BindingSpec.Shader->GetName();
+  auto& shaderDecls = m_BindingSpec.Shader->GetReflectionInfo().ResourceDeclarations;
 
-  for (const auto& [group, decls] : shaderDecls) {
+  for (const auto& [groupIndex, decls] : shaderDecls) {
     for (const auto& decl : decls) {
-      if (InputDeclarations.find(decl.Name) == InputDeclarations.end()) {
-        RN_LOG_ERR("Input won't exist on the shader.");
+      auto inputIterator = InputDeclarations.find(decl.Name);
+
+      if (inputIterator == InputDeclarations.end()) {
+        RN_LOG_ERR("Validation failed: InputDeclaration '{}' not found in shader '{}'.", decl.Name, shaderName);
         return false;
       }
 
-      if (m_Inputs.find(group) != m_Inputs.end() && m_Inputs.at(group).find(decl.LocationIndex) != m_Inputs.at(group).end()) {
-        if (IsInputEmpty(m_Inputs.at(group).at(decl.LocationIndex))) {
-          RN_LOG_ERR("Input {} is empty! ", decl.Name);
+      auto& inputDecl = inputIterator->second;
+
+      if (m_Inputs.find(inputDecl.Group) != m_Inputs.end()) {
+        // RN_LOG_ERR("Validation failed: Input group '{}' not found in shader '{}'.", inputDecl.Group, shaderName);
+        // return false;
+        if (m_Inputs.at(inputDecl.Group).find(inputDecl.Location) == m_Inputs.at(inputDecl.Group).end()) {
+          RN_LOG_ERR("Validation failed: Input '{}' from group '{}' does not exist at location '{}' in shader '{}'.", decl.Name, inputDecl.Group, inputDecl.Location, shaderName);
+          return false;
+        }
+
+        if (!IsInputValid(m_Inputs.at(inputDecl.Group).at(inputDecl.Location))) {
+          RN_LOG_ERR("Validation failed: Input '{}' is invalid in shader '{}'.", decl.Name, shaderName);
           return false;
         }
       }
@@ -111,19 +132,17 @@ bool BindingManager::Validate() {
 }
 
 void BindingManager::Bake() {
-  //if (!Validate()) {
-  //  RN_LOG_ERR("Binding validation failed for {}.", m_BindingSpec.Name);
-  //  return;
-  //}
+  RN_CORE_ASSERT(Validate(), "Validation failed for {}", m_BindingSpec.Name)
 
   for (const auto& [groupIndex, groupBindings] : m_Inputs) {
     std::vector<WGPUBindGroupEntry> shaderEntries;
-    for (const auto& [location, input] : groupBindings) {
+    for (const auto& [locationIndex, input] : groupBindings) {
       WGPUBindGroupEntry entry = {};
-      entry.binding = location;
+      entry.binding = locationIndex;
       entry.offset = 0;
       entry.nextInChain = nullptr;
 
+      // Since we dont support postponed resources we simply assert
       switch (input.Type) {
         case PT_Uniform:
           entry.buffer = input.UniformIntput->Buffer;
@@ -139,10 +158,9 @@ void BindingManager::Bake() {
       shaderEntries.push_back(entry);
     }
 
-		if(shaderEntries.empty())
-		{
-			continue;
-		}
+    if (shaderEntries.empty()) {
+      continue;
+    }
 
     std::string label = m_BindingSpec.Name;
     WGPUBindGroupDescriptor bgDesc = {.label = label.c_str()};

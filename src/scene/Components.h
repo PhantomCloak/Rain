@@ -2,9 +2,11 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/euler_angles.hpp>
 #include <string>
+#include "Math/Math.h"
 #include "core/Ref.h"
 #include "core/UUID.h"
 #include "glm/ext/matrix_transform.hpp"
+#include "glm/gtx/quaternion.hpp"
 #include "render/Material.h"
 
 struct IDComponent {
@@ -27,27 +29,15 @@ struct TransformComponent {
   glm::vec3 Translation = {0.0f, 0.0f, 0.0f};
   glm::vec3 Scale = {1.0f, 1.0f, 1.0f};
   glm::vec3 RotationEuler = {0.0f, 0.0f, 0.0f};
+  glm::quat Rotation = {1.0f, 0.0f, 0.0f, 0.0f};
 
   glm::mat4 GetTransform() const {
-    glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), Translation);
-    glm::mat4 rotationMatrix = glm::eulerAngleYXZ(glm::radians(RotationEuler.y), glm::radians(RotationEuler.x), glm::radians(RotationEuler.z));
-    glm::mat4 scaleMatrix = glm::scale(glm::mat4(1.0f), Scale);
-    return translationMatrix * rotationMatrix * scaleMatrix;
+    return glm::translate(glm::mat4(1.0f), Translation) * glm::toMat4(Rotation) * glm::scale(glm::mat4(1.0f), Scale);
   }
 
   void SetTransform(const glm::mat4& transform) {
-    Translation = glm::vec3(transform[3]);
-
-    Scale.x = glm::length(glm::vec3(transform[0]));
-    Scale.y = glm::length(glm::vec3(transform[1]));
-    Scale.z = glm::length(glm::vec3(transform[2]));
-
-    glm::mat3 rotationMatrix = glm::mat3(
-        glm::vec3(transform[0]) / Scale.x,
-        glm::vec3(transform[1]) / Scale.y,
-        glm::vec3(transform[2]) / Scale.z);
-
-    RotationEuler = glm::eulerAngles(glm::quat_cast(rotationMatrix));
+    Rain::Math::DecomposeTransform(transform, Translation, Rotation, Scale);
+    RotationEuler = glm::eulerAngles(Rotation);
   }
 };
 

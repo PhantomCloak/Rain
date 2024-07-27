@@ -49,6 +49,7 @@ add_subdirectory(vendor/assimp)
 add_subdirectory(vendor/flecs)
 add_subdirectory(vendor/tracy)
 
+target_include_directories(MyApp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb)
 target_include_directories(MyApp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/dawn/include/tint)
 
 set(TRACY_ENABLE TRUE)

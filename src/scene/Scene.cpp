@@ -3,6 +3,7 @@
 #include "Components.h"
 #include "Entity.h"
 #include "SceneRenderer.h"
+#include "imgui.h"
 #include "io/cursor.h"
 #include "io/keyboard.h"
 #include "render/ResourceManager.h"
@@ -14,6 +15,9 @@ Entity Scene::CreateEntity(std::string name) {
   return CreateChildEntity({}, name);
 }
 
+Ref<Material> redMat;
+MaterialProperties redMatProps;
+
 void Scene::Init() {
   m_SceneCamera = std::make_unique<PlayerCamera>();
   m_SceneCamera->Position.y = 0;
@@ -21,47 +25,39 @@ void Scene::Init() {
 
   static auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
 
-  Ref<MeshSource>
-      boxModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/box.gltf");
+  Ref<Texture> test = Rain::ResourceManager::LoadCubeTexture("T3D_Skybox",
+                                                             {"textures/cubemap-posX.png",
+                                                              "textures/cubemap-negX.png",
+                                                              "textures/cubemap-posY.png",
+                                                              "textures/cubemap-negY.png",
+                                                              "textures/cubemap-posZ.png",
+                                                              "textures/cubemap-posZ.png"});
 
-  auto redMat = Material::CreateMaterial("M_BoxRed", defaultShader);
-  auto matProps = MaterialProperties{
-      .ambientColor = glm::vec3(),
-      .diffuseColor = glm::vec3(1.0f, 0.0, 0),
-      .specularColor = glm::vec3(1),
-      .shininess = 64};
-  redMat->Set("uMaterial", matProps);
+  Ref<MeshSource>
+      model = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/Helment/untitled.gltf");
+
+  // sphere
+  redMat = Material::CreateMaterial("M_BoxRed", defaultShader);
+  redMatProps = MaterialProperties{
+      .Metallic = 0.2f,
+      .Roughness = 0.1f,
+      .Ao = 0.3f};
+
+  redMat->Set("uMaterial", redMatProps);
   redMat->Bake();
 
-  auto greenMat = Material::CreateMaterial("M_BoxGreen", defaultShader);
-  auto matPropsGreen = MaterialProperties{
-      .ambientColor = glm::vec3(),
-      .diffuseColor = glm::vec3(0.0f, 1.0, 0),
-      .specularColor = glm::vec3(1),
-      .shininess = 64};
-  greenMat->Set("uMaterial", matPropsGreen);
-  greenMat->Bake();
-
   Entity light = CreateEntity("DirectionalLight");
-  light.GetComponent<TransformComponent>()->Translation = glm::vec3(30, 50, 0);
+  light.GetComponent<TransformComponent>()->Translation = glm::vec3(10, 15, 5);
   light.AddComponent<DirectionalLightComponent>();
 
-  Entity sampleEntity = CreateEntity("Floor");
-  sampleEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 0, 0);
-  sampleEntity.GetComponent<TransformComponent>()->Scale = glm::vec3(20, 1, 20);
+  Entity sampleEntity = CreateEntity("Test");
+  sampleEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 0, -10);
+  sampleEntity.GetComponent<TransformComponent>()->Scale = glm::vec3(1);
 
-  Entity sampleEntity2 = CreateEntity("Box");
-  sampleEntity2.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 5, 0);
-  sampleEntity2.GetComponent<TransformComponent>()->Scale = glm::vec3(1);
+  BuildMeshEntityHierarchy(sampleEntity, model);
 
-  BuildMeshEntityHierarchy(sampleEntity, boxModel);
-  BuildMeshEntityHierarchy(sampleEntity2, boxModel);
-
-  auto childMesh = TryGetEntityWithUUID(sampleEntity.Children()[0]);
-  childMesh.GetComponent<MeshComponent>()->Materials->SetMaterial(0, redMat);
-
-  auto childMesh2 = TryGetEntityWithUUID(sampleEntity2.Children()[0]);
-  childMesh2.GetComponent<MeshComponent>()->Materials->SetMaterial(0, greenMat);
+  // TryGetEntityWithUUID(sampleEntity.GetChild(0)).GetComponent<MeshComponent>()->Materials->SetMaterial(0, redMat);
+  //  TryGetEntityWithUUID(wallOne.GetChild(0)).GetComponent<MeshComponent>()->Materials->SetMaterial(0, greenMat);
 }
 
 Entity Scene::CreateChildEntity(Entity parent, std::string name) {
@@ -101,7 +97,7 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
   renderer->SetScene(this);
 
   static float aspectRatio = Application::Get()->GetWindowSize().x / Application::Get()->GetWindowSize().y;
-  static auto projectionMatrix = glm::perspective(glm::radians(75.0f), aspectRatio, 0.10f, 2500.0f);
+  static auto projectionMatrix = glm::perspective(glm::radians(45.0f), aspectRatio, 0.10f, 2500.0f);
   renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 2500, 0.10f});
 
   static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
@@ -117,6 +113,30 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
   lightsQuery.each([&](flecs::entity entity, TransformComponent& transform, DirectionalLightComponent& directionalLight) {
     SceneLightInfo.LightPos = transform.Translation;
   });
+
+  ImGui::Begin("Scene Settings");
+
+  static float s_metallic = 0.1f;
+  if (ImGui::SliderFloat("Metallic", &s_metallic, 0, 1)) {
+    redMatProps.Metallic = s_metallic;
+    redMat->Set("uMaterial", redMatProps);
+  }
+
+  ImGui::Spacing();
+  static float s_roughness = 0.1f;
+  if (ImGui::SliderFloat("Roughness", &s_roughness, 0, 1)) {
+    redMatProps.Roughness = s_roughness;
+    redMat->Set("uMaterial", redMatProps);
+  }
+  ImGui::Spacing();
+  static float s_ao = 0.1f;
+  if (ImGui::SliderFloat("Ao", &s_ao, 0, 1)) {
+    redMatProps.Ao = s_ao;
+    redMat->Set("uMaterial", redMatProps);
+  }
+
+  ImGui::End();
+
   renderer->EndScene();
 }
 
@@ -138,7 +158,7 @@ void Scene::BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh) {
 }
 
 glm::mat4 Scene::GetWorldSpaceTransformMatrix(Entity entity) {
-  glm::mat4 transform(1.0f);
+  glm::mat4 transform = glm::identity<glm::mat4>();
 
   Entity parent = TryGetEntityWithUUID(entity.GetParentUUID());
   if (parent) {
@@ -149,7 +169,7 @@ glm::mat4 Scene::GetWorldSpaceTransformMatrix(Entity entity) {
 }
 
 void Scene::ScanKeyPress() {
-  float speed = 1.1f;
+  float speed = 0.05f;
 
   if (Keyboard::IsKeyPressing(Rain::Key::W)) {
     m_SceneCamera->ProcessKeyboard(FORWARD, speed);

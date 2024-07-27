@@ -61,6 +61,7 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
 
   auto& resourceBindings = reflectionInfo.ResourceDeclarations;
 
+	// TODO: Check shader is valid
   for (auto& entryPoint : inspector.GetEntryPoints()) {
     auto textureBindings = inspector.GetSampledTextureResourceBindings(entryPoint.name);
     auto depthTextureBindings = inspector.GetDepthTextureResourceBindings(entryPoint.name);
@@ -73,6 +74,7 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
     }
   }
 
+	// TODO: If variable shared across two stage it will duplicate
   for (auto& entryPoint : inspector.GetEntryPoints()) {
     auto* func = program.AST().Functions().Find(program.Symbols().Get(entryPoint.name));
     auto* func_sem = program.Sem().Get(func);
@@ -89,7 +91,9 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
       info.LocationIndex = binding_info.binding;
       info.Size = unwrapped_type->Size();
 
-      resourceBindings[info.GroupIndex].push_back(info);
+
+			if(resourceBindings[info.GroupIndex].size() == 0)
+				resourceBindings[info.GroupIndex].push_back(info);
     }
 
     for (auto& ruv : func_sem->TransitivelyReferencedSampledTextureVariables()) {

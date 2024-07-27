@@ -6,10 +6,9 @@
 #include "render/Texture.h"
 
 struct MaterialProperties {
-  glm::vec3 ambientColor;
-  glm::vec3 diffuseColor;
-  glm::vec3 specularColor;
-  float shininess;
+	float Metallic = 1.0f;
+	float Roughness = 1.0f;
+	float Ao = 1.0f;
 };
 
 class Material {

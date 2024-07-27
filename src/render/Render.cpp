@@ -302,30 +302,18 @@ WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandE
 
   WGPURenderPassDescriptor passDesc{.label = pipe->GetName().c_str()};
 
-  if (pipe->HasColorAttachment()) {
+  if (!pipe->HasColorAttachment()) {
     WGPURenderPassColorAttachment colorAttachment{};
     colorAttachment.loadOp = WGPULoadOp_Clear;
     colorAttachment.storeOp = WGPUStoreOp_Store;
-    colorAttachment.clearValue = WGPUColor{0.52, 0.80, 0.92, 1};
+    colorAttachment.clearValue = WGPUColor{0, 0, 0, 1};
     colorAttachment.resolveTarget = nullptr;
-    colorAttachment.view = pipe->GetColorAttachment()->View;
-
-    passDesc.colorAttachmentCount = 1;
-    passDesc.colorAttachments = &colorAttachment;
-  } else if (!pipe->HasDepthAttachment()) {
-    WGPURenderPassColorAttachment colorAttachment{};
-    colorAttachment.loadOp = WGPULoadOp_Clear;
-    colorAttachment.storeOp = WGPUStoreOp_Store;
-    colorAttachment.clearValue = WGPUColor{0.52, 0.80, 0.92, 1};
-    colorAttachment.resolveTarget = nullptr;
+    //colorAttachment.view = pipe->GetColorAttachment()->View;
     colorAttachment.view = Instance->GetCurrentSwapChainTexture()->View;
 
     passDesc.colorAttachmentCount = 1;
     passDesc.colorAttachments = &colorAttachment;
-  } else {
-    passDesc.colorAttachmentCount = 0;
-    passDesc.colorAttachments = nullptr;
-  }
+  } 
 
   if (pipe->HasDepthAttachment()) {
     WGPURenderPassDepthStencilAttachment depthAttachment;
