@@ -1,103 +1,99 @@
 {
-  "version": 3,
-  "cmakeMinimumRequired": {
-    "major": 3,
-    "minor": 19,
-    "patch": 0
-  },
-  "configurePresets": [
-    {
-      "name": "base",
-      "hidden": true,
-      "description": "Base configuration for all builds",
-      "binaryDir": "${sourceDir}/build/${presetName}",
-      "cacheVariables": {
-        "CMAKE_CXX_STANDARD": "17",
-        "CMAKE_CXX_STANDARD_REQUIRED": "TRUE",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
-      }
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 19,
+        "patch": 0
     },
-    {
-      "name": "dawn-base",
-      "inherits": "base",
-      "hidden": true,
-      "description": "Common Dawn configuration for all platforms",
-      "cacheVariables": {
-        "DAWN_FETCH_DEPENDENCIES": "ON",
-        "DAWN_ENABLE_D3D11": "OFF",
-        "DAWN_ENABLE_D3D12": "OFF",
-        "DAWN_ENABLE_METAL": "OFF",
-        "DAWN_ENABLE_VULKAN": "OFF",
-        "DAWN_BUILD_SAMPLES": "OFF",
-        "DAWN_ENABLE_OPENGLES": "OFF",
-        "DAWN_ENABLE_DESKTOP_GL": "OFF",
-        "TINT_BUILD_TINT": "OFF",
-        "DEV_MODE": "ON"
-      }
-    },
-    {
-      "name": "dawn-windows",
-      "inherits": "dawn-base",
-      "description": "Build with Dawn for Windows",
-      "cacheVariables": {
-        "USE_VULKAN": "ON",
-        "DAWN_ENABLE_D3D12": "ON",
-        "DAWN_ENABLE_VULKAN": "ON"
-      }
-    },
-    {
-      "name": "dawn-macos",
-      "inherits": "dawn-base",
-      "description": "Build with Dawn for macOS",
-      "cacheVariables": {
-        "USE_METAL": "ON",
-        "DAWN_ENABLE_METAL": "ON",
-        "RN_DEBUG": "ON",
-				"CMAKE_BUILD_TYPE": "Debug",
-        "PHYSX_ROOT_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
-        "CMAKEMODULES_PATH": "/Users/ph4nt0m/packman-repo/chk/CMakeModules/1.28.trunk.31965103",
-        "PX_OUTPUT_LIB_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
-        "PX_OUTPUT_BIN_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
-        "PX_EMSCRIPTEN ": "1",
-        "TARGET_BUILD_PLATFORM": "mac",
-        "PX_SCALAR_MATH": "1",
-        "PX_OUTPUT_ARCH": "arm",
-        "PX_SIMD_DISABLED ": "1",
-        "DAWN_DEBUG_BREAK_ON_ERROR": "1"
-      }
-    },
-    {
-      "name": "dawn-linux",
-      "inherits": "dawn-base",
-      "description": "Build with Dawn for Linux",
-      "cacheVariables": {
-        "USE_VULKAN": "ON",
-        "DAWN_ENABLE_VULKAN": "ON"
-      }
-    },
-    {
-      "name": "emscripten",
-      "inherits": "base",
-      "description": "Build for WebAssembly with Emscripten",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_TOOLCHAIN_FILE": "/Users/ph4nt0m/Developer/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
-        "EMSCRIPTEN": "ON",
-        "USE_GLFW": "3",
-        "USE_WEBGPU": "ON",
-        "ASYNCIFY": "ON",
-        "WASM_BIGINT": "ON",
-        "PHYSX_ROOT_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
-        "CMAKEMODULES_PATH": "/Users/ph4nt0m/packman-repo/chk/CMakeModules/1.28.trunk.31965103",
-        "PX_OUTPUT_LIB_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
-        "PX_OUTPUT_BIN_DIR": "/Users/ph4nt0m/Developer/playground/vendor/physx/physx",
-        "PX_EMSCRIPTEN ": "1",
-        "TARGET_BUILD_PLATFORM": "emscripten",
-        "PX_SCALAR_MATH": "1",
-        "PX_SIMD_DISABLED ": "1",
-				"ASSIMP_BUILD_NO_3DS_IMPORTER": "ON",
-				"ALLOW_BLOCKING_ON_MAIN_THREAD": "1"
-      }
-    }
-  ]
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "description": "Base configuration for all builds",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_CXX_STANDARD": "17",
+                "CMAKE_CXX_STANDARD_REQUIRED": "TRUE",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "common",
+            "inherits": "base",
+            "hidden": true,
+            "description": "Common Dawn configuration for all platforms",
+            "cacheVariables": {
+                "DAWN_FETCH_DEPENDENCIES": "ON",
+                "DAWN_ENABLE_D3D11": "OFF",
+                "DAWN_ENABLE_D3D12": "OFF",
+                "DAWN_ENABLE_METAL": "OFF",
+                "DAWN_ENABLE_VULKAN": "OFF",
+                "DAWN_BUILD_SAMPLES": "OFF",
+                "DAWN_ENABLE_OPENGLES": "OFF",
+                "DAWN_ENABLE_DESKTOP_GL": "OFF",
+                "TINT_BUILD_TINT": "OFF",
+                "DEV_MODE": "ON",
+				"CMAKEMODULES_PATH": "/Users/ph4nt0m/packman-repo/chk/CMakeModules/1.28.trunk.31965103",
+                "PHYSX_ROOT_DIR": "${sourceDir}/vendor/physx/physx",
+                "PX_OUTPUT_LIB_DIR": "${sourceDir}/vendor/physx/physx",
+                "PX_OUTPUT_BIN_DIR": "${sourceDir}/vendor/physx/physx",
+                "PX_EMSCRIPTEN ": "1",
+                "PX_SCALAR_MATH": "1",
+                "PX_OUTPUT_ARCH": "arm",
+                "PX_SIMD_DISABLED ": "1"
+            }
+        },
+        {
+            "name": "osx-debug",
+            "inherits": "common",
+            "description": "Build with Dawn for macOS",
+            "environment": {
+                "RESOURCE_DIR": "${sourceDir}/Resources"
+            },
+            "cacheVariables": {
+                "USE_METAL": "ON",
+                "RESOURCE_DIR": "${sourceDir}/Resources",
+                "DAWN_ENABLE_METAL": "ON",
+                "RN_DEBUG": "ON",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -fno-omit-frame-pointer",
+                "CMAKE_EXE_LINKER_FLAGS_DEBUG ": "-rdynamic",
+                "TARGET_BUILD_PLATFORM": "mac",
+                "DAWN_DEBUG_BREAK_ON_ERROR": "1"
+            }
+        },
+        {
+            "name": "osx-release",
+            "inherits": "common",
+            "description": "Build with Dawn for macOS",
+            "environment": {
+                "RESOURCE_DIR": "${sourceDir}/Resources"
+            },
+            "cacheVariables": {
+                "USE_METAL": "ON",
+                "RESOURCE_DIR": "${sourceDir}/Resources",
+                "DAWN_ENABLE_METAL": "ON",
+                "RN_DEBUG": "OFF",
+                "CMAKE_BUILD_TYPE": "Release",
+                "TARGET_BUILD_PLATFORM": "mac",
+                "DAWN_DEBUG_BREAK_ON_ERROR": "1"
+            }
+        },
+        {
+            "name": "emscripten-debug",
+            "inherits": "common",
+            "description": "Build for WebAssembly with Emscripten",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "/Users/ph4nt0m/Developer/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+                "EMSCRIPTEN": "ON",
+                "USE_GLFW": "3",
+                "USE_WEBGPU": "ON",
+                "ASYNCIFY": "ON",
+                "WASM_BIGINT": "ON",
+                "TARGET_BUILD_PLATFORM": "emscripten",
+                "ALLOW_BLOCKING_ON_MAIN_THREAD": "1"
+            }
+        }
+    ]
 }
