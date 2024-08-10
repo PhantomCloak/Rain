@@ -1,10 +1,9 @@
 #include "OSXWindow.h"
-#include <cstdint>
 #include "core/Assert.h"
 #include "core/Log.h"
 
 static void GLFWErrorCallback(int error, const char* description) {
-  //RN_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
+  RN_LOG_ERR("GLFW Error ({0}): {1}", error, description);
 }
 
 Rain::OSXWindow::~OSXWindow() {
@@ -25,10 +24,14 @@ void Rain::OSXWindow::Init(const WindowProps& props) {
 
   m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, "WGPU!", nullptr, nullptr);
 
+	RN_ASSERT(m_Window, "Window cannot be created!");
+
+
   glfwSetWindowUserPointer(m_Window, this);
 
   glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window) {
-    // Probably should say app to close
+			// TODO: Propagate event to gracefully stop
+			exit(0);
   });
 
   glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos) {

@@ -1,5 +1,6 @@
 #include "SceneRenderer.h"
 #include "Application.h"
+#include "debug/Profiler.h"
 #include "render/Render.h"
 
 #include "backends/imgui_impl_glfw.h"
@@ -191,6 +192,7 @@ void SceneRenderer::Init() {
 }
 
 void SceneRenderer::PreRender() {
+	RN_PROFILE_FUNC;
   static TransformVertexData* submeshTransforms = (TransformVertexData*)malloc(1024 * sizeof(TransformVertexData));
 
   uint32_t offset = 0;
@@ -211,6 +213,7 @@ void SceneRenderer::SetScene(Scene* scene) {
 }
 
 void SceneRenderer::BeginScene(const SceneCamera& camera) {
+	RN_PROFILE_FUNC;
   const glm::mat4 viewInverse = glm::inverse(camera.ViewMatrix);
   const glm::vec3 cameraPosition = viewInverse[3];
 
@@ -227,6 +230,7 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
 }
 
 void SceneRenderer::FlushDrawList() {
+	RN_PROFILE_FUNC;
   WGPUCommandEncoderDescriptor commandEncoderDesc = {.label = "Command Encoder"};
   Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
 

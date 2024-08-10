@@ -5,6 +5,7 @@
 #include <vector>
 #include "core/Assert.h"
 #include "render/RenderContext.h"
+#include "Debug/Profiler.h"
 
 std::unordered_map<std::string, std::shared_ptr<Texture>> Rain::ResourceManager::_loadedTextures;
 std::unordered_map<AssetHandle, Ref<MeshSource>> Rain::ResourceManager::m_LoadedMeshSources;
@@ -16,6 +17,7 @@ void writeMipMaps(
     uint32_t mipLevelCount,	
     const unsigned char* pixelData,
 		WGPUOrigin3D targetOrigin = {0, 0, 0}) {
+	RN_PROFILE_FUNCN("Generate Mips");
   auto m_queue = wgpuDeviceGetQueue(m_device);
 
   WGPUImageCopyTexture destination = {
@@ -115,6 +117,7 @@ bool Rain::ResourceManager::IsTextureExist(std::string id) {
 }
 
 std::shared_ptr<Texture> Rain::ResourceManager::LoadTexture(std::string id, std::string path) {
+	RN_PROFILE_FUNC;
   auto tex = std::make_shared<Texture>();
   tex->Buffer = loadTexture(path.c_str(), RenderContext::GetDevice(), &tex->View);
 

@@ -29,27 +29,28 @@ static WGPURendererData* s_Data = nullptr;
 extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
 
 WGPUInstance Render::CreateGPUInstance() {
-  WGPUInstanceDescriptor instanceDesc;
+  WGPUInstanceDescriptor instanceDesc = {};
+	instanceDesc.nextInChain = nullptr;
   static WGPUInstance instance;
 
-#if !__EMSCRIPTEN__
-  static std::vector<const char*> enabledToggles = {
-      "allow_unsafe_apis",
-  };
-
-  WGPUDawnTogglesDescriptor dawnToggleDesc;
-  dawnToggleDesc.chain.next = nullptr;
-  dawnToggleDesc.chain.sType = WGPUSType_DawnTogglesDescriptor;
-
-  dawnToggleDesc.enabledToggles = enabledToggles.data();
-  dawnToggleDesc.enabledToggleCount = 1;
-  dawnToggleDesc.disabledToggleCount = 0;
-
-  instanceDesc.nextInChain = &dawnToggleDesc.chain;
-
-  instanceDesc.features.timedWaitAnyEnable = 0;
-  instanceDesc.features.timedWaitAnyMaxCount = 64;
-#endif
+//#if !__EMSCRIPTEN__
+//  static std::vector<const char*> enabledToggles = {
+//      "allow_unsafe_apis",
+//  };
+//
+//  WGPUDawnTogglesDescriptor dawnToggleDesc;
+//  dawnToggleDesc.chain.next = nullptr;
+//  dawnToggleDesc.chain.sType = WGPUSType_DawnTogglesDescriptor;
+//
+//  dawnToggleDesc.enabledToggles = enabledToggles.data();
+//  dawnToggleDesc.enabledToggleCount = 1;
+//  dawnToggleDesc.disabledToggleCount = 0;
+//
+//  instanceDesc.nextInChain = &dawnToggleDesc.chain;
+//
+//  instanceDesc.features.timedWaitAnyEnable = 0;
+//  instanceDesc.features.timedWaitAnyMaxCount = 64;
+//#endif
 
   instance = wgpuCreateInstance(&instanceDesc);
 

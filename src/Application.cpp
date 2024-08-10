@@ -15,6 +15,8 @@
 #include "render/Render.h"
 #include "render/ResourceManager.h"
 
+#include <Tracy.hpp>
+
 #if __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -29,6 +31,7 @@ void Application::OnStart() {
 
   Rain::Log::Init();
   GPUAllocator::Init();
+
 
   Rain::ResourceManager::LoadTexture("T_Default", RESOURCE_DIR "/textures/placeholder.jpeg");
 
@@ -50,8 +53,8 @@ void Application::OnResize(int height, int width) {
 }
 
 void Application::OnUpdate() {
+	FrameMark;
   glfwPollEvents();
-
   m_Scene->OnUpdate();
   m_Scene->OnRender(m_Renderer);
 }
