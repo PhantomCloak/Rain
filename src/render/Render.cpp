@@ -26,8 +26,9 @@ static ShaderDependencies s_ShaderDependencies;
 
 static WGPURendererData* s_Data = nullptr;
 
-extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
+//extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
 
+#include "glfw3webgpu.h"
 WGPUInstance Render::CreateGPUInstance() {
   WGPUInstanceDescriptor instanceDesc = {};
 	instanceDesc.nextInChain = nullptr;
@@ -69,6 +70,7 @@ bool Render::Init(void* window) {
   m_surface = htmlGetCanvasSurface(instance, "canvas");
 #else
   m_surface = glfwGetWGPUSurface(instance, m_window);
+  //m_surface = nullptr;
 #endif
 
   static WGPURequestAdapterOptions adapterOpts{};
@@ -259,7 +261,8 @@ WGPURequiredLimits Render::GetRequiredLimits(WGPUAdapter adapter) {
   requiredLimits.limits.maxVertexAttributes = supportedLimits.limits.maxVertexAttributes;
   requiredLimits.limits.maxVertexBuffers = supportedLimits.limits.maxVertexBuffers;
   requiredLimits.limits.maxBufferSize = 150000 * sizeof(VertexAttribute);
-  requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);
+  //requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);
+  requiredLimits.limits.maxVertexBufferArrayStride = 0;
   requiredLimits.limits.minStorageBufferOffsetAlignment =
       supportedLimits.limits.minStorageBufferOffsetAlignment;
   requiredLimits.limits.minUniformBufferOffsetAlignment =

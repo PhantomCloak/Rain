@@ -5,7 +5,7 @@
 #include <vector>
 #include "core/Assert.h"
 #include "render/RenderContext.h"
-#include "Debug/Profiler.h"
+#include "debug/Profiler.h"
 
 std::unordered_map<std::string, std::shared_ptr<Texture>> Rain::ResourceManager::_loadedTextures;
 std::unordered_map<AssetHandle, Ref<MeshSource>> Rain::ResourceManager::m_LoadedMeshSources;

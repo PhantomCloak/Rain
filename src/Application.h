@@ -13,6 +13,9 @@ struct GLFWwindow;
 #if __APPLE__
 #include "platform/osx/OSXWindow.h"
 typedef Rain::OSXWindow AppWindow;
+#elif __linux__
+#include "platform/linux/LinuxWindow.h"
+typedef Rain::LinuxWindow AppWindow;
 #elif __EMSCRIPTEN__
 #include "platform/web/WebWindow.h"
 typedef Rain::WebWindow AppWindow;

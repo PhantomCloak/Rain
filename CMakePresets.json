@@ -44,6 +44,26 @@
             }
         },
         {
+            "name": "linux-debug",
+            "inherits": "common",
+            "description": "Build with Dawn for Linux",
+            "environment": {
+                "RESOURCE_DIR": "${sourceDir}/Resources"
+            },
+            "cacheVariables": {
+                "DAWN_ENABLE_VULKAN": "ON",
+                "USE_X11": "ON",
+                "RESOURCE_DIR": "${sourceDir}/Resources",
+                "RN_DEBUG": "ON",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_FLAGS_DEBUG": "-g -fno-omit-frame-pointer",
+                "CMAKE_EXE_LINKER_FLAGS_DEBUG": "-rdynamic",
+                "TARGET_BUILD_PLATFORM": "mac",
+                "DAWN_DEBUG_BREAK_ON_ERROR": "1",
+                "PX_OUTPUT_ARCH": "x86_64"
+            }
+        },
+        {
             "name": "osx-debug",
             "inherits": "common",
             "description": "Build with Dawn for macOS",

@@ -2,6 +2,7 @@
 
 #include <flecs/flecs.h>
 #include <string>
+#include <unordered_map>
 #include "Cam.h"
 #include "core/UUID.h"
 #include "render/Mesh.h"

@@ -8,7 +8,7 @@
 #include "io/cursor.h"
 #include "io/keyboard.h"
 #include "render/ResourceManager.h"
-#include <Tracy.hpp>
+//#include <Tracy.hpp>
 
 Scene::Scene(std::string sceneName)
     : m_Name(sceneName) {}

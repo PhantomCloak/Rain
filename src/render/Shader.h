@@ -1,6 +1,7 @@
 #pragma once
 #include <map>
 #include <string>
+#include <vector>
 #include "core/Ref.h"
 #include "webgpu/webgpu.h"
 
