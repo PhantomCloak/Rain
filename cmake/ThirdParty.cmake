@@ -13,9 +13,6 @@ set(ASSIMP_BUILD_SIB_IMPORTER TRUE)
 set(ASSIMP_BUILD_OBJ_IMPORTER TRUE)
 
 add_subdirectory(vendor/assimp)
-set(DAWN_FETCH_DEPENDENCIES ON)
-set(DAWN_ENABLE_VULKAN ON)
-set(TINT_BUILD_SPV_WRITER ON)
 
 # Dawn WebGPU
 if(EMSCRIPTEN)
@@ -38,12 +35,10 @@ if(EMSCRIPTEN)
 else()
 	add_compile_definitions(DAWN_DEBUG_BREAK_ON_ERROR) # TODO: Inspect target?
   add_subdirectory(vendor/dawn)
-  #set_target_properties(webgpu_dawn PROPERTIES POSITION_INDEPENDENT_CODE ON)
-	message(WARN "Dawn Loading Brrrr Dream")
 endif()
 
 # PhysX
-#add_subdirectory(vendor/PhysX/physx/compiler/public)
+add_subdirectory(vendor/PhysX/physx/compiler/public)
 
 if(EMSCRIPTEN)
 	message(FATAL "OH NOOOO!!!")
@@ -78,11 +73,11 @@ endif()
 #
 #target_include_directories(imgui PUBLIC $<INSTALL_INTERFACE:${IMGUI_DIR}> $<BUILD_INTERFACE:${IMGUI_DIR}>)
 #target_link_libraries(imgui PRIVATE webgpu_dawn webgpu_cpp webgpu_glfw glfw)
-#
+
 # Tracy
-#add_library(TracyClient STATIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/TracyClient.cpp)
-#target_include_directories(TracyClient PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/tracy)
-#target_compile_definitions(TracyClient PUBLIC TRACY_ENABLE=1)
+add_library(TracyClient STATIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/TracyClient.cpp)
+target_include_directories(TracyClient PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/tracy)
+target_compile_definitions(TracyClient PUBLIC TRACY_ENABLE=1)
 
 # Standalone
 add_subdirectory(vendor/spdlog)
@@ -106,14 +101,13 @@ else()
   libtint
 	spdlog
 	flecs
-	#imgui
-	#TracyClient
+	TracyClient
 	glfw
 	assimp
-	#PhysX
-	#PhysXCooking 
-	#PhysXCommon
-	)
+	PhysX
+	PhysXCooking 
+	PhysXCommon
+	PhysXExtensions)
 endif()
 
 
