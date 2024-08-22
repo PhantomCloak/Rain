@@ -15,7 +15,7 @@ enum RenderPassResourceType  {
 
 struct BindingSpec {
   std::string Name;
-  Ref<Shader> Shader;
+  Ref<Shader> ShaderRef;
   bool DefaultResources;
 };
 

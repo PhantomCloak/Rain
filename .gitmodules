@@ -19,3 +19,6 @@
 [submodule "vendor/stb"]
 	path = vendor/stb
 	url = https://github.com/nothings/stb
+[submodule "vendor/PhysX"]
+	path = vendor/PhysX
+	url = git@github.com:NVIDIA-Omniverse/PhysX.git

@@ -304,10 +304,11 @@ Ref<Sampler> Render::GetDefaultSampler() {
 WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder) {
   auto& pipe = pass->GetProps().Pipeline;
 
-  WGPURenderPassDescriptor passDesc{.label = pipe->GetName().c_str()};
+	WGPURenderPassDescriptor passDesc{.nextInChain = nullptr, .label = pipe->GetName().c_str()};
 
   if (!pipe->HasColorAttachment()) {
     WGPURenderPassColorAttachment colorAttachment{};
+		colorAttachment.nextInChain = nullptr;
     colorAttachment.loadOp = WGPULoadOp_Clear;
     colorAttachment.storeOp = WGPUStoreOp_Store;
     colorAttachment.clearValue = WGPUColor{0, 0, 0, 1};
@@ -318,9 +319,8 @@ WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandE
     passDesc.colorAttachmentCount = 1;
     passDesc.colorAttachments = &colorAttachment;
   } 
-
   if (pipe->HasDepthAttachment()) {
-    WGPURenderPassDepthStencilAttachment depthAttachment;
+    WGPURenderPassDepthStencilAttachment depthAttachment = {};
     depthAttachment.view = pipe->GetDepthAttachment()->View;
     depthAttachment.depthClearValue = 1.0f;
     depthAttachment.depthLoadOp = WGPULoadOp_Clear;

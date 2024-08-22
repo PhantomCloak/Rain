@@ -50,7 +50,7 @@ struct PipelineBundle {
 };
 
 RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& props)
-    : m_PipelineProps(props) {
+    : m_PipelineProps(props), m_Name(name) {
   WGPUTextureFormat swapChainFormat = WGPUTextureFormat_Undefined;
 
 #if __EMSCRIPTEN__
@@ -204,6 +204,7 @@ RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& prop
 
   WGPUPipelineLayoutDescriptor& layoutDesc = bundle.pipelineLayoutDescriptor;
 
+	layoutDesc.nextInChain = nullptr;
   layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
   layoutDesc.bindGroupLayouts = bindGroupLayouts.data();
 

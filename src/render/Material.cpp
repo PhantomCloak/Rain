@@ -12,7 +12,7 @@ Material::Material(const std::string& name, Ref<Shader> shader)
     : m_Name(name) {
   const BindingSpec spec = {
       .Name = "BG_" + name,
-      .Shader = shader,
+      .ShaderRef = shader,
       .DefaultResources = true};
 
   m_BindManager = BindingManager::Create(spec);

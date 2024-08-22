@@ -15,7 +15,7 @@
 #include "render/Render.h"
 #include "render/ResourceManager.h"
 
-//#include <Tracy.hpp>
+#include <Tracy.hpp>
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -53,7 +53,7 @@ void Application::OnResize(int height, int width) {
 }
 
 void Application::OnUpdate() {
-	//FrameMark;
+	FrameMark;
   glfwPollEvents();
   m_Scene->OnUpdate();
   m_Scene->OnRender(m_Renderer);

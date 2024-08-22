@@ -1,6 +1,6 @@
 #pragma once
 
-#define RN_ENABLE_PROFILING 0
+#define RN_ENABLE_PROFILING 1
 
 #if RN_ENABLE_PROFILING 
 #include <Tracy.hpp>

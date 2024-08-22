@@ -5,7 +5,7 @@ RenderPass::RenderPass(const RenderPassProps& spec) : m_PassProps(spec)
 {
   BindingSpec bindSpec;
   bindSpec.Name = spec.DebugName;
-  bindSpec.Shader = spec.Pipeline->GetShader();
+  bindSpec.ShaderRef = spec.Pipeline->GetShader();
 
 	m_PassBinds = BindingManager::Create(bindSpec);
 }

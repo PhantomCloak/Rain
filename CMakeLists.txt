@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.1...3.25)
 project(RainEngine VERSION 0.1.0 LANGUAGES CXX C)
+set(DAWN_DEBUG_BREAK_ON_ERROR TRUE)
+set(DEBUG_BREAK_ON_ERROR TRUE)
+set(DAWN_BREAK_ON_ERROR TRUE)
 
 #include_directories("vendor" "vendor/imgui" "vendor/spdlog/include" "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -v")
@@ -30,8 +33,6 @@ set_target_properties(ReEngine PROPERTIES
 
 target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui")
 target_compile_definitions(ReEngine PRIVATE RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources")
-#target_compile_options(ReEngine PRIVATE -fpermissive)
-#set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include("cmake/ThirdParty.cmake")
 target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/dawn/include/tint)

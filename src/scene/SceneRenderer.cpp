@@ -231,7 +231,7 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
 
 void SceneRenderer::FlushDrawList() {
 	RN_PROFILE_FUNC;
-  WGPUCommandEncoderDescriptor commandEncoderDesc = {.label = "Command Encoder"};
+	WGPUCommandEncoderDescriptor commandEncoderDesc = {.nextInChain = nullptr, .label = "Default Command Encoder"};
   Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
 
   auto commandEncoder = wgpuDeviceCreateCommandEncoder(renderContext->GetDevice(), &commandEncoderDesc);
@@ -253,7 +253,7 @@ void SceneRenderer::FlushDrawList() {
   // Render::Instance->SubmitFullscreenQuad(ppfxPassEncoder, m_PpfxPipeline->GetPipeline());
   // Render::EndRenderPass(m_PpfxPass, ppfxPassEncoder);
 
-  WGPUCommandBufferDescriptor cmdBufferDescriptor = {.label = "Command Buffer"};
+	WGPUCommandBufferDescriptor cmdBufferDescriptor = {.nextInChain = nullptr, .label = "Command Buffer"};
   WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(commandEncoder, &cmdBufferDescriptor);
 
   wgpuQueueSubmit(*renderContext->GetQueue(), 1, &commandBuffer);

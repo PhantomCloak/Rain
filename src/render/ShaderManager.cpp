@@ -167,6 +167,7 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
     for (const auto& entry : entries) {
       WGPUBindGroupLayoutEntry groupEntry = {};
       groupEntry.binding = entry.LocationIndex;
+			groupEntry.nextInChain = nullptr;
 
       switch (entry.Type) {
         case UniformBindingType:
@@ -202,6 +203,7 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
 		std::string label = shader->GetName() + std::to_string(groupIndex);
 
     WGPUBindGroupLayoutDescriptor layoutDesc = {};
+		layoutDesc.nextInChain = nullptr;
 		layoutDesc.label = label.c_str();
     layoutDesc.entries = layoutEntries.data();
     layoutDesc.entryCount = layoutEntries.size();

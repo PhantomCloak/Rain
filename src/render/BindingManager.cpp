@@ -43,7 +43,7 @@ void BindingManager::Set(const std::string& name, Ref<Texture> texture) {
     m_Inputs[decl->Group][decl->Location].Type = RenderPassResourceType::PT_Texture;
     m_Inputs[decl->Group][decl->Location].TextureInput = texture;
   } else {
-    RN_LOG_ERR("Input Texture {} does not exist on {} Shader.", name, m_BindingSpec.Shader->GetName());
+    RN_LOG_ERR("Input Texture {} does not exist on {} Shader.", name, m_BindingSpec.ShaderRef->GetName());
   }
 }
 
@@ -54,7 +54,7 @@ void BindingManager::Set(const std::string& name, Ref<GPUBuffer> uniform) {
     m_Inputs[decl->Group][decl->Location].Type = RenderPassResourceType::PT_Uniform;
     m_Inputs[decl->Group][decl->Location].UniformIntput = uniform;
   } else {
-    RN_LOG_ERR("Input Uniform {} does not exist on {} Shader.", name, m_BindingSpec.Shader->GetName());
+    RN_LOG_ERR("Input Uniform {} does not exist on {} Shader.", name, m_BindingSpec.ShaderRef->GetName());
   }
 }
 
@@ -64,12 +64,12 @@ void BindingManager::Set(const std::string& name, Ref<Sampler> sampler) {
     m_Inputs[decl->Group][decl->Location].Type = RenderPassResourceType::PT_Sampler;
     m_Inputs[decl->Group][decl->Location].SamplerInput = sampler;
   } else {
-    RN_LOG_ERR("Input Sampler {} does not exist on {} Shader.", name, m_BindingSpec.Shader->GetName());
+    RN_LOG_ERR("Input Sampler {} does not exist on {} Shader.", name, m_BindingSpec.ShaderRef->GetName());
   }
 }
 
 const ResourceDeclaration& BindingManager::GetInfo(const std::string& name) const {
-  auto& resourceBindings = m_BindingSpec.Shader->GetReflectionInfo().ResourceDeclarations;
+  auto& resourceBindings = m_BindingSpec.ShaderRef->GetReflectionInfo().ResourceDeclarations;
   for (auto& [_, entries] : resourceBindings) {
     for (auto& entry : entries) {
       if (entry.Name == name) {
@@ -84,7 +84,7 @@ const ResourceDeclaration& BindingManager::GetInfo(const std::string& name) cons
 // There is still some API limitation with deffered bindings
 
 void BindingManager::Init() {
-  auto shaderDecls = m_BindingSpec.Shader->GetReflectionInfo().ResourceDeclarations;
+  auto shaderDecls = m_BindingSpec.ShaderRef->GetReflectionInfo().ResourceDeclarations;
 
   for (const auto& [groupIndex, decls] : shaderDecls) {
     for (const auto& decl : decls) {
@@ -98,8 +98,8 @@ void BindingManager::Init() {
 }
 
 bool BindingManager::Validate() {
-  auto& shaderName = m_BindingSpec.Shader->GetName();
-  auto& shaderDecls = m_BindingSpec.Shader->GetReflectionInfo().ResourceDeclarations;
+  auto& shaderName = m_BindingSpec.ShaderRef->GetName();
+  auto& shaderDecls = m_BindingSpec.ShaderRef->GetReflectionInfo().ResourceDeclarations;
 
   for (const auto& [groupIndex, decls] : shaderDecls) {
     for (const auto& decl : decls) {
@@ -163,8 +163,8 @@ void BindingManager::Bake() {
     }
 
     std::string label = m_BindingSpec.Name;
-    WGPUBindGroupDescriptor bgDesc = {.label = label.c_str()};
-    bgDesc.layout = m_BindingSpec.Shader->GetReflectionInfo().LayoutDescriptors[groupIndex];
+		WGPUBindGroupDescriptor bgDesc = {.nextInChain = nullptr, .label = label.c_str()};
+    bgDesc.layout = m_BindingSpec.ShaderRef->GetReflectionInfo().LayoutDescriptors[groupIndex];
     bgDesc.entryCount = (uint32_t)shaderEntries.size();
     bgDesc.entries = shaderEntries.data();
 

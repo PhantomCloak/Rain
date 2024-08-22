@@ -6,6 +6,7 @@
 #include "Cam.h"
 #include "core/UUID.h"
 #include "render/Mesh.h"
+#include "scene/Entity.h"
 
 class Entity;
 

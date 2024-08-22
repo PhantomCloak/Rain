@@ -5,6 +5,7 @@
 
 Ref<Texture> Texture::Create(TextureProps props) {
   WGPUTextureDescriptor textureDesc = {
+			.nextInChain = nullptr,
       .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
       .dimension = WGPUTextureDimension_2D,
       .size = {static_cast<uint32_t>(props.Dimensions.x), static_cast<uint32_t>(props.Dimensions.y), 1},
