@@ -1,5 +1,20 @@
 #pragma once
 #include "Log.h"
+#include <execinfo.h>
+#include <iostream>
+
+inline void PrintStackTrace() {
+    const int maxFrames = 64;
+    void* frames[maxFrames];
+    int frameCount = backtrace(frames, maxFrames);
+    char** symbols = backtrace_symbols(frames, frameCount);
+    
+    std::cerr << "Stack trace:\n";
+    for (int i = 0; i < frameCount; ++i) {
+        std::cerr << symbols[i] << "\n";
+    }
+    free(symbols);
+}
 
 //#if defined(HZ_PLATFORM_WINDOWS)
 //#define RN_DEBUG_BREAK() __debugbreak()
@@ -18,8 +33,16 @@
 #include <signal.h>
 #define RN_DEBUG_BREAK() raise(SIGTRAP)
 
-#define RN_CORE_ASSERT_MESSAGE_INTERNAL(...) ::Rain::Log::PrintAssertMessage(::Rain::Log::Type::Core, "Assertion Failed" __VA_OPT__(, ) __VA_ARGS__)
-#define RN_ASSERT_MESSAGE_INTERNAL(...) ::Rain::Log::PrintAssertMessage(::Rain::Log::Type::Client, "Assertion Failed" __VA_OPT__(, ) __VA_ARGS__)
+//#define RN_CORE_ASSERT_MESSAGE_INTERNAL(...) ::Rain::Log::PrintAssertMessage(::Rain::Log::Type::Core, "Assertion Failed" __VA_OPT__(, ) __VA_ARGS__)
+//#define RN_ASSERT_MESSAGE_INTERNAL(...) ::Rain::Log::PrintAssertMessage(::Rain::Log::Type::Client, "Assertion Failed" __VA_OPT__(, ) __VA_ARGS__)
+
+#define RN_CORE_ASSERT_MESSAGE_INTERNAL(...) \
+    ::Rain::Log::PrintAssertMessage(::Rain::Log::Type::Core, "Assertion Failed" __VA_OPT__(, ) __VA_ARGS__); \
+    PrintStackTrace()
+
+#define RN_ASSERT_MESSAGE_INTERNAL(...) \
+    ::Rain::Log::PrintAssertMessage(::Rain::Log::Type::Client, "Assertion Failed" __VA_OPT__(, ) __VA_ARGS__); \
+    PrintStackTrace()
 
 #define RN_CORE_ASSERT(condition, ...)              \
   {                                                 \

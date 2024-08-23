@@ -43,6 +43,7 @@ struct MaterialUniform {
 @group(2) @binding(1) var shadowSampler: sampler_comparison;
 
 @group(3) @binding(0) var cubemapTexture: texture_cube<f32>;
+@group(3) @binding(1) var cubeSampler: sampler;
 
 @vertex
 fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {

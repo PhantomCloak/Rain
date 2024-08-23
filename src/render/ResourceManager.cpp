@@ -178,6 +178,7 @@ std::shared_ptr<Texture> Rain::ResourceManager::LoadCubeTexture(std::string id, 
   textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
   textureDesc.viewFormatCount = 0;
   textureDesc.viewFormats = nullptr;
+	textureDesc.nextInChain = nullptr;
   WGPUTexture texture = wgpuDeviceCreateTexture(RenderContext::GetDevice(), &textureDesc);
 
   WGPUExtent3D cubemapLayerSize = {cubemapSize.width, cubemapSize.height, 1};
@@ -198,6 +199,7 @@ std::shared_ptr<Texture> Rain::ResourceManager::LoadCubeTexture(std::string id, 
 	textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
 	textureViewDesc.dimension = WGPUTextureViewDimension_Cube;
 	textureViewDesc.format = textureDesc.format;
+	textureViewDesc.nextInChain = nullptr;
 	tex->View = wgpuTextureCreateView(texture, &textureViewDesc);
 
   return tex;

@@ -2,6 +2,7 @@
 #include <iostream>
 
 //#include "src/tint/api/tint.h"
+#include "core/Log.h"
 #include "src/tint/lang/wgsl/inspector/inspector.h"
 #include "src/tint/lang/wgsl/reader/reader.h"
 
@@ -55,6 +56,13 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
 
   tint::Source::File* file = new tint::Source::File(shader->GetName(), shader->GetSource());
   tint::Program program = tint::wgsl::reader::Parse(file, options);
+
+	if(program.Diagnostics().contains_errors())
+	{
+		RN_LOG_ERR("Shader Compilation Error: {0}", program.Diagnostics().str());
+		return reflectionInfo;
+	}
+
   tint::inspector::Inspector inspector(program);
 
   std::unordered_map<uint32_t, std::unordered_map<uint32_t, tint::inspector::ResourceBinding>> inspectorResourceBindings;

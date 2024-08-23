@@ -68,6 +68,10 @@ struct SceneCamera {
   float Far;
 };
 
+struct CameraData {
+	glm::mat4 InverseViewProjectionMatrix;
+};
+
 struct SceneUniform {
   glm::mat4x4 viewProjection;
   glm::mat4x4 shadowViewProjection;
@@ -113,9 +117,11 @@ class SceneRenderer {
 	Ref<RenderPass> m_ShadowPass;
 	Ref<RenderPass> m_LitPass;
 	Ref<RenderPass> m_PpfxPass;
+	Ref<RenderPass> m_SkyboxPass;
 
   Ref<RenderPipeline> m_LitPipeline;
   Ref<RenderPipeline> m_ShadowPipeline;
   Ref<RenderPipeline> m_DebugPipeline;
   Ref<RenderPipeline> m_PpfxPipeline;
+  Ref<RenderPipeline> m_SkyboxPipeline;
 };

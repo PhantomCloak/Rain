@@ -27,14 +27,6 @@ void Scene::Init() {
 
   static auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
 
-//  Ref<Texture> test = Rain::ResourceManager::LoadCubeTexture("T3D_Skybox",
-//                                                             {"textures/cubemap-posX.png",
-//                                                              "textures/cubemap-negX.png",
-//                                                              "textures/cubemap-posY.png",
-//                                                              "textures/cubemap-negY.png",
-//                                                              "textures/cubemap-posZ.png",
-//                                                              "textures/cubemap-posZ.png"});
-//
   Ref<MeshSource>
       model = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/Helment/untitled.gltf");
 
