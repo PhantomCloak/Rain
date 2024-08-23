@@ -61,5 +61,4 @@ namespace Rain {
 
 #define RN_LOG(...) ::Rain::Log::PrintMessage(::Rain::Log::Type::Core, "STATUS: ", __VA_ARGS__)
 #define RN_LOG_ERR(...) ::Rain::Log::PrintMessageError(::Rain::Log::Type::Core, "ERROR: ", __VA_ARGS__)
-
 }  // namespace Rain

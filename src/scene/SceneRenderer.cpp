@@ -2,6 +2,7 @@
 #include "Application.h"
 #include "debug/Profiler.h"
 #include "render/Render.h"
+#include "render/ResourceManager.h"
 
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_wgpu.h"
@@ -132,9 +133,19 @@ void SceneRenderer::Init() {
       .ColorFormat = TextureFormat::RGBA,
       .DepthFormat = TextureFormat::Undefined};
 
+  RenderPipelineProps skyboxPipeProps = {
+      .VertexLayout = vertexLayoutQuad,
+      .InstanceLayout = {},
+      .CullingMode = PipelineCullingMode::NONE,
+      .VertexShader = ppfxShader,
+      .FragmentShader = ppfxShader,
+      .ColorFormat = TextureFormat::RGBA,
+      .DepthFormat = TextureFormat::Undefined};
+
   m_LitPipeline = RenderPipeline::Create("RP_Lit", litPipeProps);
   m_ShadowPipeline = RenderPipeline::Create("RP_Shadow", shadowPipeProps);
   m_PpfxPipeline = RenderPipeline::Create("RP_PPFX", ppfxPipeProps);
+  m_SkyboxPipeline = RenderPipeline::Create("RP_Skybox", skyboxPipeProps);
 
   const float shadowFrustum = 200;
   m_SceneUniform.shadowViewProjection = glm::ortho(-shadowFrustum,
@@ -148,32 +159,49 @@ void SceneRenderer::Init() {
   m_SceneUniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(SceneUniform));
   m_SceneUniformBuffer->SetData(&m_SceneUniform, sizeof(SceneUniform));
 
-  RenderPassProps propShadowPass;
-  propShadowPass.DebugName = "ShadowPass";
-  propShadowPass.Pipeline = m_ShadowPipeline;
+  RenderPassProps propShadowPass = {
+      .DebugName = "ShadowPass",
+      .Pipeline = m_ShadowPipeline};
 
   m_ShadowPass = RenderPass::Create(propShadowPass);
   m_ShadowPass->Set("u_scene", m_SceneUniformBuffer);
   m_ShadowPass->Bake();
 
-  RenderPassProps propLitPass;
-  propLitPass.DebugName = "LitPass";
-  propLitPass.Pipeline = m_LitPipeline;
+  RenderPassProps propLitPass = {
+      .DebugName = "LitPass",
+      .Pipeline = m_LitPipeline};
 
   m_LitPass = RenderPass::Create(propLitPass);
   m_LitPass->Set("u_scene", m_SceneUniformBuffer);
   // m_LitPass->Set("shadowMap", m_ShadowPass->GetDepthOutput());
+  // m_LitPass->Set("shadowMap", m_ShadowDepthTexture);
   // m_LitPass->Set("shadowSampler", m_ShadowSampler);
   m_LitPass->Bake();
 
-  RenderPassProps propPpfxPass;
-  propPpfxPass.DebugName = "PpfxPass";
-  propPpfxPass.Pipeline = m_PpfxPipeline;
+  RenderPassProps propSkyboxPass = {
+      .DebugName = "SykboxPass",
+      .Pipeline = m_SkyboxPipeline};
+
+  m_SkyboxPass = RenderPass::Create(propSkyboxPass);
+  m_SkyboxPass->Set("u_scene", m_SceneUniformBuffer);
+  m_SkyboxPass->Bake();
+
+  RenderPassProps propPpfxPass = {
+      .DebugName = "PpfxPass",
+      .Pipeline = m_PpfxPipeline};
 
   // m_PpfxPass = RenderPass::Create(propPpfxPass);
   // m_PpfxPass->Set("renderTexture", m_LitPass->GetOutput(0));
   // m_PpfxPass->Set("textureSampler", m_PpfxSampler);
   // m_PpfxPass->Bake();
+
+  //	Ref<Texture> test = Rain::ResourceManager::LoadCubeTexture("T3D_Skybox",
+  //                                                             {RESOURCE_DIR "/textures/cubemap-posX.png",
+  //                                                              RESOURCE_DIR "/textures/cubemap-negX.png",
+  //                                                              RESOURCE_DIR "/textures/cubemap-posY.png",
+  //                                                              RESOURCE_DIR "/textures/cubemap-negY.png",
+  //                                                              RESOURCE_DIR "/textures/cubemap-posZ.png",
+  //                                                              RESOURCE_DIR "/textures/cubemap-negZ.png"});
 
   auto renderContext = Render::Instance->GetRenderContext();
 
@@ -192,7 +220,7 @@ void SceneRenderer::Init() {
 }
 
 void SceneRenderer::PreRender() {
-	RN_PROFILE_FUNC;
+  RN_PROFILE_FUNC;
   static TransformVertexData* submeshTransforms = (TransformVertexData*)malloc(1024 * sizeof(TransformVertexData));
 
   uint32_t offset = 0;
@@ -213,7 +241,7 @@ void SceneRenderer::SetScene(Scene* scene) {
 }
 
 void SceneRenderer::BeginScene(const SceneCamera& camera) {
-	RN_PROFILE_FUNC;
+  RN_PROFILE_FUNC;
   const glm::mat4 viewInverse = glm::inverse(camera.ViewMatrix);
   const glm::vec3 cameraPosition = viewInverse[3];
 
@@ -230,7 +258,7 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
 }
 
 void SceneRenderer::FlushDrawList() {
-	RN_PROFILE_FUNC;
+  RN_PROFILE_FUNC;
   WGPUCommandEncoderDescriptor commandEncoderDesc = {.label = "Command Encoder"};
   Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
 
