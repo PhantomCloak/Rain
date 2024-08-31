@@ -26,32 +26,32 @@ static ShaderDependencies s_ShaderDependencies;
 
 static WGPURendererData* s_Data = nullptr;
 
-//extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
+// extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
 
 #include "glfw3webgpu.h"
 WGPUInstance Render::CreateGPUInstance() {
   WGPUInstanceDescriptor instanceDesc = {};
-	instanceDesc.nextInChain = nullptr;
+  instanceDesc.nextInChain = nullptr;
   static WGPUInstance instance;
 
-//#if !__EMSCRIPTEN__
-//  static std::vector<const char*> enabledToggles = {
-//      "allow_unsafe_apis",
-//  };
-//
-//  WGPUDawnTogglesDescriptor dawnToggleDesc;
-//  dawnToggleDesc.chain.next = nullptr;
-//  dawnToggleDesc.chain.sType = WGPUSType_DawnTogglesDescriptor;
-//
-//  dawnToggleDesc.enabledToggles = enabledToggles.data();
-//  dawnToggleDesc.enabledToggleCount = 1;
-//  dawnToggleDesc.disabledToggleCount = 0;
-//
-//  instanceDesc.nextInChain = &dawnToggleDesc.chain;
-//
-//  instanceDesc.features.timedWaitAnyEnable = 0;
-//  instanceDesc.features.timedWaitAnyMaxCount = 64;
-//#endif
+  //#if !__EMSCRIPTEN__
+  //  static std::vector<const char*> enabledToggles = {
+  //      "allow_unsafe_apis",
+  //  };
+  //
+  //  WGPUDawnTogglesDescriptor dawnToggleDesc;
+  //  dawnToggleDesc.chain.next = nullptr;
+  //  dawnToggleDesc.chain.sType = WGPUSType_DawnTogglesDescriptor;
+  //
+  //  dawnToggleDesc.enabledToggles = enabledToggles.data();
+  //  dawnToggleDesc.enabledToggleCount = 1;
+  //  dawnToggleDesc.disabledToggleCount = 0;
+  //
+  //  instanceDesc.nextInChain = &dawnToggleDesc.chain;
+  //
+  //  instanceDesc.features.timedWaitAnyEnable = 0;
+  //  instanceDesc.features.timedWaitAnyMaxCount = 64;
+  //#endif
 
   instance = wgpuCreateInstance(&instanceDesc);
 
@@ -70,7 +70,7 @@ bool Render::Init(void* window) {
   m_surface = htmlGetCanvasSurface(instance, "canvas");
 #else
   m_surface = glfwGetWGPUSurface(instance, m_window);
-  //m_surface = nullptr;
+  // m_surface = nullptr;
 #endif
 
   static WGPURequestAdapterOptions adapterOpts{};
@@ -180,6 +180,44 @@ void Render::RendererPostInit() {
   s_Data->QuadIndexBuffer->SetData(indices, sizeof(uint32_t) * 6);
 }
 
+const char* getAdapterTypeString(WGPUAdapterType adapterType) {
+  switch (adapterType) {
+    case WGPUAdapterType_DiscreteGPU:
+      return "Discrete GPU";
+    case WGPUAdapterType_IntegratedGPU:
+      return "Integrated GPU";
+    case WGPUAdapterType_CPU:
+      return "CPU";
+    case WGPUAdapterType_Unknown:
+      return "Unknown";
+    default:
+      return "Unknown";
+  }
+}
+
+const char* getBackendTypeString(WGPUBackendType backendType) {
+  switch (backendType) {
+    case WGPUBackendType_Null:
+      return "Null";
+    case WGPUBackendType_WebGPU:
+      return "WebGPU";
+    case WGPUBackendType_D3D11:
+      return "Direct3D 11";
+    case WGPUBackendType_D3D12:
+      return "Direct3D 12";
+    case WGPUBackendType_Metal:
+      return "Metal";
+    case WGPUBackendType_Vulkan:
+      return "Vulkan";
+    case WGPUBackendType_OpenGL:
+      return "OpenGL";
+    case WGPUBackendType_OpenGLES:
+      return "OpenGLES";
+    default:
+      return "Unknown";
+  }
+}
+
 WGPUAdapter Render::RequestAdapter(WGPUInstance instance,
                                    WGPURequestAdapterOptions const* options) {
   struct UserData {
@@ -197,6 +235,16 @@ WGPUAdapter Render::RequestAdapter(WGPUInstance instance,
 
     userData.adapter = adapter;
     userData.requestEnded = true;
+
+    WGPUAdapterProperties properties;
+    wgpuAdapterGetProperties(adapter, &properties);
+
+    RN_LOG("Adapter Information");
+    RN_LOG(" - Name: {}", properties.name);
+    RN_LOG(" - Vendor ID: {}", properties.vendorID);
+    RN_LOG(" - Device ID: {}", properties.deviceID);
+    RN_LOG(" - Backend: {}", getBackendTypeString(properties.backendType));
+    RN_LOG(" - Adapter Type : {}", getAdapterTypeString(properties.adapterType));
   };
 
   wgpuInstanceRequestAdapter(instance /* equivalent of navigator.gpu */,
@@ -261,7 +309,7 @@ WGPURequiredLimits Render::GetRequiredLimits(WGPUAdapter adapter) {
   requiredLimits.limits.maxVertexAttributes = supportedLimits.limits.maxVertexAttributes;
   requiredLimits.limits.maxVertexBuffers = supportedLimits.limits.maxVertexBuffers;
   requiredLimits.limits.maxBufferSize = 150000 * sizeof(VertexAttribute);
-  //requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);
+  // requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);
   requiredLimits.limits.maxVertexBufferArrayStride = 0;
   requiredLimits.limits.minStorageBufferOffsetAlignment =
       supportedLimits.limits.minStorageBufferOffsetAlignment;
@@ -304,21 +352,21 @@ Ref<Sampler> Render::GetDefaultSampler() {
 WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder) {
   auto& pipe = pass->GetProps().Pipeline;
 
-	WGPURenderPassDescriptor passDesc{.nextInChain = nullptr, .label = pipe->GetName().c_str()};
+  WGPURenderPassDescriptor passDesc{.nextInChain = nullptr, .label = pipe->GetName().c_str()};
 
   if (!pipe->HasColorAttachment()) {
     WGPURenderPassColorAttachment colorAttachment{};
-		colorAttachment.nextInChain = nullptr;
+    colorAttachment.nextInChain = nullptr;
     colorAttachment.loadOp = WGPULoadOp_Clear;
     colorAttachment.storeOp = WGPUStoreOp_Store;
     colorAttachment.clearValue = WGPUColor{0, 0, 0, 1};
     colorAttachment.resolveTarget = nullptr;
-    //colorAttachment.view = pipe->GetColorAttachment()->View;
+    // colorAttachment.view = pipe->GetColorAttachment()->View;
     colorAttachment.view = Instance->GetCurrentSwapChainTexture()->View;
 
     passDesc.colorAttachmentCount = 1;
     passDesc.colorAttachments = &colorAttachment;
-  } 
+  }
   if (pipe->HasDepthAttachment()) {
     WGPURenderPassDepthStencilAttachment depthAttachment = {};
     depthAttachment.view = pipe->GetDepthAttachment()->View;

@@ -75,7 +75,8 @@ void SceneRenderer::Init() {
 
   auto defaultShader = m_ShaderManager->LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/default.wgsl");
   auto shadowShader = m_ShaderManager->LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
-  auto ppfxShader = m_ShaderManager->LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
+  //auto skyboxShader = m_ShaderManager->LoadShader("SH_Skybox", RESOURCE_DIR "/shaders/skybox.wgsl");
+  // auto ppfxShader = m_ShaderManager->LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
 
   glm::vec2 screenSize = Application::Get()->GetWindowSize();
 
@@ -93,14 +94,14 @@ void SceneRenderer::Init() {
                                      .LodMaxClamp = 1.0f});
 
   m_LitPassTexture = Texture::Create({screenSize, TextureFormat::RGBA});
-  m_PpfxSampler = Sampler::Create({.Name = "PpfxSampler",
-                                   .WrapFormat = TextureWrappingFormat::ClampToEdges,
-                                   .MagFilterFormat = FilterMode::Linear,
-                                   .MinFilterFormat = FilterMode::Linear,
-                                   .MipFilterFormat = FilterMode::Linear,
-                                   .Compare = CompareMode::CompareUndefined,
-                                   .LodMinClamp = 0.0f,
-                                   .LodMaxClamp = 1.0f});
+  // m_PpfxSampler = Sampler::Create({.Name = "PpfxSampler",
+  //                                  .WrapFormat = TextureWrappingFormat::ClampToEdges,
+  //                                  .MagFilterFormat = FilterMode::Linear,
+  //                                  .MinFilterFormat = FilterMode::Linear,
+  //                                  .MipFilterFormat = FilterMode::Linear,
+  //                                  .Compare = CompareMode::CompareUndefined,
+  //                                  .LodMinClamp = 0.0f,
+  //                                  .LodMaxClamp = 1.0f});
 
   RenderPipelineProps shadowPipeProps = {
       .VertexLayout = vertexLayout,
@@ -124,28 +125,28 @@ void SceneRenderer::Init() {
   //.TargetFrameBuffer = m_LitPassTexture,
   //.TargetDepthBuffer = m_LitDepthTexture};
 
-  RenderPipelineProps ppfxPipeProps = {
-      .VertexLayout = vertexLayoutQuad,
-      .InstanceLayout = {},
-      .CullingMode = PipelineCullingMode::NONE,
-      .VertexShader = ppfxShader,
-      .FragmentShader = ppfxShader,
-      .ColorFormat = TextureFormat::RGBA,
-      .DepthFormat = TextureFormat::Undefined};
+  // RenderPipelineProps ppfxPipeProps = {
+  //     .VertexLayout = vertexLayoutQuad,
+  //     .InstanceLayout = {},
+  //     .CullingMode = PipelineCullingMode::NONE,
+  //     .VertexShader = ppfxShader,
+  //     .FragmentShader = ppfxShader,
+  //     .ColorFormat = TextureFormat::RGBA,
+  //     .DepthFormat = TextureFormat::Undefined};
 
-  RenderPipelineProps skyboxPipeProps = {
-      .VertexLayout = vertexLayoutQuad,
-      .InstanceLayout = {},
-      .CullingMode = PipelineCullingMode::NONE,
-      .VertexShader = ppfxShader,
-      .FragmentShader = ppfxShader,
-      .ColorFormat = TextureFormat::RGBA,
-      .DepthFormat = TextureFormat::Undefined};
-
+//  RenderPipelineProps skyboxPipeProps = {
+//      .VertexLayout = vertexLayoutQuad,
+//      .InstanceLayout = {},
+//      .CullingMode = PipelineCullingMode::NONE,
+//      .VertexShader = skyboxShader,
+//      .FragmentShader = skyboxShader,
+//      .ColorFormat = TextureFormat::RGBA,
+//      .DepthFormat = TextureFormat::Undefined};
+//
   m_LitPipeline = RenderPipeline::Create("RP_Lit", litPipeProps);
   m_ShadowPipeline = RenderPipeline::Create("RP_Shadow", shadowPipeProps);
-  m_PpfxPipeline = RenderPipeline::Create("RP_PPFX", ppfxPipeProps);
-  m_SkyboxPipeline = RenderPipeline::Create("RP_Skybox", skyboxPipeProps);
+  // m_PpfxPipeline = RenderPipeline::Create("RP_PPFX", ppfxPipeProps);
+  //m_SkyboxPipeline = RenderPipeline::Create("RP_Skybox", skyboxPipeProps);
 
   const float shadowFrustum = 200;
   m_SceneUniform.shadowViewProjection = glm::ortho(-shadowFrustum,
@@ -159,49 +160,62 @@ void SceneRenderer::Init() {
   m_SceneUniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(SceneUniform));
   m_SceneUniformBuffer->SetData(&m_SceneUniform, sizeof(SceneUniform));
 
+  auto sampler = Sampler::Create(Sampler::GetDefaultProps("S_Skybox"));
+  Ref<Texture> skybox = Rain::ResourceManager::LoadCubeTexture("T3D_Skybox",
+                                                               {RESOURCE_DIR "/textures/cubemap-posX.png",
+                                                                RESOURCE_DIR "/textures/cubemap-negX.png",
+                                                                RESOURCE_DIR "/textures/cubemap-posY.png",
+                                                                RESOURCE_DIR "/textures/cubemap-negY.png",
+                                                                RESOURCE_DIR "/textures/cubemap-posZ.png",
+                                                                RESOURCE_DIR "/textures/cubemap-negZ.png"});
+
   RenderPassProps propShadowPass = {
-      .DebugName = "ShadowPass",
-      .Pipeline = m_ShadowPipeline};
+      .Pipeline = m_ShadowPipeline,
+      .DebugName = "ShadowPass"};
 
   m_ShadowPass = RenderPass::Create(propShadowPass);
   m_ShadowPass->Set("u_scene", m_SceneUniformBuffer);
   m_ShadowPass->Bake();
 
   RenderPassProps propLitPass = {
-      .DebugName = "LitPass",
-      .Pipeline = m_LitPipeline};
+      .Pipeline = m_LitPipeline,
+      .DebugName = "LitPass"};
 
   m_LitPass = RenderPass::Create(propLitPass);
   m_LitPass->Set("u_scene", m_SceneUniformBuffer);
+  //m_LitPass->Set("cubemapTexture", skybox);
+  //m_LitPass->Set("cubeSampler", sampler);
   // m_LitPass->Set("shadowMap", m_ShadowPass->GetDepthOutput());
   // m_LitPass->Set("shadowMap", m_ShadowDepthTexture);
   // m_LitPass->Set("shadowSampler", m_ShadowSampler);
   m_LitPass->Bake();
 
+  // Ref<Texture> test = Rain::ResourceManager::LoadCubeTexture("T3D_Skybox",
+  //                                                            {"textures/cubemap-posX.png",
+  //                                                             "textures/cubemap-negX.png",
+  //                                                             "textures/cubemap-posY.png",
+  //                                                             "textures/cubemap-negY.png",
+  //                                                             "textures/cubemap-posZ.png",
+  //                                                             "textures/cubemap-posZ.png"});
+  //
+
   RenderPassProps propSkyboxPass = {
-      .DebugName = "SykboxPass",
-      .Pipeline = m_SkyboxPipeline};
+      .Pipeline = m_SkyboxPipeline,
+      .DebugName = "SykboxPass"};
 
   m_SkyboxPass = RenderPass::Create(propSkyboxPass);
-  m_SkyboxPass->Set("u_scene", m_SceneUniformBuffer);
+  m_SkyboxPass->Set("renderTexture", skybox);
+  m_SkyboxPass->Set("textureSampler", sampler);
   m_SkyboxPass->Bake();
 
   RenderPassProps propPpfxPass = {
-      .DebugName = "PpfxPass",
-      .Pipeline = m_PpfxPipeline};
+      .Pipeline = m_PpfxPipeline,
+      .DebugName = "PpfxPass"};
 
   // m_PpfxPass = RenderPass::Create(propPpfxPass);
   // m_PpfxPass->Set("renderTexture", m_LitPass->GetOutput(0));
   // m_PpfxPass->Set("textureSampler", m_PpfxSampler);
   // m_PpfxPass->Bake();
-
-  //	Ref<Texture> test = Rain::ResourceManager::LoadCubeTexture("T3D_Skybox",
-  //                                                             {RESOURCE_DIR "/textures/cubemap-posX.png",
-  //                                                              RESOURCE_DIR "/textures/cubemap-negX.png",
-  //                                                              RESOURCE_DIR "/textures/cubemap-posY.png",
-  //                                                              RESOURCE_DIR "/textures/cubemap-negY.png",
-  //                                                              RESOURCE_DIR "/textures/cubemap-posZ.png",
-  //                                                              RESOURCE_DIR "/textures/cubemap-negZ.png"});
 
   auto renderContext = Render::Instance->GetRenderContext();
 
@@ -258,8 +272,8 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
 }
 
 void SceneRenderer::FlushDrawList() {
-	RN_PROFILE_FUNC;
-	WGPUCommandEncoderDescriptor commandEncoderDesc = {.nextInChain = nullptr, .label = "Default Command Encoder"};
+  RN_PROFILE_FUNC;
+  WGPUCommandEncoderDescriptor commandEncoderDesc = {.nextInChain = nullptr, .label = "Default Command Encoder"};
   Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
 
   auto commandEncoder = wgpuDeviceCreateCommandEncoder(renderContext->GetDevice(), &commandEncoderDesc);
@@ -269,6 +283,10 @@ void SceneRenderer::FlushDrawList() {
   //   Render::Instance->RenderMesh(shadowPassEncoder, m_ShadowPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
   // }
   // Render::EndRenderPass(m_ShadowPass, shadowPassEncoder);
+
+  //auto skyboxPassEncoder = Render::BeginRenderPass(m_SkyboxPass, commandEncoder);
+  //Render::Instance->SubmitFullscreenQuad(skyboxPassEncoder, m_SkyboxPipeline->GetPipeline());
+  //Render::EndRenderPass(m_SkyboxPass, skyboxPassEncoder);
 
   auto litPassEncoder = Render::BeginRenderPass(m_LitPass, commandEncoder);
   for (auto& [mk, dc] : m_DrawList) {
@@ -281,7 +299,7 @@ void SceneRenderer::FlushDrawList() {
   // Render::Instance->SubmitFullscreenQuad(ppfxPassEncoder, m_PpfxPipeline->GetPipeline());
   // Render::EndRenderPass(m_PpfxPass, ppfxPassEncoder);
 
-	WGPUCommandBufferDescriptor cmdBufferDescriptor = {.nextInChain = nullptr, .label = "Command Buffer"};
+  WGPUCommandBufferDescriptor cmdBufferDescriptor = {.nextInChain = nullptr, .label = "Command Buffer"};
   WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(commandEncoder, &cmdBufferDescriptor);
 
   wgpuQueueSubmit(*renderContext->GetQueue(), 1, &commandBuffer);

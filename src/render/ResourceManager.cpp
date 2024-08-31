@@ -6,6 +6,7 @@
 #include "core/Assert.h"
 #include "render/RenderContext.h"
 #include "debug/Profiler.h"
+#include "core/Log.h"
 
 std::unordered_map<std::string, std::shared_ptr<Texture>> Rain::ResourceManager::_loadedTextures;
 std::unordered_map<AssetHandle, Ref<MeshSource>> Rain::ResourceManager::m_LoadedMeshSources;
@@ -119,6 +120,7 @@ bool Rain::ResourceManager::IsTextureExist(std::string id) {
 std::shared_ptr<Texture> Rain::ResourceManager::LoadTexture(std::string id, std::string path) {
 	RN_PROFILE_FUNC;
   auto tex = std::make_shared<Texture>();
+	RN_LOG("Texture Loading: {}", id);
   tex->Buffer = loadTexture(path.c_str(), RenderContext::GetDevice(), &tex->View);
 
   _loadedTextures[id] = tex;
@@ -170,6 +172,7 @@ std::shared_ptr<Texture> Rain::ResourceManager::LoadCubeTexture(std::string id, 
   }
 
 	WGPUTextureDescriptor textureDesc;
+	textureDesc.label = "bb";
   textureDesc.dimension = WGPUTextureDimension_2D;
   textureDesc.format = WGPUTextureFormat_BGRA8Unorm;
   textureDesc.size = cubemapSize;
@@ -192,6 +195,7 @@ std::shared_ptr<Texture> Rain::ResourceManager::LoadCubeTexture(std::string id, 
 	tex->Buffer = texture;
 
 	WGPUTextureViewDescriptor textureViewDesc;
+	textureViewDesc.label = "nn";
 	textureViewDesc.aspect = WGPUTextureAspect_All;
 	textureViewDesc.baseArrayLayer = 0;
 	textureViewDesc.arrayLayerCount = 6;

@@ -9,6 +9,7 @@
 #include "Application.h"
 
 #include "core/Log.h"
+#include "core/SysInfo.h"
 #include "io/cursor.h"
 #include "io/keyboard.h"
 #include "render/GPUAllocator.h"
@@ -26,10 +27,17 @@ Application* Application::m_Instance;
 
 // This place still heavily under WIP
 void Application::OnStart() {
+  Rain::Log::Init();
+
+	RN_LOG("=== Rain Engine Starting ===");
+	RN_LOG("OS: {}", SysInfo::OSName());
+	RN_LOG("CPU: {}", SysInfo::CPUName());
+	RN_LOG("Total Cores: {}", SysInfo::CoreCount());
+	RN_LOG("Total Memory (RAM): {}", SysInfo::TotalMemory());
+
   render = std::make_unique<Render>();
   render->Init(GetNativeWindow());
 
-  Rain::Log::Init();
   GPUAllocator::Init();
 
 

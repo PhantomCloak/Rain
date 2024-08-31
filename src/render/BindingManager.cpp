@@ -171,7 +171,7 @@ void BindingManager::Bake() {
     auto wgpuBindGroup = wgpuDeviceCreateBindGroup(RenderContext::GetDevice(), &bgDesc);
 
     RN_ASSERT(wgpuBindGroup != 0, "BindGroup creation failed.");
-    RN_LOG("BG {}", (void*)wgpuBindGroup);
+		RN_LOG("Created BindingManager {} {}",m_BindingSpec.Name,  (void*)wgpuBindGroup);
 
     m_BindGroups[groupIndex] = wgpuBindGroup;
   }

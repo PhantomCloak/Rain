@@ -9,6 +9,7 @@
 #if RN_ENABLE_PROFILING
 #define RN_PROFILE_MARK_FRAME			FrameMark;
 #define RN_PROFILE_FUNC ZoneScoped;
+#define RN_PROFILE_SCOPE(...)			RN_PROFILE_FUNC(__VA_ARGS__)
 #define RN_PROFILE_FUNCN(name) ZoneScopedN(name)
 #else
 #define RN_PROFILE_MARK_FRAME
