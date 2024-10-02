@@ -101,6 +101,10 @@ class SceneRenderer {
 
  private:
   Scene* m_Scene;
+
+	CameraData m_CameraData;
+  Ref<GPUBuffer> m_CameraUniformBuffer;
+
   Ref<GPUBuffer> m_TransformBuffer;
   Ref<GPUBuffer> m_SceneUniformBuffer;
   SceneUniform m_SceneUniform;

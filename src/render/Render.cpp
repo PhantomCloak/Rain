@@ -357,7 +357,8 @@ WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandE
   if (!pipe->HasColorAttachment()) {
     WGPURenderPassColorAttachment colorAttachment{};
     colorAttachment.nextInChain = nullptr;
-    colorAttachment.loadOp = WGPULoadOp_Clear;
+    //colorAttachment.loadOp = WGPULoadOp_Clear;
+    colorAttachment.loadOp = WGPULoadOp_Load;
     colorAttachment.storeOp = WGPUStoreOp_Store;
     colorAttachment.clearValue = WGPUColor{0, 0, 0, 1};
     colorAttachment.resolveTarget = nullptr;

@@ -39,11 +39,11 @@ struct MaterialUniform {
 @group(1) @binding(3) var metalicRoughnessTexture: texture_2d<f32>;
 @group(1) @binding(4) var heightTexture: texture_2d<f32>;
 
-@group(2) @binding(0) var shadowMap: texture_depth_2d;
-@group(2) @binding(1) var shadowSampler: sampler_comparison;
+//@group(2) @binding(0) var shadowMap: texture_depth_2d;
+//@group(2) @binding(1) var shadowSampler: sampler_comparison;
 
-@group(3) @binding(0) var cubemapTexture: texture_cube<f32>;
-@group(3) @binding(1) var cubeSampler: sampler;
+@group(2) @binding(0) var irradianceMap: texture_cube<f32>;
+@group(2) @binding(1) var irradianceMapSampler: sampler;
 
 @vertex
 fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
@@ -170,10 +170,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 		let PI = 3.14159265359;
 		let NdotL = max(dot(N, L), 0.0);
 		Lo += (kD * albedo / PI + specular) * radiance * NdotL;
+		
+		// IBL
+		let irradiance = textureSample(irradianceMap, irradianceMapSampler, N).rgb;
+		let diffuse = irradiance * albedo;
+		let ambient = (kD * diffuse) * ao;
+		//let ambient = vec3(0.03) * albedo * ao;
 
-		let ambient = vec3(0.03) * albedo * ao;
 		var color = ambient + Lo;  
+
+		// HDR tonemapping
 		color = color / (color + vec3(1.0));
+		// gamma correct
 		color = pow(color, vec3(1.0/2.2));
 
 		return vec4f(color, 1.0);

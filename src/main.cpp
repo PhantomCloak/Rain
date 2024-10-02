@@ -7,7 +7,7 @@
 #endif
 Rain::Window* appi;
 int main(int, char**) {
-  Rain::WindowProps props("Bouncing Balls");
+  Rain::WindowProps props("Bouncing Balls", 1920, 1080);
 
 #if __EMSCRIPTEN__
   double canvasWidth, canvasHeight;
