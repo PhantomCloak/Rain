@@ -174,7 +174,7 @@ std::shared_ptr<Texture> Rain::ResourceManager::LoadCubeTexture(std::string id, 
 	WGPUTextureDescriptor textureDesc;
 	textureDesc.label = "bb";
   textureDesc.dimension = WGPUTextureDimension_2D;
-  textureDesc.format = WGPUTextureFormat_BGRA8Unorm;
+  textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
   textureDesc.size = cubemapSize;
   textureDesc.mipLevelCount = (uint32_t)(floor((float)(log2(glm::max(textureDesc.size.width, textureDesc.size.height))))) + 1;  // can be replaced with bit_width in C++ 20
   textureDesc.sampleCount = 1;

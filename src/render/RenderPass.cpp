@@ -3,6 +3,7 @@
 
 RenderPass::RenderPass(const RenderPassProps& spec) : m_PassProps(spec)
 {
+	RN_ASSERT(spec.Pipeline != NULL, "RenderPass Pipeline {} cannot be null.", spec.DebugName);
   BindingSpec bindSpec;
   bindSpec.Name = spec.DebugName;
   bindSpec.ShaderRef = spec.Pipeline->GetShader();
