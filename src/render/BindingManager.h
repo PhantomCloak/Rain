@@ -48,6 +48,7 @@ class BindingManager {
 	void Init();
 	bool Validate();
   void Bake();
+	void InvalidateAndUpdate();
 
 	const RenderPassInputDeclaration* GetInputDeclaration(const std::string& name) const;
 
@@ -56,6 +57,11 @@ class BindingManager {
   const ResourceDeclaration& GetInfo(const std::string& name) const;
 
   std::map<int, WGPUBindGroup> m_BindGroups;
+
+  std::map<uint32_t, std::map<uint32_t, WGPUBindGroupEntry>> m_GroupEntryMap;
+
   std::map<uint32_t, std::map<uint32_t, RenderPassInput>> m_Inputs;
+  std::map<uint32_t, std::map<uint32_t, RenderPassInput>> m_InvalidatedInputs;
+
   BindingSpec m_BindingSpec;
 };

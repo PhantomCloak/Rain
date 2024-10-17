@@ -34,24 +34,24 @@ WGPUInstance Render::CreateGPUInstance() {
   instanceDesc.nextInChain = nullptr;
   static WGPUInstance instance;
 
-  //#if !__EMSCRIPTEN__
-  //  static std::vector<const char*> enabledToggles = {
-  //      "allow_unsafe_apis",
-  //  };
+  // #if !__EMSCRIPTEN__
+  //   static std::vector<const char*> enabledToggles = {
+  //       "allow_unsafe_apis",
+  //   };
   //
-  //  WGPUDawnTogglesDescriptor dawnToggleDesc;
-  //  dawnToggleDesc.chain.next = nullptr;
-  //  dawnToggleDesc.chain.sType = WGPUSType_DawnTogglesDescriptor;
+  //   WGPUDawnTogglesDescriptor dawnToggleDesc;
+  //   dawnToggleDesc.chain.next = nullptr;
+  //   dawnToggleDesc.chain.sType = WGPUSType_DawnTogglesDescriptor;
   //
-  //  dawnToggleDesc.enabledToggles = enabledToggles.data();
-  //  dawnToggleDesc.enabledToggleCount = 1;
-  //  dawnToggleDesc.disabledToggleCount = 0;
+  //   dawnToggleDesc.enabledToggles = enabledToggles.data();
+  //   dawnToggleDesc.enabledToggleCount = 1;
+  //   dawnToggleDesc.disabledToggleCount = 0;
   //
-  //  instanceDesc.nextInChain = &dawnToggleDesc.chain;
+  //   instanceDesc.nextInChain = &dawnToggleDesc.chain;
   //
-  //  instanceDesc.features.timedWaitAnyEnable = 0;
-  //  instanceDesc.features.timedWaitAnyMaxCount = 64;
-  //#endif
+  //   instanceDesc.features.timedWaitAnyEnable = 0;
+  //   instanceDesc.features.timedWaitAnyMaxCount = 64;
+  // #endif
 
   instance = wgpuCreateInstance(&instanceDesc);
 
@@ -236,7 +236,7 @@ WGPUAdapter Render::RequestAdapter(WGPUInstance instance,
     userData.adapter = adapter;
     userData.requestEnded = true;
 
-    WGPUAdapterProperties properties;
+    WGPUAdapterProperties properties = {};
     wgpuAdapterGetProperties(adapter, &properties);
 
     RN_LOG("Adapter Information");
@@ -349,25 +349,31 @@ Ref<Sampler> Render::GetDefaultSampler() {
   return sampler;
 }
 
-WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder) {
+WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder, bool hack) {
+	pass->Prepare();
   auto& pipe = pass->GetProps().Pipeline;
 
   WGPURenderPassDescriptor passDesc{.nextInChain = nullptr, .label = pipe->GetName().c_str()};
 
-  if (!pipe->HasColorAttachment()) {
-    WGPURenderPassColorAttachment colorAttachment{};
-    colorAttachment.nextInChain = nullptr;
-    //colorAttachment.loadOp = WGPULoadOp_Clear;
-    colorAttachment.loadOp = WGPULoadOp_Load;
-    colorAttachment.storeOp = WGPUStoreOp_Store;
-    colorAttachment.clearValue = WGPUColor{0, 0, 0, 1};
-    colorAttachment.resolveTarget = nullptr;
-    // colorAttachment.view = pipe->GetColorAttachment()->View;
-    colorAttachment.view = Instance->GetCurrentSwapChainTexture()->View;
+  WGPURenderPassColorAttachment colorAttachment{};
+  colorAttachment.nextInChain = nullptr;
+  colorAttachment.loadOp = WGPULoadOp_Load;
+  colorAttachment.storeOp = WGPUStoreOp_Store;
+  colorAttachment.clearValue = WGPUColor{0, 0, 0, 1};
+  colorAttachment.resolveTarget = nullptr;
 
+  if (pipe->HasColorAttachment()) {
+    colorAttachment.view = pipe->GetColorAttachment()->View;
     passDesc.colorAttachmentCount = 1;
     passDesc.colorAttachments = &colorAttachment;
+  } else {
+    if (!hack) {
+      passDesc.colorAttachmentCount = 1;
+      passDesc.colorAttachments = &colorAttachment;
+      colorAttachment.view = Instance->GetCurrentSwapChainTexture()->View;
+    }
   }
+
   if (pipe->HasDepthAttachment()) {
     WGPURenderPassDepthStencilAttachment depthAttachment = {};
     depthAttachment.view = pipe->GetDepthAttachment()->View;

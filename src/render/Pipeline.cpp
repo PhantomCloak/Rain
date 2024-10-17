@@ -214,3 +214,7 @@ RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& prop
 
   m_Pipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
 }
+
+void RenderPipeline::Invalidate() {
+
+}

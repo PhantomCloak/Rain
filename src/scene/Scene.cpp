@@ -17,41 +17,20 @@ Entity Scene::CreateEntity(std::string name) {
   return CreateChildEntity({}, name);
 }
 
-Ref<Material> redMat;
-MaterialProperties redMatProps;
-
 void Scene::Init() {
   m_SceneCamera = std::make_unique<PlayerCamera>();
   m_SceneCamera->Position.y = 0;
   m_SceneCamera->Position.z = 0;
 
-  static auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
+  Ref<MeshSource> exampleModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/SponzaExp5.gltf");
+  Entity sponzaModel = CreateEntity("Box");
+  sponzaModel.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 10, 0);
+  BuildMeshEntityHierarchy(sponzaModel, exampleModel);
 
-  Ref<MeshSource>
-      model = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/Helment/untitled.gltf");
-
-  // sphere
-  redMat = Material::CreateMaterial("M_BoxRed", defaultShader);
-  redMatProps = MaterialProperties{
-      .Metallic = 0.2f,
-      .Roughness = 0.1f,
-      .Ao = 0.3f};
-
-  redMat->Set("uMaterial", redMatProps);
-  redMat->Bake();
 
   Entity light = CreateEntity("DirectionalLight");
-  light.GetComponent<TransformComponent>()->Translation = glm::vec3(10, 15, 5);
+  light.GetComponent<TransformComponent>()->Translation = glm::vec3(30, 150, 0);
   light.AddComponent<DirectionalLightComponent>();
-
-  Entity sampleEntity = CreateEntity("Test");
-  sampleEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 0, -10);
-  sampleEntity.GetComponent<TransformComponent>()->Scale = glm::vec3(1);
-
-  BuildMeshEntityHierarchy(sampleEntity, model);
-
-  // TryGetEntityWithUUID(sampleEntity.GetChild(0)).GetComponent<MeshComponent>()->Materials->SetMaterial(0, redMat);
-  //  TryGetEntityWithUUID(wallOne.GetChild(0)).GetComponent<MeshComponent>()->Materials->SetMaterial(0, greenMat);
 }
 
 Entity Scene::CreateChildEntity(Entity parent, std::string name) {
@@ -112,23 +91,23 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
   ImGui::Begin("Scene Settings");
 
   static float s_metallic = 0.1f;
-  if (ImGui::SliderFloat("Metallic", &s_metallic, 0, 1)) {
-    redMatProps.Metallic = s_metallic;
-    redMat->Set("uMaterial", redMatProps);
-  }
+  //if (ImGui::SliderFloat("Metallic", &s_metallic, 0, 1)) {
+  //  redMatProps.Metallic = s_metallic;
+  //  redMat->Set("uMaterial", redMatProps);
+  //}
 
-  ImGui::Spacing();
-  static float s_roughness = 0.1f;
-  if (ImGui::SliderFloat("Roughness", &s_roughness, 0, 1)) {
-    redMatProps.Roughness = s_roughness;
-    redMat->Set("uMaterial", redMatProps);
-  }
-  ImGui::Spacing();
-  static float s_ao = 0.1f;
-  if (ImGui::SliderFloat("Ao", &s_ao, 0, 1)) {
-    redMatProps.Ao = s_ao;
-    redMat->Set("uMaterial", redMatProps);
-  }
+  //ImGui::Spacing();
+  //static float s_roughness = 0.1f;
+  //if (ImGui::SliderFloat("Roughness", &s_roughness, 0, 1)) {
+  //  redMatProps.Roughness = s_roughness;
+  //  redMat->Set("uMaterial", redMatProps);
+  //}
+  //ImGui::Spacing();
+  //static float s_ao = 0.1f;
+  //if (ImGui::SliderFloat("Ao", &s_ao, 0, 1)) {
+  //  redMatProps.Ao = s_ao;
+  //  redMat->Set("uMaterial", redMatProps);
+  //}
 
   ImGui::End();
 
@@ -164,7 +143,7 @@ glm::mat4 Scene::GetWorldSpaceTransformMatrix(Entity entity) {
 }
 
 void Scene::ScanKeyPress() {
-  float speed = 0.05f;
+  float speed = 0.55f;
 
   if (Keyboard::IsKeyPressing(Rain::Key::W)) {
     m_SceneCamera->ProcessKeyboard(FORWARD, speed);

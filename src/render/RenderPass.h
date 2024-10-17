@@ -31,6 +31,8 @@ class RenderPass {
 
   static Ref<RenderPass> Create(const RenderPassProps& spec);
 
+	void Prepare();
+
  private:
   Ref<BindingManager> m_PassBinds;
   RenderPassProps m_PassProps;

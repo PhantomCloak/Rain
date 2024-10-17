@@ -274,3 +274,8 @@ class RenderTypeUtils {
 		static WGPUAddressMode ToRenderType(TextureWrappingFormat format);
 		static WGPUFilterMode ToRenderType(FilterMode format);
 };
+
+class RenderUtils {
+	public:
+		static uint32_t CalculateMipCount(uint32_t width, uint32_t height);
+};

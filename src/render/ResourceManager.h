@@ -1,9 +1,5 @@
 #pragma once
 #include "core/UUID.h"
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_RESIZE2_IMPLEMENTATION
-#define TINYOBJLOADER_IMPLEMENTATION
-
 #include <webgpu/webgpu.h>
 #include <string>
 #include <unordered_map>

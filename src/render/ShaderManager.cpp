@@ -1,8 +1,9 @@
 #include "ShaderManager.h"
 #include <iostream>
 
-//#include "src/tint/api/tint.h"
+// #include "src/tint/api/tint.h"
 #include "core/Log.h"
+#include "src/tint/lang/core/type/reference.h"
 #include "src/tint/lang/wgsl/inspector/inspector.h"
 #include "src/tint/lang/wgsl/reader/reader.h"
 
@@ -57,19 +58,20 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
   tint::Source::File* file = new tint::Source::File(shader->GetName(), shader->GetSource());
   tint::Program program = tint::wgsl::reader::Parse(file, options);
 
-	if(program.Diagnostics().contains_errors())
-	{
-		RN_LOG_ERR("Shader Compilation Error: {0}", program.Diagnostics().str());
-		return reflectionInfo;
-	}
+  if (program.Diagnostics().contains_errors()) {
+    RN_LOG_ERR("Shader Compilation Error: {0}", program.Diagnostics().str());
+    return reflectionInfo;
+  }
 
   tint::inspector::Inspector inspector(program);
 
   std::unordered_map<uint32_t, std::unordered_map<uint32_t, tint::inspector::ResourceBinding>> inspectorResourceBindings;
 
+  auto& userTypes = reflectionInfo.UserTypes;
+  ;
   auto& resourceBindings = reflectionInfo.ResourceDeclarations;
 
-	// TODO: Check shader is valid
+  // TODO: Check shader is valid
   for (auto& entryPoint : inspector.GetEntryPoints()) {
     auto textureBindings = inspector.GetSampledTextureResourceBindings(entryPoint.name);
     auto depthTextureBindings = inspector.GetDepthTextureResourceBindings(entryPoint.name);
@@ -82,7 +84,7 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
     }
   }
 
-	// TODO: If variable shared across two stage it will duplicate
+  // TODO: If variable shared across two stage it will duplicate
   for (auto& entryPoint : inspector.GetEntryPoints()) {
     auto* func = program.AST().Functions().Find(program.Symbols().Get(entryPoint.name));
     auto* func_sem = program.Sem().Get(func);
@@ -92,6 +94,21 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
       auto binding_info = ruv.second;
       auto* unwrapped_type = var->Type()->UnwrapRef();
 
+      auto* uniformType = var->Type()->UnwrapRef()->As<tint::core::type::Struct>();
+      auto typeName = uniformType->Name().Name();
+
+      if (userTypes.find(typeName) == userTypes.end()) {
+        for (const auto& member : uniformType->Members()) {
+          auto memberName = member->Name().Name();
+		  userTypes[typeName][memberName] = {
+			  .Name = memberName,
+			  .Type = ShaderUniformType::Int,
+			  .Size = member->Size(),
+			  .Offset = member->Offset()
+		  };
+        }
+      }
+
       ResourceDeclaration info;
       info.Type = BindingType::UniformBindingType;
       info.Name = var->Declaration()->name->symbol.Name();
@@ -99,9 +116,9 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
       info.LocationIndex = binding_info.binding;
       info.Size = unwrapped_type->Size();
 
-
-			if(resourceBindings[info.GroupIndex].size() == 0)
-				resourceBindings[info.GroupIndex].push_back(info);
+      if (resourceBindings[info.GroupIndex].size() == 0) {
+        resourceBindings[info.GroupIndex].push_back(info);
+      }
     }
 
     for (auto& ruv : func_sem->TransitivelyReferencedSampledTextureVariables()) {
@@ -175,7 +192,7 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
     for (const auto& entry : entries) {
       WGPUBindGroupLayoutEntry groupEntry = {};
       groupEntry.binding = entry.LocationIndex;
-			groupEntry.nextInChain = nullptr;
+      groupEntry.nextInChain = nullptr;
 
       switch (entry.Type) {
         case UniformBindingType:
@@ -208,11 +225,11 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
       layoutEntries.push_back(groupEntry);
     }
 
-		std::string label = shader->GetName() + std::to_string(groupIndex);
+    std::string label = shader->GetName() + std::to_string(groupIndex);
 
     WGPUBindGroupLayoutDescriptor layoutDesc = {};
-		layoutDesc.nextInChain = nullptr;
-		layoutDesc.label = label.c_str();
+    layoutDesc.nextInChain = nullptr;
+    layoutDesc.label = label.c_str();
     layoutDesc.entries = layoutEntries.data();
     layoutDesc.entryCount = layoutEntries.size();
 

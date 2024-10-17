@@ -42,6 +42,7 @@ class RenderPipeline {
 	const bool HasDepthAttachment() { return m_PipelineProps.TargetDepthBuffer != nullptr; }
 
   Ref<Shader> GetShader() const { return m_PipelineProps.FragmentShader; }
+	void Invalidate();
 
  private:
   std::string m_Name;

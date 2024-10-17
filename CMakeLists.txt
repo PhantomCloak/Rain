@@ -4,6 +4,10 @@ set(DAWN_DEBUG_BREAK_ON_ERROR TRUE)
 set(DEBUG_BREAK_ON_ERROR TRUE)
 set(DAWN_BREAK_ON_ERROR TRUE)
 
+set(CMAKE_CXX_FLAGS "-Wno-error ${CMAKE_CXX_FLAGS}" CACHE STRING "" FORCE)
+set(CMAKE_C_FLAGS "-Wno-error ${CMAKE_C_FLAGS}" CACHE STRING "" FORCE)
+
+
 #include_directories("vendor" "vendor/imgui" "vendor/spdlog/include" "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -v")
 
@@ -48,6 +52,6 @@ if(EMSCRIPTEN)
 		-O0
 		--preload-file "${CMAKE_CURRENT_SOURCE_DIR}/Resources"
 		)
-	set_target_properties(MyApp PROPERTIES SUFFIX ".html")
+		set_target_properties(ReEngine PROPERTIES SUFFIX ".html")
 endif()
 

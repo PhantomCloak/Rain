@@ -73,17 +73,18 @@ void SceneRenderer::Init() {
 
   // clang-format on
 
-  auto defaultShader = m_ShaderManager->LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/default.wgsl");
+  auto pbrShader = m_ShaderManager->LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/pbr.wgsl");
   auto shadowShader = m_ShaderManager->LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
   auto skyboxShader = m_ShaderManager->LoadShader("SH_Skybox", RESOURCE_DIR "/shaders/skybox.wgsl");
-  // auto ppfxShader = m_ShaderManager->LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
+  auto ppfxShader = m_ShaderManager->LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
 
   glm::vec2 screenSize = Application::Get()->GetWindowSize();
+  uint32_t screenWidth = static_cast<uint32_t>(screenSize.x);
+  uint32_t screenHeight = static_cast<uint32_t>(screenSize.y);
 
-  m_LitDepthTexture = Texture::Create({screenSize, TextureFormat::Depth});
-  m_LitDepthTexture = Texture::Create({screenSize, TextureFormat::Depth});
+  m_LitDepthTexture = Texture::Create({.Format = TextureFormat::Depth, .Width = screenWidth, .Height = screenHeight, .GenerateMips = false});
+  m_ShadowDepthTexture = Texture::Create({.Format = TextureFormat::Depth, .Width = 4096, .Height = 4096, .GenerateMips = false, .CreateSampler = false});
 
-  m_ShadowDepthTexture = Texture::Create({{4096, 4096}, TextureFormat::Depth});
   m_ShadowSampler = Sampler::Create({.Name = "ShadowSampler",
                                      .WrapFormat = TextureWrappingFormat::ClampToEdges,
                                      .MagFilterFormat = FilterMode::Linear,
@@ -93,15 +94,7 @@ void SceneRenderer::Init() {
                                      .LodMinClamp = 1.0f,
                                      .LodMaxClamp = 1.0f});
 
-  m_LitPassTexture = Texture::Create({screenSize, TextureFormat::RGBA});
-  // m_PpfxSampler = Sampler::Create({.Name = "PpfxSampler",
-  //                                  .WrapFormat = TextureWrappingFormat::ClampToEdges,
-  //                                  .MagFilterFormat = FilterMode::Linear,
-  //                                  .MinFilterFormat = FilterMode::Linear,
-  //                                  .MipFilterFormat = FilterMode::Linear,
-  //                                  .Compare = CompareMode::CompareUndefined,
-  //                                  .LodMinClamp = 0.0f,
-  //                                  .LodMaxClamp = 1.0f});
+  m_LitPassTexture = Texture::Create({.Format = TextureFormat::BRGBA, .Width = screenWidth, .Height = screenHeight, .SamplerWrap = TextureWrappingFormat::ClampToEdges, .SamplerFilter = FilterMode::Linear, .GenerateMips = false});
 
   RenderPipelineProps shadowPipeProps = {
       .VertexLayout = vertexLayout,
@@ -117,13 +110,22 @@ void SceneRenderer::Init() {
       .VertexLayout = vertexLayout,
       .InstanceLayout = instanceLayout,
       .CullingMode = PipelineCullingMode::NONE,
-      .VertexShader = defaultShader,
-      .FragmentShader = defaultShader,
+      .VertexShader = pbrShader,
+      .FragmentShader = pbrShader,
       .ColorFormat = TextureFormat::RGBA,
       .DepthFormat = TextureFormat::Depth,
+      //.TargetDepthBuffer = m_LitDepthTexture};
+      .TargetFrameBuffer = m_LitPassTexture,
       .TargetDepthBuffer = m_LitDepthTexture};
-  //.TargetFrameBuffer = m_LitPassTexture,
-  //.TargetDepthBuffer = m_LitDepthTexture};
+
+  RenderPipelineProps ppfxPipeProps = {
+      .VertexLayout = vertexLayoutQuad,
+      .InstanceLayout = {},
+      .CullingMode = PipelineCullingMode::NONE,
+      .VertexShader = ppfxShader,
+      .FragmentShader = ppfxShader,
+      .ColorFormat = TextureFormat::RGBA,
+      .DepthFormat = TextureFormat::Undefined};
 
   RenderPipelineProps skyboxPipeProps = {
       .VertexLayout = vertexLayoutQuad,
@@ -132,11 +134,12 @@ void SceneRenderer::Init() {
       .VertexShader = skyboxShader,
       .FragmentShader = skyboxShader,
       .ColorFormat = TextureFormat::RGBA,
-      .DepthFormat = TextureFormat::Undefined};
+      .DepthFormat = TextureFormat::Undefined,
+      .TargetFrameBuffer = m_LitPassTexture};
 
   m_LitPipeline = RenderPipeline::Create("RP_Lit", litPipeProps);
   m_ShadowPipeline = RenderPipeline::Create("RP_Shadow", shadowPipeProps);
-	// m_PpfxPipeline = RenderPipeline::Create("RP_PPFX", ppfxPipeProps);
+  m_PpfxPipeline = RenderPipeline::Create("RP_PPFX", ppfxPipeProps);
   m_SkyboxPipeline = RenderPipeline::Create("RP_Skybox", skyboxPipeProps);
 
   const float shadowFrustum = 200;
@@ -182,11 +185,12 @@ void SceneRenderer::Init() {
 
   m_LitPass = RenderPass::Create(propLitPass);
   m_LitPass->Set("u_scene", m_SceneUniformBuffer);
-	m_LitPass->Set("irradianceMap", skybox);
-	m_LitPass->Set("irradianceMapSampler", skyboxSample);
-  //  m_LitPass->Set("shadowMap", m_ShadowPass->GetDepthOutput());
+  // m_LitPass->Set("irradianceMap", skybox);
+  // m_LitPass->Set("irradianceMapSampler", skyboxSample);
+
   //  m_LitPass->Set("shadowMap", m_ShadowDepthTexture);
-  //  m_LitPass->Set("shadowSampler", m_ShadowSampler);
+  m_LitPass->Set("shadowMap", m_ShadowPass->GetDepthOutput());
+  m_LitPass->Set("shadowSampler", m_ShadowSampler);
   m_LitPass->Bake();
 
   RenderPassProps propSkyboxPass = {
@@ -206,10 +210,10 @@ void SceneRenderer::Init() {
       .Pipeline = m_PpfxPipeline,
       .DebugName = "PpfxPass"};
 
-  // m_PpfxPass = RenderPass::Create(propPpfxPass);
-  // m_PpfxPass->Set("renderTexture", m_LitPass->GetOutput(0));
-  // m_PpfxPass->Set("textureSampler", m_PpfxSampler);
-  // m_PpfxPass->Bake();
+  m_PpfxPass = RenderPass::Create(propPpfxPass);
+  m_PpfxPass->Set("renderTexture", m_LitPass->GetOutput(0));
+  m_PpfxPass->Set("textureSampler", m_LitPass->GetOutput(0)->Sampler);
+  m_PpfxPass->Bake();
 
   auto renderContext = Render::Instance->GetRenderContext();
 
@@ -248,6 +252,14 @@ void SceneRenderer::SetScene(Scene* scene) {
   m_Scene = scene;
 }
 
+void SceneRenderer::SetViewportSize(int height, int width) {
+  RN_LOG("RESIZE");
+  m_ViewportWidth = width;
+  m_ViewportHeight = height;
+
+  m_NeedResize = true;
+}
+
 void SceneRenderer::BeginScene(const SceneCamera& camera) {
   RN_PROFILE_FUNC;
   const glm::mat4 viewInverse = glm::inverse(camera.ViewMatrix);
@@ -266,6 +278,13 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
   m_SceneUniformBuffer->SetData(&m_SceneUniform, sizeof(SceneUniform));
   m_CameraUniformBuffer->SetData(&m_CameraData, sizeof(CameraData));
 
+  if (m_NeedResize) {
+    m_LitPass->GetOutput(0)->Resize(m_ViewportWidth, m_ViewportHeight);
+    m_LitPass->GetDepthOutput()->Resize(m_ViewportWidth, m_ViewportHeight);
+
+    m_NeedResize = false;
+  }
+
   ImGui_ImplWGPU_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
@@ -278,39 +297,56 @@ void SceneRenderer::FlushDrawList() {
 
   auto commandEncoder = wgpuDeviceCreateCommandEncoder(renderContext->GetDevice(), &commandEncoderDesc);
 
-  auto skyboxPassEncoder = Render::BeginRenderPass(m_SkyboxPass, commandEncoder);
-  Render::Instance->SubmitFullscreenQuad(skyboxPassEncoder, m_SkyboxPipeline->GetPipeline());
-  Render::EndRenderPass(m_SkyboxPass, skyboxPassEncoder);
+  {
+    ZoneScopedN("Skybox Pass");
 
-  // auto shadowPassEncoder = Render::BeginRenderPass(m_ShadowPass, commandEncoder);
-  // for (auto& [mk, dc] : m_DrawList) {
-  //   Render::Instance->RenderMesh(shadowPassEncoder, m_ShadowPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
-  // }
-  // Render::EndRenderPass(m_ShadowPass, shadowPassEncoder);
+    auto skyboxPassEncoder = Render::BeginRenderPass(m_SkyboxPass, commandEncoder);
+    Render::Instance->SubmitFullscreenQuad(skyboxPassEncoder, m_SkyboxPipeline->GetPipeline());
+    Render::EndRenderPass(m_SkyboxPass, skyboxPassEncoder);
 
-  auto litPassEncoder = Render::BeginRenderPass(m_LitPass, commandEncoder);
-  for (auto& [mk, dc] : m_DrawList) {
-    Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+    auto shadowPassEncoder = Render::BeginRenderPass(m_ShadowPass, commandEncoder, true);
+    for (auto& [mk, dc] : m_DrawList) {
+      Render::Instance->RenderMesh(shadowPassEncoder, m_ShadowPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+    }
+    Render::EndRenderPass(m_ShadowPass, shadowPassEncoder);
   }
-  ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
-  Render::EndRenderPass(m_LitPass, litPassEncoder);
 
-  // auto ppfxPassEncoder = Render::BeginRenderPass(m_PpfxPass, commandEncoder);
-  // Render::Instance->SubmitFullscreenQuad(ppfxPassEncoder, m_PpfxPipeline->GetPipeline());
-  // Render::EndRenderPass(m_PpfxPass, ppfxPassEncoder);
+  {
+    ZoneScopedN("Lit Pass");
+    auto litPassEncoder = Render::BeginRenderPass(m_LitPass, commandEncoder);
+    for (auto& [mk, dc] : m_DrawList) {
+      Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+    }
+    ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
+    Render::EndRenderPass(m_LitPass, litPassEncoder);
+  }
 
-  WGPUCommandBufferDescriptor cmdBufferDescriptor = {.nextInChain = nullptr, .label = "Command Buffer"};
-  WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(commandEncoder, &cmdBufferDescriptor);
+  {
+    ZoneScopedN("PPFX Pass");
+    auto ppfxPassEncoder = Render::BeginRenderPass(m_PpfxPass, commandEncoder);
+    Render::Instance->SubmitFullscreenQuad(ppfxPassEncoder, m_PpfxPipeline->GetPipeline());
+    Render::EndRenderPass(m_PpfxPass, ppfxPassEncoder);
+  }
 
-  wgpuQueueSubmit(*renderContext->GetQueue(), 1, &commandBuffer);
+  {
+		ZoneScopedNS("Submit", 6);
+    WGPUCommandBufferDescriptor cmdBufferDescriptor = {.nextInChain = nullptr, .label = "Command Buffer"};
+    WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(commandEncoder, &cmdBufferDescriptor);
+    wgpuQueueSubmit(*renderContext->GetQueue(), 1, &commandBuffer);
 
-  wgpuCommandEncoderRelease(commandEncoder);
-  wgpuTextureViewRelease(Render::Instance->GetCurrentSwapChainTexture()->View);
+    wgpuCommandEncoderRelease(commandEncoder);
+    wgpuTextureViewRelease(Render::Instance->GetCurrentSwapChainTexture()->View);
 
+  }
+
+	{
+		ZoneScopedNS("Swap", 6);
 #ifndef __EMSCRIPTEN__
-  wgpuSwapChainPresent(Render::Instance->m_swapChain);
-  wgpuDeviceTick(renderContext->GetDevice());
+    wgpuSwapChainPresent(Render::Instance->m_swapChain);
+    wgpuDeviceTick(renderContext->GetDevice());
 #endif
+	}
+
 
   m_DrawList.clear();
   m_MeshTransformMap.clear();

@@ -69,7 +69,7 @@ struct SceneCamera {
 };
 
 struct CameraData {
-	glm::mat4 InverseViewProjectionMatrix;
+  glm::mat4 InverseViewProjectionMatrix;
 };
 
 struct SceneUniform {
@@ -77,9 +77,9 @@ struct SceneUniform {
   glm::mat4x4 shadowViewProjection;
   glm::mat4x4 cameraViewMatrix;
   glm::vec3 CameraPosition;
-	float _pad0;
-	glm::vec3 LightPosition;
-	float _pad1;
+  float _pad0;
+  glm::vec3 LightPosition;
+  float _pad1;
 };
 
 class SceneRenderer {
@@ -92,6 +92,7 @@ class SceneRenderer {
   void BeginScene(const SceneCamera& camera);
   void EndScene();
   void SetScene(Scene* scene);
+  void SetViewportSize(int height, int width);
   static SceneRenderer* instance;
   Ref<ShaderManager> m_ShaderManager;
 
@@ -102,7 +103,7 @@ class SceneRenderer {
  private:
   Scene* m_Scene;
 
-	CameraData m_CameraData;
+  CameraData m_CameraData;
   Ref<GPUBuffer> m_CameraUniformBuffer;
 
   Ref<GPUBuffer> m_TransformBuffer;
@@ -116,16 +117,20 @@ class SceneRenderer {
   Ref<Texture> m_LitPassTexture;
 
   Ref<Sampler> m_ShadowSampler;
-  Ref<Sampler> m_PpfxSampler;
 
-	Ref<RenderPass> m_ShadowPass;
-	Ref<RenderPass> m_LitPass;
-	Ref<RenderPass> m_PpfxPass;
-	Ref<RenderPass> m_SkyboxPass;
+  Ref<RenderPass> m_ShadowPass;
+  Ref<RenderPass> m_LitPass;
+  Ref<RenderPass> m_PpfxPass;
+  Ref<RenderPass> m_SkyboxPass;
 
   Ref<RenderPipeline> m_LitPipeline;
   Ref<RenderPipeline> m_ShadowPipeline;
   Ref<RenderPipeline> m_DebugPipeline;
   Ref<RenderPipeline> m_PpfxPipeline;
   Ref<RenderPipeline> m_SkyboxPipeline;
+
+  bool m_NeedResize = false;
+
+  uint32_t m_ViewportWidth;
+  uint32_t m_ViewportHeight;
 };

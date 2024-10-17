@@ -5,11 +5,7 @@
 #include "render/GPUAllocator.h"
 #include "render/Texture.h"
 
-struct MaterialProperties {
-	float Metallic = 1.0f;
-	float Roughness = 1.0f;
-	float Ao = 1.0f;
-};
+#define MATERIAL_UNIFORM_KEY "MaterialUniform"
 
 class Material {
  public:
@@ -21,7 +17,9 @@ class Material {
   void Set(const std::string& name, Ref<Texture> texture);
   void Set(const std::string& name, Ref<GPUBuffer> uniform);
   void Set(const std::string& name, Ref<Sampler> sampler);
-  void Set(const std::string& name, const MaterialProperties& props);
+  void Set(const std::string& name, float value);
+  void Set(const std::string& name, int value);
+  void Set(const std::string& name, bool value);
 
   Material(const std::string& name, Ref<Shader> shader);
 
@@ -30,12 +28,27 @@ class Material {
 
   const WGPUBindGroup& GetBinding(int index);
   static Ref<Material> CreateMaterial(const std::string& name, Ref<Shader> shader);
+  const ShaderTypeDecl& FindShaderUniformDecl(const std::string& name);
+
+  template <typename T>
+  void Set(const std::string& name, const T& value) {
+    auto decl = FindShaderUniformDecl(name);
+    if (decl.Type == ShaderUniformType::None) {
+      RN_LOG_ERR("material uniform couldn't found! {}", name);
+      return;
+    }
+
+    auto& buffer = m_UniformStorageBuffer;
+    buffer.Write((byte*)&value, decl.Size, decl.Offset);
+  }
 
   Ref<BindingManager> m_BindManager;
 
  private:
+  Ref<Shader> m_Shader;
   std::string m_Name;
   Ref<GPUBuffer> m_UBMaterial;
+  Buffer m_UniformStorageBuffer;
 };
 
 class MaterialTable {

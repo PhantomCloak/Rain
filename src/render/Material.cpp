@@ -1,12 +1,6 @@
 #include "Material.h"
 #include "render/Render.h"
 
-struct MaterialUniform {
-  float Metallic;  // at byte offset 0
-  float Rougness;  // at byte offset 4
-  float Ao;        // at byte offset 8
-  float _pad0;
-};
 
 Material::Material(const std::string& name, Ref<Shader> shader)
     : m_Name(name) {
@@ -15,7 +9,13 @@ Material::Material(const std::string& name, Ref<Shader> shader)
       .ShaderRef = shader,
       .DefaultResources = true};
 
+	if(m_Name == "Material_24")
+	{
+		RN_LOG("AA");
+	}
+
   m_BindManager = BindingManager::Create(spec);
+	m_Shader = shader;
 
   for (const auto& [name, decl] : m_BindManager->InputDeclarations) {
     if (decl.Group != 1) {
@@ -29,7 +29,17 @@ Material::Material(const std::string& name, Ref<Shader> shader)
     }
   }
 
-  m_UBMaterial = GPUAllocator::GAlloc(name, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(MaterialUniform));
+	
+	int size = 0;
+	for(const auto& [_, member] : m_Shader->GetReflectionInfo().UserTypes[MATERIAL_UNIFORM_KEY])
+	{
+		size += member.Size;
+	}
+	m_UniformStorageBuffer.Allocate(size);
+	m_UniformStorageBuffer.ZeroInitialize();
+
+  m_UBMaterial = GPUAllocator::GAlloc(name, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, size);
+	m_BindManager->Set("uMaterial", m_UBMaterial);
 }
 
 Ref<Material> Material::CreateMaterial(const std::string& name, Ref<Shader> shader) {
@@ -37,10 +47,12 @@ Ref<Material> Material::CreateMaterial(const std::string& name, Ref<Shader> shad
 };
 
 void Material::Bake() {
+	m_UBMaterial->SetData(m_UniformStorageBuffer.Data, m_UniformStorageBuffer.GetSize());
   m_BindManager->Bake();
 }
 
 const WGPUBindGroup& Material::GetBinding(int index) {
+	m_BindManager->InvalidateAndUpdate();
   return m_BindManager->GetBindGroup(index);
 }
 
@@ -58,12 +70,18 @@ void Material::Set(const std::string& name, Ref<Sampler> sampler) {
   m_BindManager->Set(name, sampler);
 }
 
-void Material::Set(const std::string& name, const MaterialProperties& props) {
-  MaterialUniform un;
-  un.Metallic = props.Metallic,
-  un.Rougness = props.Roughness,
-  un.Ao = props.Ao,
+void Material::Set(const std::string& name, float value) {
+	Set<float>(name, value);
+}
 
-  m_UBMaterial->SetData(&un, sizeof(MaterialUniform));
-  m_BindManager->Set(name, m_UBMaterial);
+void Material::Set(const std::string& name, int value) {
+	Set<int>(name, value);
+}
+
+void Material::Set(const std::string& name, bool value) {
+	Set<int>(name, (int)value);
+}
+
+const ShaderTypeDecl& Material::FindShaderUniformDecl(const std::string& name) {
+	return m_Shader->GetReflectionInfo().UserTypes[MATERIAL_UNIFORM_KEY][name];
 }

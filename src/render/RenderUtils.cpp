@@ -88,20 +88,22 @@ uint32_t LayoutUtils::CeilToNextMultiple(uint32_t value, uint32_t step) {
 }
 
 TextureFormat RenderTypeUtils::FromRenderType(WGPUTextureFormat format) {
-	RN_ASSERT(false, "Haven't implemented yet");
+  RN_ASSERT(false, "Haven't implemented yet");
 }
 
 TextureWrappingFormat RenderTypeUtils::FromRenderType(WGPUAddressMode format) {
-	RN_ASSERT(false, "Haven't implemented yet");
+  RN_ASSERT(false, "Haven't implemented yet");
 }
 
 FilterMode RenderTypeUtils::FromRenderType(WGPUFilterMode format) {
-	RN_ASSERT(false, "Haven't implemented yet");
+  RN_ASSERT(false, "Haven't implemented yet");
 }
 
 WGPUTextureFormat RenderTypeUtils::ToRenderType(TextureFormat format) {
   switch (format) {
     case RGBA:
+      return WGPUTextureFormat_RGBA8Unorm;
+    case BRGBA:
       return WGPUTextureFormat_BGRA8Unorm;
     case Depth:
       return WGPUTextureFormat_Depth24Plus;
@@ -131,4 +133,8 @@ WGPUFilterMode RenderTypeUtils::ToRenderType(FilterMode format) {
     default:
       RN_ASSERT(false, "Format conversion for FilterMode not exist.")
   }
+}
+
+uint32_t RenderUtils::CalculateMipCount(uint32_t width, uint32_t height) {
+  return (uint32_t)(floor((float)(log2(glm::max(width, height))))) + 1;
 }

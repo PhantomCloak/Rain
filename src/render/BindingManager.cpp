@@ -132,49 +132,87 @@ bool BindingManager::Validate() {
 }
 
 void BindingManager::Bake() {
-  RN_CORE_ASSERT(Validate(), "Validation failed for {}", m_BindingSpec.Name)
+  //RN_CORE_ASSERT(Validate(), "Validation failed for {}", m_BindingSpec.Name)
 
   for (const auto& [groupIndex, groupBindings] : m_Inputs) {
-    std::vector<WGPUBindGroupEntry> shaderEntries;
     for (const auto& [locationIndex, input] : groupBindings) {
       WGPUBindGroupEntry entry = {};
       entry.binding = locationIndex;
       entry.offset = 0;
       entry.nextInChain = nullptr;
+      m_GroupEntryMap[groupIndex][locationIndex] = entry;
+    }
+  }
 
-      // Since we dont support postponed resources we simply assert
+	InvalidateAndUpdate();
+}
+
+void BindingManager::InvalidateAndUpdate() {
+  for (const auto& [index, inputs] : m_Inputs) {
+    for (const auto& [location, input] : inputs) {
+      const auto& storedEntry = m_GroupEntryMap[index].at(location);
+
       switch (input.Type) {
         case PT_Uniform:
-          entry.buffer = input.UniformIntput->Buffer;
-          entry.size = input.UniformIntput->Size;
+          if (storedEntry.buffer != input.UniformIntput->Buffer) {
+            m_InvalidatedInputs[index][location] = input;
+          }
           break;
         case PT_Texture:
-          entry.textureView = input.TextureInput->View;
+          if (storedEntry.textureView != input.TextureInput->View) {
+            m_InvalidatedInputs[index][location] = input;
+          }
           break;
         case PT_Sampler:
-          entry.sampler = *input.SamplerInput->GetNativeSampler();
+          if (storedEntry.sampler != *input.SamplerInput->GetNativeSampler()) {
+            m_InvalidatedInputs[index][location] = input;
+          }
           break;
       }
-      shaderEntries.push_back(entry);
+    }
+  }
+
+  if (m_InvalidatedInputs.empty()) {
+    return;
+  }
+
+  for (const auto& [index, inputs] : m_InvalidatedInputs) {
+    for (const auto& [location, input] : inputs) {
+			WGPUBindGroupEntry& storedEntry = m_GroupEntryMap[index].at(location);
+
+      switch (input.Type) {
+        case PT_Uniform:
+          storedEntry.buffer = input.UniformIntput->Buffer;
+					storedEntry.size = input.UniformIntput->Size;
+          break;
+        case PT_Texture:
+          storedEntry.textureView = input.TextureInput->View;
+          break;
+        case PT_Sampler:
+          storedEntry.sampler = *input.SamplerInput->GetNativeSampler();
+          break;
+      }
     }
 
-    if (shaderEntries.empty()) {
-      continue;
-    }
+		std::vector<WGPUBindGroupEntry> entries;
+		for(const auto&[_, entry] : m_GroupEntryMap[index])
+			entries.emplace_back(entry);
 
     std::string label = m_BindingSpec.Name;
-		WGPUBindGroupDescriptor bgDesc = {.nextInChain = nullptr, .label = label.c_str()};
-    bgDesc.layout = m_BindingSpec.ShaderRef->GetReflectionInfo().LayoutDescriptors[groupIndex];
-    bgDesc.entryCount = (uint32_t)shaderEntries.size();
-    bgDesc.entries = shaderEntries.data();
+    WGPUBindGroupDescriptor bgDesc = {.nextInChain = nullptr, .label = label.c_str()};
+    bgDesc.layout = m_BindingSpec.ShaderRef->GetReflectionInfo().LayoutDescriptors[index];
+		bgDesc.entryCount = entries.size();
+    bgDesc.entries = entries.data();
 
-    auto wgpuBindGroup = wgpuDeviceCreateBindGroup(RenderContext::GetDevice(), &bgDesc);
+    auto bindGroup = wgpuDeviceCreateBindGroup(RenderContext::GetDevice(), &bgDesc);
 
-    RN_ASSERT(wgpuBindGroup != 0, "BindGroup creation failed.");
-		RN_LOG("Created BindingManager {} {}",m_BindingSpec.Name,  (void*)wgpuBindGroup);
+    RN_ASSERT(bindGroup != 0, "BindGroup creation failed.");
+    RN_LOG("Created BindingManager {} {}", m_BindingSpec.Name, (void*)bindGroup);
 
-    m_BindGroups[groupIndex] = wgpuBindGroup;
+    m_BindGroups[index] = bindGroup;
   }
+
+	m_InvalidatedInputs.clear();
 }
 
 const RenderPassInputDeclaration* BindingManager::GetInputDeclaration(const std::string& name) const {

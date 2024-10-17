@@ -28,3 +28,7 @@ void RenderPass::Set(const std::string& name, Ref<Sampler> sampler) {
 void RenderPass::Bake() {
 	m_PassBinds->Bake();
 }
+
+void RenderPass::Prepare() {
+	m_PassBinds->InvalidateAndUpdate();
+}

@@ -80,26 +80,11 @@ MeshSource::MeshSource(std::string path) {
 
     static auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
 
-    auto materialProps = MaterialProperties();
     auto material = Material::CreateMaterial(aiMatName, defaultShader);
-
-    //if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR,  metallicFactor) == AI_SUCCESS) {
-		//	materialProps.Metallic = metallicFactor;
-    //}
-
-    //if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) == AI_SUCCESS) {
-		//	materialProps.Roughness = roughnessFactor;
-    //}
-
-    //if (aiMat->Get(AI_MATKEY_COLOR_SPECULAR, color) == AI_SUCCESS) {
-    //  //materialProps.specularColor = glm::vec3(color.r, color.g, color.b);
-    //}
-
-    //if (aiMat->Get(AI_MATKEY_SHININESS, shininess) == AI_SUCCESS) {
-    //  //materialProps.shininess = (shininess / 10.0f) * 128.0f;
-    //}
-
-    material->Set("uMaterial", materialProps);
+		material->Set("Metallic", 0.5f);
+		material->Set("Roughness", 0.5f);
+		material->Set("Ao", 0.5f);
+		material->Set("UseNormalMap", false);
 
     for (int j = 0; j < aiMat->GetTextureCount(aiTextureType_DIFFUSE); j++) {
       aiString texturePath;
@@ -158,7 +143,6 @@ MeshSource::MeshSource(std::string path) {
     }
 
     material->Bake();
-    // m_Materials[i] = material;
     Materials->SetMaterial(i, material);
   }
 

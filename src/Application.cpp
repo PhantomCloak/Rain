@@ -58,6 +58,8 @@ void Application::OnResize(int height, int width) {
   render->m_swapChainDesc.height = height;
   render->m_swapChainDesc.width = width;
   render->m_swapChain = render->BuildSwapChain(render->m_swapChainDesc, render->m_device, render->m_surface);
+
+	m_Renderer->SetViewportSize(height, width);
 }
 
 void Application::OnUpdate() {

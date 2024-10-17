@@ -17,7 +17,7 @@ class Render {
 	static Ref<Texture> GetWhiteTexture();
 	static Ref<Sampler> GetDefaultSampler();
 
-  static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
+  static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder, bool hack = false);
   static void EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder);
 
   static void RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
@@ -48,6 +48,7 @@ class Render {
 
  public:
   Ref<RenderContext> m_RenderContext;
+  Ref<RenderPass> m_CurrentRenderPass;
   WGPUSurface m_surface = nullptr;
   GLFWwindow* m_window = nullptr;
   WGPUAdapter m_adapter = nullptr;
