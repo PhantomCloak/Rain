@@ -2,7 +2,7 @@ struct VertexInput {
 	@location(0) a_position: vec3f,
 	@location(1) a_normal: vec3f,
 	@location(2) a_uv: vec2f,
-	@location(3) tangent: vec3f
+	@location(3) a_tangent: vec3f
 };
 
 struct InstanceInput {
@@ -15,18 +15,24 @@ struct VertexOutput {
 	@builtin(position) pos: vec4f,
 	@location(2) Normal: vec3f,
 	@location(3) Uv: vec2f,
-	//@location(4) WorldPosition: vec4f,
-	@location(4) LightPos: vec3f,
-	@location(5) FragPos: vec3f,
-	@location(6) FragPosLightSpace: vec4f,
+	@location(4) FragPos: vec3f,
+	@location(5) WorldPos: vec4f,
+    @location(6) ShadowCoord0: vec3f,
+    @location(7) ShadowCoord1: vec3f,
+    @location(8) ShadowCoord2: vec3f,
+    @location(9) ShadowCoord3: vec3f,
 };
 
 struct SceneData {
 	viewProjection: mat4x4f,
-	shadowViewProjection: mat4x4f,
 	cameraViewMatrix: mat4x4f,
 	CameraPosition: vec3<f32>,
-	LightPosition: vec3<f32>
+	LightDirection: vec3<f32>
+};
+
+struct ShadowData {
+	ShadowViewProjection: array<mat4x4<f32>, 4>,
+	CascadeDistances: vec4<f32>
 };
 
 struct MaterialUniform {
@@ -38,146 +44,100 @@ struct MaterialUniform {
 
 @group(0) @binding(0) var<uniform> u_scene: SceneData;
 
-@group(1) @binding(0) var gradientTexture: texture_2d<f32>;
-@group(1) @binding(1) var textureSampler: sampler;
+@group(1) @binding(0) var u_AlbedoTex: texture_2d<f32>;
+@group(1) @binding(1) var u_TextureSampler: sampler;
 @group(1) @binding(2) var<uniform> uMaterial: MaterialUniform;
-@group(1) @binding(3) var metalicRoughnessTexture: texture_2d<f32>;
-@group(1) @binding(4) var heightTexture: texture_2d<f32>;
+@group(1) @binding(3) var u_MetallicTex: texture_2d<f32>;
+@group(1) @binding(4) var u_NormalTex: texture_2d<f32>;
 
-@group(2) @binding(0) var shadowMap: texture_depth_2d;
-@group(2) @binding(1) var shadowSampler: sampler_comparison;
+@group(2) @binding(0) var u_ShadowMap: texture_depth_2d_array;
+@group(2) @binding(1) var u_ShadowSampler: sampler_comparison;
+@group(2) @binding(2) var<uniform> u_ShadowData: ShadowData;
 
 @group(3) @binding(0) var irradianceMap: texture_cube<f32>;
 @group(3) @binding(1) var irradianceMapSampler: sampler;
 
+
 @vertex
 fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
-	var out: VertexOutput;
+    var out: VertexOutput;
 
-	let transform = mat4x4<f32>(
-			vec4<f32>(instance.a_MRow0.x, instance.a_MRow1.x, instance.a_MRow2.x, 0.0),
-			vec4<f32>(instance.a_MRow0.y, instance.a_MRow1.y, instance.a_MRow2.y, 0.0),
-			vec4<f32>(instance.a_MRow0.z, instance.a_MRow1.z, instance.a_MRow2.z, 0.0),
-			vec4<f32>(instance.a_MRow0.w, instance.a_MRow1.w, instance.a_MRow2.w, 1.0)
-	);
+    let transform = mat4x4<f32>(
+        vec4<f32>(instance.a_MRow0.x, instance.a_MRow1.x, instance.a_MRow2.x, 0.0),
+        vec4<f32>(instance.a_MRow0.y, instance.a_MRow1.y, instance.a_MRow2.y, 0.0),
+        vec4<f32>(instance.a_MRow0.z, instance.a_MRow1.z, instance.a_MRow2.z, 0.0),
+        vec4<f32>(instance.a_MRow0.w, instance.a_MRow1.w, instance.a_MRow2.w, 1.0)
+    );
 
-	let fragPos = (transform * vec4f(in.a_position, 1.0)).xyz;
-	out.pos = u_scene.viewProjection * transform * vec4f(in.a_position, 1.0);
-	out.Normal = (u_scene.cameraViewMatrix * transform * vec4f(in.a_normal, 0.0)).xyz;
+    let worldPos = (transform * vec4f(in.a_position, 1.0)).xyz;
+    out.WorldPos = vec4f(worldPos, 1.0);
 
-	out.Uv = in.a_uv;
+    let normalMatrix = mat3x3<f32>(
+        transform[0].xyz,
+        transform[1].xyz,
+        transform[2].xyz
+    );
 
-	out.LightPos = (u_scene.cameraViewMatrix * vec4f(u_scene.LightPosition, 1.0)).xyz;
-	out.FragPos = (u_scene.cameraViewMatrix * vec4f(fragPos, 1.0)).xyz;
-	out.FragPosLightSpace = u_scene.shadowViewProjection * vec4f(fragPos, 1.0);
+    out.Normal = normalize(normalMatrix * in.a_normal);
+    out.Uv = in.a_uv;
 
-	return out;
-}
+    out.pos = u_scene.viewProjection * vec4f(worldPos, 1.0);
 
-fn DistributionGGX(N: vec3<f32>, H: vec3<f32>, roughness: f32) -> f32 {
-    let a = roughness * roughness;
-    let a2 = a * a;
-    let NdotH = max(dot(N, H), 0.0);
-    let NdotH2 = NdotH * NdotH;
+    let shadowCoords0 = u_ShadowData.ShadowViewProjection[0] * vec4f(worldPos, 1.0);
+    let shadowCoords1 = u_ShadowData.ShadowViewProjection[1] * vec4f(worldPos, 1.0);
+    let shadowCoords2 = u_ShadowData.ShadowViewProjection[2] * vec4f(worldPos, 1.0);
+    let shadowCoords3 = u_ShadowData.ShadowViewProjection[3] * vec4f(worldPos, 1.0);
 
-    let nom = a2;
-    var denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = denom * denom * 3.14159265359; // PI
+    out.ShadowCoord0 = shadowCoords0.xyz / shadowCoords0.w;
+    out.ShadowCoord1 = shadowCoords1.xyz / shadowCoords1.w;
+    out.ShadowCoord2 = shadowCoords2.xyz / shadowCoords2.w;
+    out.ShadowCoord3 = shadowCoords3.xyz / shadowCoords3.w;
 
-    return nom / denom;
-}
+	out.FragPos = (u_scene.cameraViewMatrix * vec4f(worldPos, 1.0)).xyz;
 
-fn GeometrySchlickGGX(NdotV: f32, roughness: f32) -> f32 {
-    let r = (roughness + 1.0);
-    let k = (r * r) / 8.0;
-
-    let nom = NdotV;
-    let denom = NdotV * (1.0 - k) + k;
-
-    return nom / denom;
-}
-
-fn GeometrySmith(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, roughness: f32) -> f32 {
-    let NdotV = max(dot(N, V), 0.0);
-    let NdotL = max(dot(N, L), 0.0);
-    let ggx2 = GeometrySchlickGGX(NdotV, roughness);
-    let ggx1 = GeometrySchlickGGX(NdotL, roughness);
-
-    return ggx1 * ggx2;
-}
-
-fn fresnelSchlick(cosTheta: f32, F0: vec3<f32>) -> vec3<f32> {
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-}
-
-fn getNormalFromMap(normalMap: texture_2d<f32>, defaultSampler: sampler, TexCoords: vec2<f32>, WorldPos: vec3<f32>, Normal: vec3<f32>) -> vec3<f32> {
-    let tangentNormal = textureSample(normalMap, defaultSampler, TexCoords).xyz * 2.0 - 1.0;
-
-    let Q1 = dpdx(WorldPos);
-    let Q2 = dpdy(WorldPos);
-    let st1 = dpdx(TexCoords);
-    let st2 = dpdy(TexCoords);
-
-    let N = normalize(Normal);
-    let T = normalize(Q1 * st2.y - Q2 * st1.y);
-    let B = -normalize(cross(N, T));
-    let TBN = mat3x3<f32>(T, B, N);
-
-    return normalize(TBN * tangentNormal);
-}
-
-fn ShadowCalculation(
-    fragPosLightSpace: vec4<f32>,
-    normal: vec3<f32>,
-    lightDir: vec3<f32>
-) -> f32 {
-    var projCoords: vec3<f32> = fragPosLightSpace.xyz;
-    projCoords = vec3(projCoords.xy * vec2(0.5, -0.5) + vec2(0.5), projCoords.z);
-
-    let currentDepth: f32 = projCoords.z;
-    let bias: f32 = max(0.005 * (1.0 - dot(normal, lightDir)), 0.001);
-
-    var shadow: f32 = 0.0;
-
-    let texelSize: vec2<f32> = vec2(1.0 / 2048.0);
-    const halfKernelWidth: i32 = 1;
-
-    for (var x: i32 = -halfKernelWidth; x <= halfKernelWidth; x++) {
-        for (var y: i32 = -halfKernelWidth; y <= halfKernelWidth; y++) {
-            let sampleCoords: vec2<f32> = projCoords.xy + vec2<f32>(f32(x), f32(y)) * texelSize;
-            let pcfDepth: f32 = textureSampleCompare(shadowMap, shadowSampler, sampleCoords, currentDepth - bias);
-            shadow += pcfDepth;
-        }
-    }
-    shadow /= f32((halfKernelWidth * 2 + 1) * (halfKernelWidth * 2 + 1));
-
-    return shadow;
+    return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-	let textureColor = textureSample(gradientTexture, textureSampler, in.Uv).rgba;
-	let ambient = vec3f(0.3);
+    let albedo = textureSample(u_AlbedoTex, u_TextureSampler, in.Uv).rgb;
 
-	if(uMaterial.UseNormalMap == 1)
-	{
-	}
+    let ambientStrength = 0.25;
+    let ambient = ambientStrength * albedo;
 
-	let d = vec3(1.0, 1.0, 1.0);
+    let norm = normalize(in.Normal);
+	let lightDir = u_scene.LightDirection;
 
-	// Diffuse
-	let norm = normalize(in.Normal);
-	let lightDir = normalize(in.LightPos - in.FragPos);
-	var diffuse = vec3f(max(dot(norm, lightDir), 0.0)) * d;
+    let lightColor = vec3f(1.0, 1.0, 1.0);
+    let diff = max(dot(norm, lightDir), 0.0);
+    let diffuse = diff * lightColor * albedo;
 
-	// Specular
-	let viewDir = normalize(-in.FragPos);
-	let halfwayDir = normalize(lightDir + viewDir);
-	var specular = vec3f(pow(max(dot(norm, halfwayDir), 0.0), 64));
+    let SHADOW_MAP_CASCADE_COUNT = 4u;
+    var layer = SHADOW_MAP_CASCADE_COUNT - 1u;
 
-	var shadow = ShadowCalculation(in.FragPosLightSpace, in.Normal , lightDir);
-	let finalColor = (ambient + (shadow)  * (diffuse + specular)) * textureColor.rgb;
-	//let finalColor = (ambient + diffuse + specular) * textureColor.rgb;
-	return vec4f(finalColor, 1.0);
+    for (var i = SHADOW_MAP_CASCADE_COUNT - 1u; i > 0u; i = i - 1u) {
+        if (-in.FragPos.z < u_ShadowData.CascadeDistances[i - 1u]) {
+            layer = i - 1u;
+        }
+    }
+
+    let shadowCoords = GetShadowMapCoords(in, layer);
+    let MIN_BIAS = 0.005;
+    let bias = max(MIN_BIAS * (1.0 - dot(norm, lightDir)), MIN_BIAS);
+    var shadow: f32 = textureSampleCompare(u_ShadowMap, u_ShadowSampler, shadowCoords.xy * vec2(0.5, -0.5) + vec2(0.5), layer, shadowCoords.z - bias);
+
+    return vec4f(ambient + shadow * diffuse, 1.0);
 }
 
+fn GetShadowMapCoords(
+	in: VertexOutput,
+    cascade: u32
+) -> vec3<f32> {
+    switch (cascade) {
+        case 0: { return in.ShadowCoord0; }
+        case 1: { return in.ShadowCoord1; }
+        case 2: { return in.ShadowCoord2; }
+        case 3: { return in.ShadowCoord3; }
+        default: { return vec3<f32>(0.0); }
+    }
+}

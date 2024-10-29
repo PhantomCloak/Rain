@@ -14,14 +14,12 @@ struct VertexOutput {
 	@builtin(position) position: vec4f,
 };
 
-struct SceneData {
-	viewProjection: mat4x4f,
-	shadowViewProjection: mat4x4f,
-	cameraViewMatrix: mat4x4f,
-	lightPos: vec3<f32>,
+struct ShadowData {
+	ShadowViewProjection: array<mat4x4<f32>, 4>,
+	CascadeDistances: vec4<f32>
 };
 
-@group(0) @binding(0) var<uniform> u_scene: SceneData;
+@group(0) @binding(0) var<uniform> u_ShadowData: ShadowData;
 
 @vertex
 fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
@@ -34,9 +32,11 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
 			vec4<f32>(instance.a_MRow0.w, instance.a_MRow1.w, instance.a_MRow2.w, 1.0)
 	);
 
-	out.position = u_scene.shadowViewProjection * transform * vec4f(in.position, 1.0);
+	out.position = u_ShadowData.ShadowViewProjection[co] * transform * vec4f(in.position, 1.0);
 	return out;
 }
+
+override co: u32 = 0; 
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
