@@ -8,7 +8,7 @@
 #include "io/cursor.h"
 #include "io/keyboard.h"
 #include "render/ResourceManager.h"
-//#include <Tracy.hpp>
+// #include <Tracy.hpp>
 
 Scene::Scene(std::string sceneName)
     : m_Name(sceneName) {}
@@ -17,20 +17,34 @@ Entity Scene::CreateEntity(std::string name) {
   return CreateChildEntity({}, name);
 }
 
+float rotX = -15.0;
+float rotY = 0.0;
+float rotZ = 15.0;
+
+float posX = 0.0;
+float posY = 1000.0;
+float posZ = 0.0;
+
+UUID entityIdDir = 0.0;
+Entity entityCamera;
 void Scene::Init() {
   m_SceneCamera = std::make_unique<PlayerCamera>();
-  m_SceneCamera->Position.y = 0;
-  m_SceneCamera->Position.z = 0;
+  m_SceneCamera->Position.x = 198.84;
+  m_SceneCamera->Position.y = 90.84;
+  m_SceneCamera->Position.z = 155;
 
-  Ref<MeshSource> exampleModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/SponzaExp5.gltf");
-  Entity sponzaModel = CreateEntity("Box");
-  sponzaModel.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 10, 0);
-  BuildMeshEntityHierarchy(sponzaModel, exampleModel);
-
+  Ref<MeshSource> cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/cityz.gltf");
+  Entity map = CreateEntity("Box");
+  map.GetComponent<TransformComponent>()->Translation = glm::vec3(0.0, 0.0, 0);
+  map.GetComponent<TransformComponent>()->Scale = glm::vec3(0.10);
+  BuildMeshEntityHierarchy(map, cityModel);
 
   Entity light = CreateEntity("DirectionalLight");
-  light.GetComponent<TransformComponent>()->Translation = glm::vec3(30, 150, 0);
+  light.GetComponent<TransformComponent>()->Translation = glm::vec3(posX, posY, posZ);
+  light.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(rotX, rotY, rotZ));
+  light.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
   light.AddComponent<DirectionalLightComponent>();
+  entityIdDir = light.GetUUID();
 }
 
 Entity Scene::CreateChildEntity(Entity parent, std::string name) {
@@ -50,6 +64,7 @@ Entity Scene::CreateChildEntity(Entity parent, std::string name) {
     entity.SetParent(parent);
   }
 
+  SceneLightInfo.LightPos = glm::vec3(posX, posY, posZ);
   m_EntityMap[idComponent->ID] = entity;
 
   return entity;
@@ -67,12 +82,15 @@ void Scene::OnUpdate() {
 }
 
 void Scene::OnRender(Ref<SceneRenderer> renderer) {
-	RN_PROFILE_FUNC;
+  RN_PROFILE_FUNC;
   renderer->SetScene(this);
 
-  static float aspectRatio = Application::Get()->GetWindowSize().x / Application::Get()->GetWindowSize().y;
-  static auto projectionMatrix = glm::perspective(glm::radians(45.0f), aspectRatio, 0.10f, 2500.0f);
-  renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 2500, 0.10f});
+  static float w = Application::Get()->GetWindowSize().x;
+  static float h = Application::Get()->GetWindowSize().y;
+
+  static auto projectionMatrix = glm::perspectiveFov(glm::radians(65.0f), w, h, 0.10f, 2500.0f);
+
+  renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 0.10, 2500.0f});
 
   static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
   drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent) {
@@ -85,35 +103,56 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
 
   static flecs::query<TransformComponent, DirectionalLightComponent> lightsQuery = m_World.query<TransformComponent, DirectionalLightComponent>();
   lightsQuery.each([&](flecs::entity entity, TransformComponent& transform, DirectionalLightComponent& directionalLight) {
-    SceneLightInfo.LightPos = transform.Translation;
+    SceneLightInfo.LightDirection = glm::normalize(glm::mat3(transform.GetTransform()) * glm::vec3(1.0f));
+    SceneLightInfo.LightPos = glm::vec3(posX, posY, posZ);
   });
 
   ImGui::Begin("Scene Settings");
 
-  static float s_metallic = 0.1f;
-  //if (ImGui::SliderFloat("Metallic", &s_metallic, 0, 1)) {
-  //  redMatProps.Metallic = s_metallic;
-  //  redMat->Set("uMaterial", redMatProps);
-  //}
+  if (ImGui::InputFloat("Rot X", &rotX, 0, 1)) {
+    auto ent2 = TryGetEntityWithUUID(entityIdDir);
 
-  //ImGui::Spacing();
-  //static float s_roughness = 0.1f;
-  //if (ImGui::SliderFloat("Roughness", &s_roughness, 0, 1)) {
-  //  redMatProps.Roughness = s_roughness;
-  //  redMat->Set("uMaterial", redMatProps);
-  //}
-  //ImGui::Spacing();
-  //static float s_ao = 0.1f;
-  //if (ImGui::SliderFloat("Ao", &s_ao, 0, 1)) {
-  //  redMatProps.Ao = s_ao;
-  //  redMat->Set("uMaterial", redMatProps);
-  //}
+    auto transform2 = ent2.GetComponent<TransformComponent>();
 
+    transform2->SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
+  }
+  if (ImGui::InputFloat("Rot Y", &rotY, 0, 1)) {
+    auto ent2 = TryGetEntityWithUUID(entityIdDir);
+
+    auto transform2 = ent2.GetComponent<TransformComponent>();
+    transform2->SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
+  }
+  if (ImGui::InputFloat("Rot Z", &rotZ, 0, 1)) {
+    auto ent2 = TryGetEntityWithUUID(entityIdDir);
+
+    auto transform2 = ent2.GetComponent<TransformComponent>();
+    transform2->SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
+  }
+  if (ImGui::InputFloat("POS X", &posX, 0, 1)) {
+    auto ent2 = TryGetEntityWithUUID(entityIdDir);
+
+    auto transform2 = ent2.GetComponent<TransformComponent>();
+
+    transform2->Translation = glm::vec3(posX, posY, posZ);
+  }
+  if (ImGui::InputFloat("POS Y", &posY, 0, 1)) {
+    auto ent2 = TryGetEntityWithUUID(entityIdDir);
+
+    auto transform2 = ent2.GetComponent<TransformComponent>();
+
+    transform2->Translation = glm::vec3(posX, posY, posZ);
+  }
+  if (ImGui::InputFloat("POS Z", &posZ, 0, 1)) {
+    auto ent2 = TryGetEntityWithUUID(entityIdDir);
+
+    auto transform2 = ent2.GetComponent<TransformComponent>();
+    transform2->Translation = glm::vec3(posX, posY, posZ);
+    RN_LOG("X: {} Y: {} Z{} ", transform2->Translation.x, transform2->Translation.y, transform2->Translation.z);
+  }
   ImGui::End();
 
   renderer->EndScene();
 }
-
 void Scene::BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh) {
   const std::vector<Ref<MeshNode>> nodes = mesh->GetNodes();
 
@@ -124,7 +163,7 @@ void Scene::BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh) {
     Entity nodeEntity = CreateChildEntity(parent, node->Name);
     uint32_t materialId = mesh->m_SubMeshes[node->SubMeshId].MaterialIndex;
 
-    nodeEntity.AddComponent<MeshComponent>((uint32_t)mesh->Id, (uint32_t)node->SubMeshId, materialId);
+    nodeEntity.AddComponent<MeshComponent>(mesh->Id, (uint32_t)node->SubMeshId, materialId);
     nodeEntity.AddComponent<TransformComponent>();
 
     nodeEntity.Transform()->SetTransform(node->LocalTransform);
@@ -143,7 +182,7 @@ glm::mat4 Scene::GetWorldSpaceTransformMatrix(Entity entity) {
 }
 
 void Scene::ScanKeyPress() {
-  float speed = 0.55f;
+  float speed = 1.55f;
 
   if (Keyboard::IsKeyPressing(Rain::Key::W)) {
     m_SceneCamera->ProcessKeyboard(FORWARD, speed);
@@ -160,6 +199,8 @@ void Scene::ScanKeyPress() {
   } else {
     return;
   }
+
+  auto& pos = m_SceneCamera->Position;
 }
 
 void Scene::OnMouseMove(double xPos, double yPos) {

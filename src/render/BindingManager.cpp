@@ -1,4 +1,5 @@
 #include "BindingManager.h"
+#include "debug/Profiler.h"
 #include "render/Render.h"
 
 RenderPassResourceType GetRenderPassTypeFromShaderDecl(BindingType type) {
@@ -24,7 +25,7 @@ bool IsInputValid(const RenderPassInput& input) {
     case PT_Uniform:
       return input.UniformIntput != NULL && input.UniformIntput->Buffer != NULL;
     case PT_Texture:
-      return input.TextureInput != NULL && input.TextureInput->View != NULL;
+      return input.TextureInput != NULL && input.TextureInput->GetNativeView() != NULL;
     case PT_Sampler:
       return input.SamplerInput != NULL && input.SamplerInput->GetNativeSampler() != NULL;
     default:
@@ -98,6 +99,7 @@ void BindingManager::Init() {
 }
 
 bool BindingManager::Validate() {
+	RN_PROFILE_FUNC;
   auto& shaderName = m_BindingSpec.ShaderRef->GetName();
   auto& shaderDecls = m_BindingSpec.ShaderRef->GetReflectionInfo().ResourceDeclarations;
 
@@ -132,7 +134,8 @@ bool BindingManager::Validate() {
 }
 
 void BindingManager::Bake() {
-  //RN_CORE_ASSERT(Validate(), "Validation failed for {}", m_BindingSpec.Name)
+	RN_PROFILE_FUNC;
+  RN_CORE_ASSERT(Validate(), "Validation failed for {}", m_BindingSpec.Name)
 
   for (const auto& [groupIndex, groupBindings] : m_Inputs) {
     for (const auto& [locationIndex, input] : groupBindings) {
@@ -148,6 +151,7 @@ void BindingManager::Bake() {
 }
 
 void BindingManager::InvalidateAndUpdate() {
+	RN_PROFILE_FUNC;
   for (const auto& [index, inputs] : m_Inputs) {
     for (const auto& [location, input] : inputs) {
       const auto& storedEntry = m_GroupEntryMap[index].at(location);
@@ -159,7 +163,7 @@ void BindingManager::InvalidateAndUpdate() {
           }
           break;
         case PT_Texture:
-          if (storedEntry.textureView != input.TextureInput->View) {
+          if (storedEntry.textureView != input.TextureInput->GetNativeView()) {
             m_InvalidatedInputs[index][location] = input;
           }
           break;
@@ -186,7 +190,7 @@ void BindingManager::InvalidateAndUpdate() {
 					storedEntry.size = input.UniformIntput->Size;
           break;
         case PT_Texture:
-          storedEntry.textureView = input.TextureInput->View;
+          storedEntry.textureView = input.TextureInput->GetNativeView();
           break;
         case PT_Sampler:
           storedEntry.sampler = *input.SamplerInput->GetNativeSampler();

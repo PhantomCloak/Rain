@@ -58,3 +58,7 @@ Ref<Sampler> Sampler::Create(SamplerProps props) {
 
   return sampler;
 }
+
+void Sampler::Release() {
+	wgpuSamplerRelease(*m_Sampler); // TODO better do
+}

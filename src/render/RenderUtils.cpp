@@ -101,11 +101,11 @@ FilterMode RenderTypeUtils::FromRenderType(WGPUFilterMode format) {
 
 WGPUTextureFormat RenderTypeUtils::ToRenderType(TextureFormat format) {
   switch (format) {
-    case RGBA:
+    case RGBA8:
       return WGPUTextureFormat_RGBA8Unorm;
-    case BRGBA:
+    case BRGBA8:
       return WGPUTextureFormat_BGRA8Unorm;
-    case Depth:
+    case Depth24Plus:
       return WGPUTextureFormat_Depth24Plus;
     case Undefined:
       return WGPUTextureFormat_Undefined;

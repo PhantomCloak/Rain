@@ -3,8 +3,8 @@
 #include <map>
 #include "render/RenderUtils.h"
 #include "render/Shader.h"
-#include "render/Texture.h"
 #include "webgpu/webgpu.h"
+#include "render/Framebuffer.h"
 
 enum PipelineCullingMode {
   BACK,
@@ -12,40 +12,34 @@ enum PipelineCullingMode {
   NONE
 };
 
-struct RenderPipelineProps {
+struct RenderPipelineSpec {
   VertexBufferLayout VertexLayout;
   VertexBufferLayout InstanceLayout;
   PipelineCullingMode CullingMode;
-  Ref<Shader> VertexShader;
-  Ref<Shader> FragmentShader;
-  TextureFormat ColorFormat;
-  TextureFormat DepthFormat;
-	Ref<Texture> TargetFrameBuffer;
-	Ref<Texture> TargetDepthBuffer;
-  std::map<int, GroupLayout> groupLayout;  // We should get it from the shader but there is no translation lib atm
+  Ref<Shader> Shader;
+  Ref<Framebuffer> TargetFramebuffer;
+  std::map<std::string, int> Overrides;  // We should get it from the shader but there is no translation lib atm
+
+	std::string DebugName;
 };
 
 class RenderPipeline {
  public:
-  RenderPipeline(std::string name, const RenderPipelineProps& props);
+  RenderPipeline(const RenderPipelineSpec& props);
+  RenderPipeline(std::string name, const RenderPipelineSpec& props);
 
-  static Ref<RenderPipeline> Create(std::string name, const RenderPipelineProps& props, Ref<Texture> colorAttachment = nullptr, Ref<Texture> depthAttachment = nullptr) {
-    return CreateRef<RenderPipeline>(name, props);
+  static Ref<RenderPipeline> Create(const RenderPipelineSpec& props){
+    return CreateRef<RenderPipeline>(props);
   }
 
+	const std::string& GetName() { return m_PipelineSpec.DebugName; }
+	const RenderPipelineSpec& GetPipelineSpec() { return m_PipelineSpec; }
   const WGPURenderPipeline& GetPipeline() { return m_Pipeline; }
-  const std::string& GetName() { return m_Name; }
 
-	const Ref<Texture> GetColorAttachment() { return m_PipelineProps.TargetFrameBuffer; }
-	const Ref<Texture> GetDepthAttachment() { return m_PipelineProps.TargetDepthBuffer; }
-	const bool HasColorAttachment() { return m_PipelineProps.TargetFrameBuffer != nullptr; }
-	const bool HasDepthAttachment() { return m_PipelineProps.TargetDepthBuffer != nullptr; }
+  void Invalidate();
 
-  Ref<Shader> GetShader() const { return m_PipelineProps.FragmentShader; }
-	void Invalidate();
+  RenderPipelineSpec m_PipelineSpec;
+  WGPURenderPipeline m_Pipeline;
 
  private:
-  std::string m_Name;
-  RenderPipelineProps m_PipelineProps;
-  WGPURenderPipeline m_Pipeline;
 };

@@ -35,46 +35,22 @@ WGPUVertexFormat ConvertWGPUVertexFormat(ShaderDataType type) {
   return WGPUVertexFormat_Undefined;
 }
 
-struct PipelineBundle {
-  WGPURenderPipelineDescriptor pipelineDescriptor;
-  WGPUColorTargetState colorTargetState;
-  WGPUFragmentState fragmentState;
-  WGPUBlendState blendState;
-  WGPUDepthStencilState depthStencilState;
-  std::vector<WGPUBindGroupLayout> bindGroupLayouts;
-  std::vector<WGPUBindGroupLayoutDescriptor> bindGroupLayoutDescriptors;
-  std::map<int, std::vector<WGPUBindGroupLayoutEntry>> groupLayoutEntries;
-  WGPUPipelineLayoutDescriptor pipelineLayoutDescriptor;
-  WGPUPipelineLayout pipelineLayout;
-  WGPURenderPipeline pipeline;
-};
+RenderPipeline::RenderPipeline(const RenderPipelineSpec& props)
+    : m_PipelineSpec(props) {
+  Invalidate();
+}
 
-RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& props)
-    : m_PipelineProps(props), m_Name(name) {
-  WGPUTextureFormat swapChainFormat = WGPUTextureFormat_Undefined;
-
-#if __EMSCRIPTEN__
-  swapChainFormat = wgpuSurfaceGetPreferredFormat(RenderContext::GetSurface(), RenderContext::GetAdapter());
-#else
-  swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
-#endif
-
-  static std::map<std::string, PipelineBundle> pipelineBundle = {};
-
-  PipelineBundle& bundle = pipelineBundle[name];
-  m_PipelineProps = props;
-
-  WGPURenderPipelineDescriptor& pipelineDesc = bundle.pipelineDescriptor;
-
-  pipelineDesc.label = name.c_str();
+void RenderPipeline::Invalidate() {
+  WGPURenderPipelineDescriptor* pipelineDesc = (WGPURenderPipelineDescriptor*)malloc(sizeof(WGPURenderPipelineDescriptor));
+  pipelineDesc->label = m_PipelineSpec.DebugName.c_str();
 
   std::vector<WGPUVertexAttribute> vertexAttributes;
   std::vector<WGPUVertexAttribute> instanceAttributes;
 
   std::vector<WGPUVertexBufferLayout> vertexLayouts;
 
-  const auto& vertexLayout = m_PipelineProps.VertexLayout;
-  const auto& instanceLayout = m_PipelineProps.InstanceLayout;
+  const auto& vertexLayout = m_PipelineSpec.VertexLayout;
+  const auto& instanceLayout = m_PipelineSpec.InstanceLayout;
 
   for (const auto& element : vertexLayout) {
     vertexAttributes.push_back({.format = ConvertWGPUVertexFormat(element.Type),
@@ -89,7 +65,6 @@ RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& prop
   vblVertex.stepMode = WGPUVertexStepMode_Vertex;
 
   vertexLayouts.push_back(vblVertex);
-
   if (instanceLayout.GetElementCount()) {
     for (const auto& element : instanceLayout) {
       instanceAttributes.push_back({.format = ConvertWGPUVertexFormat(element.Type),
@@ -106,115 +81,121 @@ RenderPipeline::RenderPipeline(std::string name, const RenderPipelineProps& prop
     vertexLayouts.push_back(vblInstance);
   }
 
-  // TODO: Inspect memory for emscriptten
-  pipelineDesc.vertex.bufferCount = vertexLayouts.size();
-  pipelineDesc.vertex.buffers = vertexLayouts.data();
+  //// TODO: Inspect memory for emscriptten
+  pipelineDesc->vertex.bufferCount = vertexLayouts.size();
+  pipelineDesc->vertex.buffers = vertexLayouts.data();
+  pipelineDesc->vertex.module = m_PipelineSpec.Shader->GetNativeShaderModule();
+  pipelineDesc->vertex.entryPoint = "vs_main";  // let be constant for now
+  pipelineDesc->vertex.nextInChain = nullptr;
+  pipelineDesc->primitive.topology = WGPUPrimitiveTopology_TriangleList;
+  pipelineDesc->primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
+  pipelineDesc->primitive.frontFace = WGPUFrontFace_CCW;
+  pipelineDesc->primitive.nextInChain = nullptr;
 
-  pipelineDesc.vertex.module = props.VertexShader->GetNativeShaderModule();
-  pipelineDesc.vertex.entryPoint = "vs_main";  // let be constant for now
+  std::vector<WGPUConstantEntry>* constants = new std::vector<WGPUConstantEntry>();
 
-  pipelineDesc.vertex.constantCount = 0;
-  pipelineDesc.vertex.constants = nullptr;
-
-  pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
-  pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
-  pipelineDesc.primitive.frontFace = WGPUFrontFace_CCW;
+  for (const auto& [key, value] : m_PipelineSpec.Overrides) {
+    WGPUConstantEntry constant;
+		constant.key = key.c_str();
+    constant.value = static_cast<double>(value);
+		constant.nextInChain = nullptr;
+		constants->push_back(constant);
+  }
+	pipelineDesc->vertex.constantCount = constants->size();
+	pipelineDesc->vertex.constants = constants->size() > 0 ? constants->data() : NULL;
 
   WGPUCullMode mode;
-  if (props.CullingMode == PipelineCullingMode::BACK) {
+  if (m_PipelineSpec.CullingMode == PipelineCullingMode::BACK) {
     mode = WGPUCullMode_Back;
-  } else if (props.CullingMode == PipelineCullingMode::FRONT) {
+  } else if (m_PipelineSpec.CullingMode == PipelineCullingMode::FRONT) {
     mode = WGPUCullMode_Front;
   } else {
     mode = WGPUCullMode_None;
   }
 
-  pipelineDesc.primitive.cullMode = mode;
+  pipelineDesc->primitive.cullMode = mode;
 
-  WGPUFragmentState& fragmentState = bundle.fragmentState;
-  fragmentState.module = props.FragmentShader->GetNativeShaderModule();
-  fragmentState.entryPoint = "fs_main";
-  fragmentState.constantCount = 0;
-  fragmentState.constants = NULL;
+  WGPUFragmentState* fragmentState = (WGPUFragmentState*)malloc(sizeof(WGPUFragmentState));
+  fragmentState->module = m_PipelineSpec.Shader->GetNativeShaderModule();
+  fragmentState->entryPoint = "fs_main";
+  fragmentState->constantCount = 0;
+  fragmentState->constants = NULL;
+  fragmentState->nextInChain = nullptr;
 
-  if (props.ColorFormat != TextureFormat::Undefined) {
-    WGPUBlendState& blendState = bundle.blendState;
-    blendState.color.srcFactor = WGPUBlendFactor_SrcAlpha;
-    blendState.color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
-    blendState.color.operation = WGPUBlendOperation_Add;
-    blendState.alpha.srcFactor = WGPUBlendFactor_Zero;
-    blendState.alpha.dstFactor = WGPUBlendFactor_One;
-    blendState.alpha.operation = WGPUBlendOperation_Add;
+  if (m_PipelineSpec.TargetFramebuffer->HasColorAttachment()) {
+    WGPUBlendState* blendState = (WGPUBlendState*)malloc(sizeof(WGPUBlendState));
+    blendState->color.srcFactor = WGPUBlendFactor_SrcAlpha;
+    blendState->color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+    blendState->color.operation = WGPUBlendOperation_Add;
+    blendState->alpha.srcFactor = WGPUBlendFactor_Zero;
+    blendState->alpha.dstFactor = WGPUBlendFactor_One;
+    blendState->alpha.operation = WGPUBlendOperation_Add;
 
-    WGPUColorTargetState& colorTarget = bundle.colorTargetState;
-    colorTarget.format = swapChainFormat;
-    colorTarget.blend = &blendState;
-    colorTarget.writeMask = WGPUColorWriteMask_All;
+    WGPUColorTargetState* colorTarget = (WGPUColorTargetState*)malloc(sizeof(WGPUColorTargetState));
+    colorTarget->format = RenderTypeUtils::ToRenderType(m_PipelineSpec.TargetFramebuffer->m_FrameBufferSpec.ColorFormat);
+    colorTarget->blend = blendState;
+    colorTarget->writeMask = WGPUColorWriteMask_All;
+    colorTarget->nextInChain = nullptr;
 
-    fragmentState.targetCount = 1;
-    fragmentState.targets = &colorTarget;
+    fragmentState->targets = colorTarget;
+  };
+
+  fragmentState->targetCount = m_PipelineSpec.TargetFramebuffer->HasColorAttachment() ? 1 : 0;
+
+	if (m_PipelineSpec.TargetFramebuffer->HasDepthAttachment()) {
+    WGPUDepthStencilState* depthStencilState = (WGPUDepthStencilState*)malloc(sizeof(WGPUDepthStencilState));
+    depthStencilState->format = WGPUTextureFormat_Depth24Plus;
+    depthStencilState->stencilReadMask = 0xFFFFFFFF;
+    depthStencilState->stencilWriteMask = 0xFFFFFFFF;
+
+    depthStencilState->depthBias = 0;
+    depthStencilState->depthBiasSlopeScale = 0;
+    depthStencilState->depthBiasClamp = 0;
+
+    depthStencilState->stencilFront.compare = WGPUCompareFunction_Always;
+    depthStencilState->stencilFront.failOp = WGPUStencilOperation_Keep;
+    depthStencilState->stencilFront.depthFailOp = WGPUStencilOperation_Keep;
+    depthStencilState->stencilFront.passOp = WGPUStencilOperation_Keep;
+
+    depthStencilState->stencilBack.compare = WGPUCompareFunction_Always;
+    depthStencilState->stencilBack.failOp = WGPUStencilOperation_Keep;
+    depthStencilState->stencilBack.depthFailOp = WGPUStencilOperation_Keep;
+    depthStencilState->stencilBack.passOp = WGPUStencilOperation_Keep;
+
+    depthStencilState->depthCompare = WGPUCompareFunction_Less;
+    depthStencilState->depthWriteEnabled = true;
+
+    depthStencilState->stencilReadMask = 0xFFFFFFFF;
+    depthStencilState->stencilWriteMask = 0xFFFFFFFF;
+		depthStencilState->nextInChain = nullptr;
+
+    pipelineDesc->depthStencil = depthStencilState;
   } else {
-    fragmentState.targetCount = 0;
+    pipelineDesc->depthStencil = nullptr;
   }
 
-  pipelineDesc.fragment = &fragmentState;
-  if (props.DepthFormat == TextureFormat::Undefined) {
-    pipelineDesc.depthStencil = nullptr;
-  } else {
-    WGPUDepthStencilState& depthStencilState = bundle.depthStencilState;
-    depthStencilState.format = WGPUTextureFormat_Depth24Plus;
-    depthStencilState.stencilReadMask = 0xFFFFFFFF;
-    depthStencilState.stencilWriteMask = 0xFFFFFFFF;
-
-    depthStencilState.depthBias = 0;
-    depthStencilState.depthBiasSlopeScale = 0;
-    depthStencilState.depthBiasClamp = 0;
-
-    depthStencilState.stencilFront.compare = WGPUCompareFunction_Always;
-    depthStencilState.stencilFront.failOp = WGPUStencilOperation_Keep;
-    depthStencilState.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
-    depthStencilState.stencilFront.passOp = WGPUStencilOperation_Keep;
-
-    depthStencilState.stencilBack.compare = WGPUCompareFunction_Always;
-    depthStencilState.stencilBack.failOp = WGPUStencilOperation_Keep;
-    depthStencilState.stencilBack.depthFailOp = WGPUStencilOperation_Keep;
-    depthStencilState.stencilBack.passOp = WGPUStencilOperation_Keep;
-
-    depthStencilState.depthCompare = WGPUCompareFunction_Less;
-    depthStencilState.depthWriteEnabled = true;
-
-    depthStencilState.stencilReadMask = 0xFFFFFFFF;
-    depthStencilState.stencilWriteMask = 0xFFFFFFFF;
-
-    pipelineDesc.depthStencil = &depthStencilState;
-  }
-
-  pipelineDesc.multisample.count = 1;
-  pipelineDesc.multisample.mask = ~0u;
-  pipelineDesc.multisample.alphaToCoverageEnabled = false;
-
-  std::vector<WGPUBindGroupLayout>& bindGroupLayouts = bundle.bindGroupLayouts;
+  pipelineDesc->fragment = fragmentState;
+  pipelineDesc->multisample.count = 1;
+  pipelineDesc->multisample.mask = ~0u;
+  pipelineDesc->multisample.alphaToCoverageEnabled = false;
+	pipelineDesc->multisample.nextInChain = nullptr;
 
   auto device = RenderContext::GetDevice();
-  auto& groupLayout = m_PipelineProps.groupLayout;
 
-  for (auto& [_, layout] : m_PipelineProps.VertexShader->GetReflectionInfo().LayoutDescriptors) {
+  std::vector<WGPUBindGroupLayout> bindGroupLayouts;
+  for (const auto& [_, layout] : m_PipelineSpec.Shader->GetReflectionInfo().LayoutDescriptors) {
     bindGroupLayouts.push_back(layout);
   }
 
-  WGPUPipelineLayoutDescriptor& layoutDesc = bundle.pipelineLayoutDescriptor;
+  WGPUPipelineLayoutDescriptor* layoutDesc = (WGPUPipelineLayoutDescriptor*)malloc(sizeof(WGPUPipelineLayoutDescriptor));
+  layoutDesc->bindGroupLayoutCount = bindGroupLayouts.size();
+  layoutDesc->bindGroupLayouts = bindGroupLayouts.data();
+  layoutDesc->nextInChain = nullptr;
 
-	layoutDesc.nextInChain = nullptr;
-  layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
-  layoutDesc.bindGroupLayouts = bindGroupLayouts.data();
+  WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, layoutDesc);
+  pipelineDesc->layout = pipelineLayout;
+  pipelineDesc->nextInChain = nullptr;
 
-  WGPUPipelineLayout& pipelineLayout = bundle.pipelineLayout;
-  pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &layoutDesc);
-  pipelineDesc.layout = pipelineLayout;
-
-  m_Pipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
-}
-
-void RenderPipeline::Invalidate() {
-
+  RN_LOG("CREATE: {}", m_PipelineSpec.DebugName);
+  m_Pipeline = wgpuDeviceCreateRenderPipeline(device, pipelineDesc);
 }

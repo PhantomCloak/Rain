@@ -1,17 +1,17 @@
 #include "RenderPass.h"
 
 
-RenderPass::RenderPass(const RenderPassProps& spec) : m_PassProps(spec)
+RenderPass::RenderPass(const RenderPassSpec& spec) : m_PassSpec(spec)
 {
 	RN_ASSERT(spec.Pipeline != NULL, "RenderPass Pipeline {} cannot be null.", spec.DebugName);
   BindingSpec bindSpec;
   bindSpec.Name = spec.DebugName;
-  bindSpec.ShaderRef = spec.Pipeline->GetShader();
+	bindSpec.ShaderRef = spec.Pipeline->GetPipelineSpec().Shader;
 
 	m_PassBinds = BindingManager::Create(bindSpec);
 }
 
-Ref<RenderPass> RenderPass::Create(const RenderPassProps& spec) {
+Ref<RenderPass> RenderPass::Create(const RenderPassSpec& spec) {
 	auto renderPass = CreateRef<RenderPass>(spec);
   return renderPass;
 }

@@ -41,7 +41,7 @@ class MeshNode {
 // TODO: At the moment we pack everything into MeshSource class, in the future we should seperate import, materials etc.
 class MeshSource {
  public:
-  UUID Id = 0;
+  UUID Id;
   std::vector<Ref<MeshNode>> m_Nodes;
   std::vector<SubMesh> m_SubMeshes;
 

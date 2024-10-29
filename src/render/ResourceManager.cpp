@@ -157,6 +157,7 @@ std::shared_ptr<Texture> Rain::ResourceManager::LoadTexture(std::string id, std:
 	TextureProps textureProp = {};
 	textureProp.DebugName = id;
 	textureProp.CreateSampler = false;
+	textureProp.GenerateMips = false;
 
   auto p = std::filesystem::path(path);
 	auto texture = Texture::Create(textureProp, p);
@@ -243,7 +244,8 @@ std::shared_ptr<Texture> Rain::ResourceManager::LoadCubeTexture(std::string id, 
   textureViewDesc.dimension = WGPUTextureViewDimension_Cube;
   textureViewDesc.format = textureDesc.format;
   textureViewDesc.nextInChain = nullptr;
-  tex->View = wgpuTextureCreateView(texture, &textureViewDesc);
+  //tex->View = ;
+	tex->m_Views.push_back(wgpuTextureCreateView(texture, &textureViewDesc));
 
   return tex;
 }

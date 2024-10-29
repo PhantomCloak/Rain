@@ -2,6 +2,7 @@
 #include "Mesh.h"
 #include "ResourceManager.h"
 #include "core/Assert.h"
+#include "debug/Profiler.h"
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -339,7 +340,7 @@ WGPUSwapChain Render::BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDev
 
 Ref<Texture> Render::GetWhiteTexture() {
   static auto whiteTexture = Rain::ResourceManager::GetTexture("T_Default");
-  RN_ASSERT(whiteTexture->View != 0, "Material: Default texture couldn't found.");
+  RN_ASSERT(whiteTexture->GetNativeView() != 0, "Material: Default texture couldn't found.");
   return whiteTexture;
 }
 
@@ -349,11 +350,16 @@ Ref<Sampler> Render::GetDefaultSampler() {
   return sampler;
 }
 
-WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder, bool hack) {
-	pass->Prepare();
-  auto& pipe = pass->GetProps().Pipeline;
+WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder) {
+  RN_PROFILE_FUNC;
+  pass->Prepare();
 
-  WGPURenderPassDescriptor passDesc{.nextInChain = nullptr, .label = pipe->GetName().c_str()};
+  auto renderFrameBuffer = pass->GetTargetFrameBuffer();
+
+  WGPUTextureView swp;
+  WGPURenderPassDescriptor passDesc = {};
+  passDesc.nextInChain = nullptr;
+  passDesc.label = pass->GetProps().DebugName.c_str();
 
   WGPURenderPassColorAttachment colorAttachment{};
   colorAttachment.nextInChain = nullptr;
@@ -362,21 +368,32 @@ WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandE
   colorAttachment.clearValue = WGPUColor{0, 0, 0, 1};
   colorAttachment.resolveTarget = nullptr;
 
-  if (pipe->HasColorAttachment()) {
-    colorAttachment.view = pipe->GetColorAttachment()->View;
+  if (renderFrameBuffer->HasColorAttachment()) {
+    if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget) {
+      Instance->m_SwapTexture = Render::Instance->GetCurrentSwapChainTexture();
+      colorAttachment.view = Instance->m_SwapTexture;
+    } else {
+      colorAttachment.view = renderFrameBuffer->GetAttachment(0)->GetNativeView();
+    }
+
     passDesc.colorAttachmentCount = 1;
     passDesc.colorAttachments = &colorAttachment;
-  } else {
-    if (!hack) {
-      passDesc.colorAttachmentCount = 1;
-      passDesc.colorAttachments = &colorAttachment;
-      colorAttachment.view = Instance->GetCurrentSwapChainTexture()->View;
-    }
   }
 
-  if (pipe->HasDepthAttachment()) {
+  if (renderFrameBuffer->HasDepthAttachment()) {
     WGPURenderPassDepthStencilAttachment depthAttachment = {};
-    depthAttachment.view = pipe->GetDepthAttachment()->View;
+
+		auto depth = renderFrameBuffer->GetDepthAttachment();
+		if(depth->m_Views.size() > 1)
+		{
+			int layerNum = renderFrameBuffer->m_FrameBufferSpec.ExistingImageLayers[0];
+			depthAttachment.view = renderFrameBuffer->GetDepthAttachment()->m_Views[layerNum + 1];
+		}
+		else
+		{
+			depthAttachment.view = renderFrameBuffer->GetDepthAttachment()->GetNativeView();
+		}
+
     depthAttachment.depthClearValue = 1.0f;
     depthAttachment.depthLoadOp = WGPULoadOp_Clear;
     depthAttachment.depthStoreOp = WGPUStoreOp_Store;
@@ -394,7 +411,7 @@ WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandE
   auto renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &passDesc);
   auto bindings = pass->GetBindManager();
 
-  for (auto& [index, bindGroup] : bindings->GetBindGroups()) {
+  for (const auto& [index, bindGroup] : bindings->GetBindGroups()) {
     wgpuRenderPassEncoderSetBindGroup(renderPass, index, bindGroup, 0, 0);
   }
 
@@ -402,7 +419,14 @@ WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandE
 }
 
 void Render::EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder) {
+  RN_PROFILE_FUNC;
   wgpuRenderPassEncoderEnd(encoder);
+  wgpuRenderPassEncoderRelease(encoder);
+
+  const auto renderFrameBuffer = pass->GetTargetFrameBuffer();
+  if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget) {
+    wgpuTextureViewRelease(Instance->m_SwapTexture);
+  }
 }
 
 void Render::RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
@@ -460,11 +484,7 @@ void Render::SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WG
 void Render::AddShaderDependency(Ref<Shader> shader, Ref<Material> material) {
 }
 
-Ref<Texture> Render::GetCurrentSwapChainTexture() {
-  static auto textureRef = CreateRef<Texture>();
-
+WGPUTextureView Render::GetCurrentSwapChainTexture() {
   WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(m_swapChain);
-  textureRef->View = nextTexture;
-
-  return textureRef;
+  return nextTexture;
 }

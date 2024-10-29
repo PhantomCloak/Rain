@@ -17,7 +17,7 @@ class Render {
 	static Ref<Texture> GetWhiteTexture();
 	static Ref<Sampler> GetDefaultSampler();
 
-  static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder, bool hack = false);
+  static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
   static void EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder);
 
   static void RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
@@ -35,7 +35,7 @@ class Render {
 
   std::unordered_map<UUID, Material> Materials;
 
-  Ref<Texture> GetCurrentSwapChainTexture();
+  WGPUTextureView GetCurrentSwapChainTexture();
 
   WGPUSurface GetActiveSurface() { return m_surface; }
 
@@ -54,6 +54,8 @@ class Render {
   WGPUAdapter m_adapter = nullptr;
   WGPUDevice m_device = nullptr;
   WGPUQueue m_queue = nullptr;
+	WGPUTextureView m_SwapTexture;
+
   WGPUSwapChain m_swapChain = nullptr;
   WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_Undefined;
   WGPUTextureFormat m_depthTextureFormat = WGPUTextureFormat_Depth24Plus;

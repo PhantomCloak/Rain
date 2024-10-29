@@ -15,6 +15,7 @@ Ref<Shader> Shader::CreateFromSring(const std::string& name, const std::string& 
   shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
   shaderCodeDesc.code = content.c_str();
   WGPUShaderModuleDescriptor shaderDesc;
+	shaderDesc.label = name.c_str();
   shaderDesc.nextInChain = &shaderCodeDesc.chain;
 
 	shader->m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);

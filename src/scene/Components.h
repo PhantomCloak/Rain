@@ -39,6 +39,11 @@ struct TransformComponent {
     Rain::Math::DecomposeTransform(transform, Translation, Rotation, Scale);
     RotationEuler = glm::eulerAngles(Rotation);
   }
+
+  void SetRotationEuler(const glm::vec3& euler) {
+    RotationEuler = euler;
+    Rotation = glm::quat(RotationEuler);
+  }
 };
 
 struct RigidBodyComponent {
@@ -66,10 +71,10 @@ struct RelationshipComponent {
 
 struct MeshComponent {
   Ref<MaterialTable> Materials = CreateRef<MaterialTable>();
-  uint32_t MeshSourceId = -1;
+  uint64_t MeshSourceId = -1;
   uint32_t SubMeshId = -1;
 
-  MeshComponent(uint32_t meshSourceId = -1, uint32_t subMeshId = -1, uint32_t materialId = -1)
+  MeshComponent(uint64_t meshSourceId = -1, uint32_t subMeshId = -1, uint32_t materialId = -1)
       : SubMeshId(subMeshId), MeshSourceId(meshSourceId) {}
 };
 

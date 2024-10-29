@@ -5,7 +5,7 @@
 #include "render/Sampler.h"
 #include "render/Texture.h"
 
-struct RenderPassProps {
+struct RenderPassSpec {
   Ref<RenderPipeline> Pipeline;
   std::string DebugName;
   glm::vec4 MarkerColor;
@@ -17,23 +17,23 @@ struct RenderPassProps {
 
 class RenderPass {
  public:
-  RenderPass(const RenderPassProps& props);
+  RenderPass(const RenderPassSpec& props);
 
   void Set(const std::string& name, Ref<Texture> texture);
   void Set(const std::string& name, Ref<GPUBuffer> uniform);
   void Set(const std::string& name, Ref<Sampler> sampler);
   void Bake();
 
-  const Ref<Texture> GetOutput(int index) { return m_PassProps.Pipeline->GetColorAttachment(); }
-  const Ref<Texture> GetDepthOutput() { return m_PassProps.Pipeline->GetDepthAttachment(); }
-  const RenderPassProps& GetProps() { return m_PassProps; }
+  const Ref<Texture> GetOutput(int index) { return GetTargetFrameBuffer()->GetAttachment(index); }
+  const Ref<Texture> GetDepthOutput() { return GetTargetFrameBuffer()->GetDepthAttachment(); }
+  const RenderPassSpec& GetProps() { return m_PassSpec; }
   const Ref<BindingManager> GetBindManager() { return m_PassBinds; }
+	const Ref<Framebuffer> GetTargetFrameBuffer() { return m_PassSpec.Pipeline->GetPipelineSpec().TargetFramebuffer; }
 
-  static Ref<RenderPass> Create(const RenderPassProps& spec);
+  static Ref<RenderPass> Create(const RenderPassSpec& spec);
 
 	void Prepare();
 
- private:
   Ref<BindingManager> m_PassBinds;
-  RenderPassProps m_PassProps;
+  RenderPassSpec m_PassSpec;
 };

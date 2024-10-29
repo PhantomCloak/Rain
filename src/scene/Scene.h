@@ -13,6 +13,7 @@ class Entity;
 class SceneRenderer;
 
 struct LightInfo {
+	glm::vec3 LightDirection;
 	glm::vec3 LightPos;
 };
 
@@ -37,9 +38,9 @@ class Scene {
 	void ScanKeyPress();
 
 	LightInfo SceneLightInfo;
+  std::unique_ptr<PlayerCamera> m_SceneCamera;
  private:
   std::unordered_map<UUID, Entity> m_EntityMap;
-  std::unique_ptr<PlayerCamera> m_SceneCamera;
   flecs::world m_World;
   std::string m_Name;
 

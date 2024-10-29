@@ -9,11 +9,6 @@ Material::Material(const std::string& name, Ref<Shader> shader)
       .ShaderRef = shader,
       .DefaultResources = true};
 
-	if(m_Name == "Material_24")
-	{
-		RN_LOG("AA");
-	}
-
   m_BindManager = BindingManager::Create(spec);
 	m_Shader = shader;
 
@@ -29,7 +24,6 @@ Material::Material(const std::string& name, Ref<Shader> shader)
     }
   }
 
-	
 	int size = 0;
 	for(const auto& [_, member] : m_Shader->GetReflectionInfo().UserTypes[MATERIAL_UNIFORM_KEY])
 	{

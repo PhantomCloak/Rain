@@ -40,17 +40,32 @@ Texture::Texture(const TextureProps& props, const std::filesystem::path& path)
   CreateFromFile(props, path);
 }
 
-
 void Texture::Resize(uint width, uint height) {
-	m_TextureProps.Width = width;
-	m_TextureProps.Height = height;
-	Invalidate();
+  m_TextureProps.Width = width;
+  m_TextureProps.Height = height;
+  Invalidate();
+}
+
+void Texture::Release() {
+  wgpuTextureRelease(TextureBuffer);
+
+  for (const auto& view : m_Views) {
+    wgpuTextureViewRelease(view);
+  }
+
+  if (m_TextureProps.CreateSampler) {
+    Sampler->Release();
+  }
+  m_Views.clear();
 }
 
 void Texture::Invalidate() {
-  if (TextureBuffer != NULL && View != NULL) {
+  if (TextureBuffer != NULL && m_Views.size() <= 0) {
     wgpuTextureRelease(TextureBuffer);
-    wgpuTextureViewRelease(View);
+    for (const auto& view : m_Views) {
+      wgpuTextureViewRelease(view);
+    }
+    m_Views.clear();
   }
 
   uint32_t mipCount = m_TextureProps.GenerateMips ? RenderUtils::CalculateMipCount(m_TextureProps.Width, m_TextureProps.Height) : 1;
@@ -58,46 +73,63 @@ void Texture::Invalidate() {
   WGPUTextureDescriptor textureDesc = {};
   textureDesc.nextInChain = nullptr;
   textureDesc.label = m_TextureProps.DebugName.c_str();
-	textureDesc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+  textureDesc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
   textureDesc.dimension = WGPUTextureDimension_2D;
   textureDesc.size.width = m_TextureProps.Width;
   textureDesc.size.height = m_TextureProps.Height;
-  textureDesc.size.depthOrArrayLayers = 1;
+  textureDesc.size.depthOrArrayLayers = m_TextureProps.layers;
 
   textureDesc.format = RenderTypeUtils::ToRenderType(m_TextureProps.Format);
   textureDesc.mipLevelCount = mipCount;
   textureDesc.sampleCount = 1;
 
-  std::string samplerName = "S_" + m_TextureProps.DebugName;
-  SamplerProps samplerProps = {
-      .Name = samplerName,
-      .WrapFormat = m_TextureProps.SamplerWrap,
-      .MagFilterFormat = m_TextureProps.SamplerFilter,
-      .MinFilterFormat = m_TextureProps.SamplerFilter,
-      .MipFilterFormat = m_TextureProps.SamplerFilter,
-      .LodMinClamp = 0.0f,
-      .LodMaxClamp = (float)mipCount};
+  if (m_TextureProps.CreateSampler) {
+    std::string samplerName = "S_" + m_TextureProps.DebugName;
+    SamplerProps samplerProps = {
+        .Name = samplerName,
+        .WrapFormat = m_TextureProps.SamplerWrap,
+        .MagFilterFormat = m_TextureProps.SamplerFilter,
+        .MinFilterFormat = m_TextureProps.SamplerFilter,
+        .MipFilterFormat = m_TextureProps.SamplerFilter,
+        .LodMinClamp = 0.0f,
+        .LodMaxClamp = (float)mipCount};
 
-  Sampler = Sampler::Create(samplerProps);
+    Sampler = Sampler::Create(samplerProps);
+  }
 
   Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
 
   TextureBuffer = wgpuDeviceCreateTexture(renderContext->GetDevice(), &textureDesc);
 
-	if (m_ImageData.GetSize() > 0) {
+  if (m_ImageData.GetSize() > 0) {
     WriteMipLevel(m_ImageData, TextureBuffer, m_TextureProps.Width, m_TextureProps.Height, mipCount);
   }
 
-  WGPUTextureViewDescriptor textureViewDesc = {};
-  textureViewDesc.aspect = WGPUTextureAspect_All;
-  textureViewDesc.baseArrayLayer = 0;
-  textureViewDesc.arrayLayerCount = 1;
-  textureViewDesc.baseMipLevel = 0;
-  textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
-  textureViewDesc.dimension = WGPUTextureViewDimension_2D;
-  textureViewDesc.format = textureDesc.format;
+	m_Views.clear();
+  if (m_TextureProps.layers > 1) {
+    WGPUTextureViewDescriptor textureViewDesc = {};
+    textureViewDesc.aspect = WGPUTextureAspect_All;
+    textureViewDesc.baseArrayLayer = 0;
+    textureViewDesc.arrayLayerCount = m_TextureProps.layers;
+    textureViewDesc.baseMipLevel = 0;
+    textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
+    textureViewDesc.dimension = WGPUTextureViewDimension_2DArray;
+    textureViewDesc.format = textureDesc.format;
+    m_Views.push_back(wgpuTextureCreateView(TextureBuffer, &textureViewDesc));
+  }
 
-  View = wgpuTextureCreateView(TextureBuffer, &textureViewDesc);
+  for (int i = 0; i < m_TextureProps.layers; i++) {
+    WGPUTextureViewDescriptor textureViewDesc = {};
+    textureViewDesc.aspect = WGPUTextureAspect_All;
+    textureViewDesc.baseArrayLayer = i;
+    textureViewDesc.arrayLayerCount = 1;
+    textureViewDesc.baseMipLevel = 0;
+    textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
+    textureViewDesc.dimension = WGPUTextureViewDimension_2D;
+    textureViewDesc.format = textureDesc.format;
+
+    m_Views.push_back(wgpuTextureCreateView(TextureBuffer, &textureViewDesc));
+  }
 }
 
 void Texture::CreateFromFile(const TextureProps& props, const std::filesystem::path& path) {

@@ -102,7 +102,7 @@ MeshSource::MeshSource(std::string path) {
         matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
       }
 
-      material->Set("gradientTexture", matTexture);
+      material->Set("u_AlbedoTex", matTexture);
     }
 
     if (aiMat->GetTextureCount(aiTextureType_NORMALS) > 0) {
@@ -121,7 +121,7 @@ MeshSource::MeshSource(std::string path) {
         matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
       }
 
-			material->Set("heightTexture", matTexture);
+			material->Set("u_NormalTex", matTexture);
     }
 
     if (aiMat->GetTextureCount(aiTextureType_METALNESS) > 0) {
@@ -139,7 +139,7 @@ MeshSource::MeshSource(std::string path) {
       } else {
         matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
       }
-			material->Set("metalicRoughnessTexture", matTexture);
+			material->Set("u_MetallicTex", matTexture);
     }
 
     material->Bake();

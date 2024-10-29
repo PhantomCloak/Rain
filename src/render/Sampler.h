@@ -48,6 +48,8 @@ class Sampler {
 
   Sampler(Ref<WGPUSampler> sampler)
       : m_Sampler(sampler) {};
+
+	void Release();
  private:
   Ref<WGPUSampler> m_Sampler;
 };

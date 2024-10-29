@@ -73,13 +73,17 @@ struct CameraData {
 };
 
 struct SceneUniform {
-  glm::mat4x4 viewProjection;
-  glm::mat4x4 shadowViewProjection;
-  glm::mat4x4 cameraViewMatrix;
+  glm::mat4x4 ViewProjection;
+  glm::mat4x4 View;
   glm::vec3 CameraPosition;
   float _pad0;
-  glm::vec3 LightPosition;
+  glm::vec3 LightDir;
   float _pad1;
+};
+
+struct ShadowUniform {
+	glm::mat4 ShadowViews[4];
+	glm::vec4 CascadeDistances;
 };
 
 class SceneRenderer {
@@ -93,6 +97,11 @@ class SceneRenderer {
   void EndScene();
   void SetScene(Scene* scene);
   void SetViewportSize(int height, int width);
+
+	glm::mat4 getLightSpaceMatrix(float nearPlane, float farPlane, float zoom, float w, float h, glm::mat4 viewMat, glm::vec3 lightDir);
+	std::vector<glm::vec4> getFrustumCornersWorldSpace(const glm::mat4& projview);
+	std::vector<glm::vec4> getFrustumCornersWorldSpace(const glm::mat4& proj, const glm::mat4& view);
+
   static SceneRenderer* instance;
   Ref<ShaderManager> m_ShaderManager;
 
@@ -108,28 +117,38 @@ class SceneRenderer {
 
   Ref<GPUBuffer> m_TransformBuffer;
   Ref<GPUBuffer> m_SceneUniformBuffer;
+  Ref<GPUBuffer> m_ShadowUniformBuffer;;
+
   SceneUniform m_SceneUniform;
+  ShadowUniform m_ShadowUniform;
+
   std::map<MeshKey, DrawCommand> m_DrawList;
   std::map<MeshKey, TransformMapData> m_MeshTransformMap;
 
   Ref<Texture> m_ShadowDepthTexture;
   Ref<Texture> m_LitDepthTexture;
   Ref<Texture> m_LitPassTexture;
+	SceneCamera Cam;
 
   Ref<Sampler> m_ShadowSampler;
 
-  Ref<RenderPass> m_ShadowPass;
+	Ref<Framebuffer> m_CompositeFramebuffer;
+
+  Ref<RenderPass> m_ShadowPass[4];
   Ref<RenderPass> m_LitPass;
   Ref<RenderPass> m_PpfxPass;
   Ref<RenderPass> m_SkyboxPass;
 
+
+	//Ref<RenderPipeline> m_ShadowPipeline;
+	Ref<RenderPipeline> m_ShadowPipeline[4];
   Ref<RenderPipeline> m_LitPipeline;
-  Ref<RenderPipeline> m_ShadowPipeline;
   Ref<RenderPipeline> m_DebugPipeline;
   Ref<RenderPipeline> m_PpfxPipeline;
   Ref<RenderPipeline> m_SkyboxPipeline;
 
   bool m_NeedResize = false;
+	uint32_t m_NumOfCascades = 4;
 
   uint32_t m_ViewportWidth;
   uint32_t m_ViewportHeight;

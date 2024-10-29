@@ -26,7 +26,7 @@ Buffer TextureImporter::ImportFileToBuffer(const std::filesystem::path& path, Te
 	//imageBuffer.Data = pixelData;
   imageBuffer.Size = width * height * 4;
 
-	outFormat = TextureFormat::RGBA;
+	outFormat = TextureFormat::RGBA8;
 
   outWidth = width;
   outHeight = height;
