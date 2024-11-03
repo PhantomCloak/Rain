@@ -38,18 +38,19 @@ else()
 endif()
 
 # PhysX
-add_subdirectory(vendor/PhysX/physx/compiler/public)
 
 if(EMSCRIPTEN)
-	message(FATAL "OH NOOOO!!!")
-	target_link_options(PhysX PRIVATE -sALLOW_BLOCKING_ON_MAIN_THREAD=1)
+	#message(FATAL "OH NOOOO!!!")
+	#target_link_options(PhysX PRIVATE -sALLOW_BLOCKING_ON_MAIN_THREAD=1)
 
-	set(EMSCRIPTEN_PTHREADS_COMPILER_FLAGS "-pthread")
-	set(EMSCRIPTEN_PTHREADS_LINKER_FLAGS "${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}") # -sPROXY_TO_PTHREAD
+	#set(EMSCRIPTEN_PTHREADS_COMPILER_FLAGS "-pthread")
+	#set(EMSCRIPTEN_PTHREADS_LINKER_FLAGS "${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}") # -sPROXY_TO_PTHREAD
 
-	string(APPEND CMAKE_C_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
-	string(APPEND CMAKE_CXX_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
-	string(APPEND CMAKE_EXE_LINKER_FLAGS " ${EMSCRIPTEN_PTHREADS_LINKER_FLAGS}")
+	#string(APPEND CMAKE_C_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
+	#string(APPEND CMAKE_CXX_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
+	#string(APPEND CMAKE_EXE_LINKER_FLAGS " ${EMSCRIPTEN_PTHREADS_LINKER_FLAGS}")
+else()
+	add_subdirectory(vendor/PhysX/physx/compiler/public)
 endif()
 
 # ImGui
@@ -86,7 +87,7 @@ add_subdirectory(vendor/flecs)
 
 # Linking
 if(EMSCRIPTEN)
-	target_link_libraries(ReEngine PRIVATE tint_lang_wgsl_inspector libtint)
+	target_link_libraries(ReEngine PRIVATE tint_lang_wgsl_inspector libtint assimp flecs spdlog)
 else()
 	target_link_libraries(ReEngine PRIVATE dawn_common
   dawn_glfw

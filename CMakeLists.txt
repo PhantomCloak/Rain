@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1...3.25)
+cmake_minimum_required(VERSION 3.15...3.25)
 project(RainEngine VERSION 0.1.0 LANGUAGES CXX C)
 set(DAWN_DEBUG_BREAK_ON_ERROR TRUE)
 set(DEBUG_BREAK_ON_ERROR TRUE)
@@ -42,16 +42,8 @@ include("cmake/ThirdParty.cmake")
 target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/dawn/include/tint)
 
 if(EMSCRIPTEN)
-	target_link_options(ReEngine PRIVATE
-		-sUSE_GLFW=3
-		-sUSE_WEBGPU=1
-		-sASYNCIFY=1
-		-sALLOW_MEMORY_GROWTH=1
-		-sWASM_BIGINT=1
-		-sSTACK_SIZE=1mb
-		-O0
-		--preload-file "${CMAKE_CURRENT_SOURCE_DIR}/Resources"
-		)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sDISABLE_EXCEPTION_CATCHING=0")
+	target_link_options(ReEngine PRIVATE -sUSE_GLFW=3 -sUSE_WEBGPU=1 -sASYNCIFY=1 -sALLOW_MEMORY_GROWTH=1 -sWASM_BIGINT=1 -sSTACK_SIZE=1mb --preload-file "${CMAKE_CURRENT_SOURCE_DIR}/Resources")
 		set_target_properties(ReEngine PROPERTIES SUFFIX ".html")
 endif()
 

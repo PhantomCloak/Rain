@@ -1,5 +1,6 @@
 #pragma once
 #include "Base.h"
+typedef unsigned int uint;
 
 class UUID {
  public:

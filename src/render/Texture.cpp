@@ -71,6 +71,8 @@ void Texture::Invalidate() {
   uint32_t mipCount = m_TextureProps.GenerateMips ? RenderUtils::CalculateMipCount(m_TextureProps.Width, m_TextureProps.Height) : 1;
 
   WGPUTextureDescriptor textureDesc = {};
+	ZERO_INIT(textureDesc);
+
   textureDesc.nextInChain = nullptr;
   textureDesc.label = m_TextureProps.DebugName.c_str();
   textureDesc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
@@ -108,6 +110,7 @@ void Texture::Invalidate() {
 	m_Views.clear();
   if (m_TextureProps.layers > 1) {
     WGPUTextureViewDescriptor textureViewDesc = {};
+		ZERO_INIT(textureViewDesc);
     textureViewDesc.aspect = WGPUTextureAspect_All;
     textureViewDesc.baseArrayLayer = 0;
     textureViewDesc.arrayLayerCount = m_TextureProps.layers;
@@ -120,6 +123,7 @@ void Texture::Invalidate() {
 
   for (int i = 0; i < m_TextureProps.layers; i++) {
     WGPUTextureViewDescriptor textureViewDesc = {};
+		ZERO_INIT(textureViewDesc);
     textureViewDesc.aspect = WGPUTextureAspect_All;
     textureViewDesc.baseArrayLayer = i;
     textureViewDesc.arrayLayerCount = 1;

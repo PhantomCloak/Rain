@@ -1,3 +1,4 @@
+#ifndef __EMSCRIPTEN__
 #pragma once
 #ifndef NDEBUG
 #define NDEBUG
@@ -16,3 +17,4 @@ class PhysicUtils {
 	static PxTransform ConvertPxTransform(glm::vec3 position, float rotation, glm::vec3 direction = glm::vec3(0, 1, 0));
 	static PxTransform ConvertPxTransform(glm::vec3 position, glm::vec3 rotation);
 };
+#endif

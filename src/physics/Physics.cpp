@@ -1,3 +1,4 @@
+#ifndef __EMSCRIPTEN__
 #include "Physics.h"
 #include <iostream>
 
@@ -31,3 +32,4 @@ PxScene* Physics::CreateScene(glm::vec3 gravity) {
   sceneDesc.filterShader = PxDefaultSimulationFilterShader;
   return gPhysics->createScene(sceneDesc);
 }
+#endif

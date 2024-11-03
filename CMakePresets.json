@@ -49,12 +49,31 @@
                 "DAWN_ENABLE_VULKAN": "ON",
                 "TINT_BUILD_SPV_WRITER ": "ON",
                 "USE_X11": "ON",
-				"USE_VULKAN": "ON",
+								"USE_VULKAN": "ON",
                 "RESOURCE_DIR": "${sourceDir}/Resources",
                 "RN_DEBUG": "ON",
                 "CMAKE_BUILD_TYPE": "Debug",
                 "CMAKE_CXX_FLAGS_DEBUG": "-g",
                 "CMAKE_EXE_LINKER_FLAGS_DEBUG": "-rdynamic",
+                "TARGET_BUILD_PLATFORM": "linux",
+                "DAWN_DEBUG_BREAK_ON_ERROR": "1"
+            }
+        },
+        {
+            "name": "linux-release",
+            "inherits": "common",
+            "description": "Build with Dawn for Linux",
+            "environment": {
+                "RESOURCE_DIR": "${sourceDir}/Resources"
+            },
+            "cacheVariables": {
+                "DAWN_ENABLE_VULKAN": "ON",
+                "TINT_BUILD_SPV_WRITER ": "ON",
+                "USE_X11": "ON",
+								"USE_VULKAN": "ON",
+                "RESOURCE_DIR": "${sourceDir}/Resources",
+                "RN_DEBUG": "ON",
+                "CMAKE_BUILD_TYPE": "Release",
                 "TARGET_BUILD_PLATFORM": "linux",
                 "DAWN_DEBUG_BREAK_ON_ERROR": "1"
             }
@@ -110,6 +129,23 @@
                 "TARGET_BUILD_PLATFORM": "emscripten",
                 "ALLOW_BLOCKING_ON_MAIN_THREAD": "1"
             }
+        },
+        {
+            "name": "emscripten-release",
+            "inherits": "common",
+            "description": "Build for WebAssembly with Emscripten",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_TOOLCHAIN_FILE": "/home/phantom/Developer/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+                "EMSCRIPTEN": "ON",
+                "USE_GLFW": "3",
+                "USE_WEBGPU": "ON",
+                "ASYNCIFY": "ON",
+                "WASM_BIGINT": "ON",
+                "TARGET_BUILD_PLATFORM": "emscripten",
+                "ALLOW_BLOCKING_ON_MAIN_THREAD": "1"
+            }
         }
+
     ]
 }

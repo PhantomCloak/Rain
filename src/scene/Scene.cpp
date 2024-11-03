@@ -18,8 +18,8 @@ Entity Scene::CreateEntity(std::string name) {
 }
 
 float rotX = -15.0;
-float rotY = 0.0;
-float rotZ = 15.0;
+float rotY = 25.0;
+float rotZ = 30.0;
 
 float posX = 0.0;
 float posY = 1000.0;

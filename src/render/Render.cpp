@@ -2,6 +2,7 @@
 #include "Mesh.h"
 #include "ResourceManager.h"
 #include "core/Assert.h"
+#include "core/Ref.h"
 #include "debug/Profiler.h"
 
 #if __EMSCRIPTEN__
@@ -31,9 +32,8 @@ static WGPURendererData* s_Data = nullptr;
 
 #include "glfw3webgpu.h"
 WGPUInstance Render::CreateGPUInstance() {
-  WGPUInstanceDescriptor instanceDesc = {};
-  instanceDesc.nextInChain = nullptr;
-  static WGPUInstance instance;
+  WGPUInstanceDescriptor* instanceDesc = (WGPUInstanceDescriptor*)malloc(sizeof(WGPUInstanceDescriptor));
+  instanceDesc->nextInChain = nullptr;
 
   // #if !__EMSCRIPTEN__
   //   static std::vector<const char*> enabledToggles = {
@@ -54,46 +54,60 @@ WGPUInstance Render::CreateGPUInstance() {
   //   instanceDesc.features.timedWaitAnyMaxCount = 64;
   // #endif
 
-  instance = wgpuCreateInstance(&instanceDesc);
+  m_Instance = wgpuCreateInstance(nullptr);
 
-  RN_CORE_ASSERT(instance, "An error occured while acquiring the WebGPU instance.");
+  RN_CORE_ASSERT(m_Instance, "An error occured while acquiring the WebGPU instance.");
 
-  return instance;
+  return m_Instance;
 }
 
 bool Render::Init(void* window) {
   Instance = this;
 
-  auto instance = CreateGPUInstance();
+	RN_LOG("Creating GPU Instance");
+  CreateGPUInstance();
+	RN_LOG("GPU Instance: {}", m_Instance == nullptr);
   m_window = static_cast<GLFWwindow*>(window);
+	RN_LOG("Window: {}", m_window == nullptr);
 
 #if __EMSCRIPTEN__
-  m_surface = htmlGetCanvasSurface(instance, "canvas");
+  m_surface = htmlGetCanvasSurface(m_Instance, "canvas");
 #else
-  m_surface = glfwGetWGPUSurface(instance, m_window);
+  m_surface = glfwGetWGPUSurface(m_Instance, m_window);
   // m_surface = nullptr;
 #endif
 
-  static WGPURequestAdapterOptions adapterOpts{};
-  adapterOpts.compatibleSurface = m_surface;
-  m_adapter = RequestAdapter(instance, &adapterOpts);
+	RN_LOG("GPU Surface {}", m_surface == nullptr);
 
-  WGPURequiredLimits requiredLimits = GetRequiredLimits(m_adapter);
-  static WGPUDeviceDescriptor deviceDesc;
+  WGPURequestAdapterOptions* adapterOpts = ZERO_ALLOC(WGPURequestAdapterOptions);
 
-  deviceDesc.label = "My Device";
+  adapterOpts->compatibleSurface = m_surface;
+  adapterOpts->compatibilityMode = false;
+	adapterOpts->nextInChain = nullptr;
+  m_adapter = RequestAdapter(m_Instance, adapterOpts);
+
+	RN_LOG("GPU Adapter {}", m_adapter == nullptr);
+
+  WGPURequiredLimits* requiredLimits = GetRequiredLimits(m_adapter);
+  WGPUDeviceDescriptor* deviceDesc = ZERO_ALLOC(WGPUDeviceDescriptor);
+
+  deviceDesc->label = "MyDevice";
 #if __EMSCRIPTEN__
-  deviceDesc.requiredFeaturesCount = 0;
+  //deviceDesc.requiredFeaturesCount = 0;
+  deviceDesc->requiredFeatureCount = 0;
 #else
   // deviceDesc.requiredFeaturesCount = 0;
   static WGPUFeatureName sucker[] = {WGPUFeatureName_TimestampQuery};
-  deviceDesc.requiredFeatures = &sucker[0];
-  deviceDesc.requiredFeatureCount = 1;
+  deviceDesc->requiredFeatures = &sucker[0];
+  deviceDesc->requiredFeatureCount = 1;
 #endif
-  deviceDesc.requiredLimits = &requiredLimits;
-  deviceDesc.defaultQueue.label = "The default queue";
 
-  m_device = RequestDevice(m_adapter, &deviceDesc);
+  deviceDesc->requiredLimits = requiredLimits;
+  deviceDesc->defaultQueue.label = "defq";
+  deviceDesc->nextInChain = nullptr;
+
+	std::cout << "req limit" << requiredLimits << std::endl;
+  m_device = RequestDevice(m_adapter, deviceDesc);
 
   m_queue = wgpuDeviceGetQueue(m_device);
 
@@ -219,47 +233,57 @@ const char* getBackendTypeString(WGPUBackendType backendType) {
   }
 }
 
-WGPUAdapter Render::RequestAdapter(WGPUInstance instance,
-                                   WGPURequestAdapterOptions const* options) {
-  struct UserData {
+struct UserData {
     WGPUAdapter adapter = nullptr;
     bool requestEnded = false;
   };
-  UserData userData;
 
-  auto onAdapterRequestEnded = [](WGPURequestAdapterStatus status,
-                                  WGPUAdapter adapter, char const* message,
-                                  void* pUserData) {
-    UserData& userData = *reinterpret_cast<UserData*>(pUserData);
+void onAdapterRequestEnded(WGPURequestAdapterStatus status, WGPUAdapter adapter, const char* message, void* pUserData) {
+    auto userData = (UserData*)pUserData;
 
-    RN_CORE_ASSERT(status == WGPURequestAdapterStatus_Success, "An error occured while acquiring WebGPU adapter");
+    RN_CORE_ASSERT(status == WGPURequestAdapterStatus_Success, "An error occurred while acquiring WebGPU adapter");
 
-    userData.adapter = adapter;
-    userData.requestEnded = true;
+    userData->adapter = adapter;
+    userData->requestEnded = true;
 
-    WGPUAdapterProperties properties = {};
-    wgpuAdapterGetProperties(adapter, &properties);
+    RN_LOG("Adapter Status: {}", (ulong)status);
+    RN_LOG("Adapter: {}", (ulong)adapter);
+		std::cout << "USER DATA: " << userData << std::endl;
+		std::cout << "USER DATA OBJ ADAPTER: " << userData->adapter << std::endl;
+		std::cout << "USER DATA ENDED: " << userData->requestEnded << std::endl;
+		std::cout << "ADAPTER: " << adapter << std::endl;
+		std::cout << "MSG: " << message << std::endl;
+		std::cout << "STATUS: " << status << std::endl;
+    WGPUAdapterProperties* properties = ZERO_ALLOC(WGPUAdapterProperties);
+    wgpuAdapterGetProperties(adapter, properties);
 
-    RN_LOG("Adapter Information");
-    RN_LOG(" - Name: {}", properties.name);
-    RN_LOG(" - Vendor ID: {}", properties.vendorID);
-    RN_LOG(" - Device ID: {}", properties.deviceID);
-    RN_LOG(" - Backend: {}", getBackendTypeString(properties.backendType));
-    RN_LOG(" - Adapter Type : {}", getAdapterTypeString(properties.adapterType));
-  };
+    //RN_LOG("Adapter Information");
+    //RN_LOG(" - Name: {}", properties.name);
+    //RN_LOG(" - Vendor ID: {}", properties.vendorID);
+    //RN_LOG(" - Device ID: {}", properties.deviceID);
+    //RN_LOG(" - Backend: {}", getBackendTypeString(properties.backendType));
+    //RN_LOG(" - Adapter Type: {}", getAdapterTypeString(properties.adapterType));
+}
 
-  wgpuInstanceRequestAdapter(instance /* equivalent of navigator.gpu */,
-                             options, onAdapterRequestEnded, (void*)&userData);
+WGPUAdapter Render::RequestAdapter(WGPUInstance instance, WGPURequestAdapterOptions const* options) {
+    UserData* userData = (UserData*)malloc(sizeof(UserData));
+
+		//std::cout << "INSTANCE: " << instance << std::endl;
+    wgpuInstanceRequestAdapter(instance, options, onAdapterRequestEnded, userData);
 
 #if __EMSCRIPTEN__
-  while (!userData.requestEnded) {
-    emscripten_sleep(100);
-  }
+    while (!userData->requestEnded) {
+        emscripten_sleep(300);
+    }
+		emscripten_sleep(1000);
+#endif
+		std::cout << "aa" << std::endl;
+#if __EMSCRIPTEN__
+		emscripten_sleep(200);
 #endif
 
-  assert(userData.requestEnded);
-
-  return userData.adapter;
+    assert(userData->requestEnded);
+    return userData->adapter;
 }
 
 WGPUDevice Render::RequestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor) {
@@ -267,67 +291,70 @@ WGPUDevice Render::RequestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const
     WGPUDevice device = nullptr;
     bool requestEnded = false;
   };
-  UserData userData;
+	UserData* userData = (UserData*)malloc(sizeof(UserData));
 
   auto onDeviceRequestEnded = [](WGPURequestDeviceStatus status,
                                  WGPUDevice device, char const* message,
                                  void* pUserData) {
-    UserData& userData = *reinterpret_cast<UserData*>(pUserData);
+		RN_LOG("Devicee callback received");
+		std::cout << "device: " << device << std::endl;
+		std::cout << "msg: " << message << std::endl;
+		std::cout << "status: " << status << std::endl;
+		std::cout << "ud: " << pUserData << std::endl;
+
+    auto userData = (UserData*)pUserData;
 
     RN_CORE_ASSERT(status == WGPURequestDeviceStatus_Success, "An error occured while acquiring WebGPU adapter");
 
-    userData.device = device;
-    userData.requestEnded = true;
+    userData->device = device;
+    userData->requestEnded = true;
   };
 
   wgpuAdapterRequestDevice(adapter, descriptor, onDeviceRequestEnded,
-                           (void*)&userData);
+                           (void*)userData);
 
   // TODO: temporary hack for some browsers, it should be investigated more
 #if __EMSCRIPTEN__
-  while (!userData.requestEnded) {
-    emscripten_sleep(100);
+  while (!userData->requestEnded) {
+    emscripten_sleep(1000);
   }
 #endif
 
-  assert(userData.requestEnded);
+	std::cout << "aa" << std::endl;
 
-  return userData.device;
+#if __EMSCRIPTEN__
+	emscripten_sleep(200);
+#endif
+  assert(userData->requestEnded);
+
+  return userData->device;
 }
 
-WGPURequiredLimits Render::GetRequiredLimits(WGPUAdapter adapter) {
-  static WGPUSupportedLimits supportedLimits = {};
+WGPURequiredLimits* Render::GetRequiredLimits(WGPUAdapter adapter) {
+    static WGPUSupportedLimits supportedLimits = {};
+    supportedLimits.nextInChain = nullptr;
 
 #ifdef __EMSCRIPTEN__
-  // Error in Chrome handling
-  supportedLimits.limits.minStorageBufferOffsetAlignment = 256;
-  supportedLimits.limits.minUniformBufferOffsetAlignment = 256;
+    // Specific limits required for Emscripten
+    supportedLimits.limits.minStorageBufferOffsetAlignment = 256;
+    supportedLimits.limits.minUniformBufferOffsetAlignment = 256;
 #else
-  wgpuAdapterGetLimits(adapter, &supportedLimits);
+    wgpuAdapterGetLimits(adapter, &supportedLimits);
 #endif
 
-  static WGPURequiredLimits requiredLimits = {};
-  requiredLimits.limits.maxVertexAttributes = supportedLimits.limits.maxVertexAttributes;
-  requiredLimits.limits.maxVertexBuffers = supportedLimits.limits.maxVertexBuffers;
-  requiredLimits.limits.maxBufferSize = 150000 * sizeof(VertexAttribute);
-  // requiredLimits.limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);
-  requiredLimits.limits.maxVertexBufferArrayStride = 0;
-  requiredLimits.limits.minStorageBufferOffsetAlignment =
-      supportedLimits.limits.minStorageBufferOffsetAlignment;
-  requiredLimits.limits.minUniformBufferOffsetAlignment =
-      supportedLimits.limits.minUniformBufferOffsetAlignment;
-  requiredLimits.limits.maxInterStageShaderComponents = supportedLimits.limits.maxInterStageShaderComponents;
-  requiredLimits.limits.maxBindGroups = supportedLimits.limits.maxBindGroups;
-  requiredLimits.limits.maxUniformBuffersPerShaderStage = supportedLimits.limits.maxUniformBuffersPerShaderStage;
-  requiredLimits.limits.maxUniformBufferBindingSize = 64 * 4 * sizeof(float);
-  requiredLimits.limits.maxTextureDimension1D = 4096;
-  requiredLimits.limits.maxTextureDimension2D = 4096;
-  requiredLimits.limits.maxDynamicUniformBuffersPerPipelineLayout = supportedLimits.limits.maxDynamicUniformBuffersPerPipelineLayout;
-  requiredLimits.limits.maxTextureArrayLayers = supportedLimits.limits.maxTextureArrayLayers;
-  requiredLimits.limits.maxSampledTexturesPerShaderStage = supportedLimits.limits.maxSampledTexturesPerShaderStage;
-  requiredLimits.limits.maxSamplersPerShaderStage = supportedLimits.limits.maxSamplersPerShaderStage;
+    WGPURequiredLimits* requiredLimits = (WGPURequiredLimits*)malloc(sizeof(WGPURequiredLimits));
+    requiredLimits->limits = supportedLimits.limits;  // Copy all supported limits
 
-  return requiredLimits;
+    // Override specific limits as needed
+    requiredLimits->limits.maxBufferSize = 150000 * sizeof(VertexAttribute);
+    requiredLimits->limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);  // Ensure only one assignment
+    requiredLimits->limits.maxTextureDimension1D = 4096;
+    requiredLimits->limits.maxTextureDimension2D = 4096;
+    // Add any additional specific overrides below
+
+		RN_LOG("Max Texture Limit: {}", supportedLimits.limits.maxTextureDimension2D);
+    requiredLimits->nextInChain = nullptr;
+    return requiredLimits;
 }
 
 WGPUSwapChain Render::BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface) {
@@ -358,15 +385,23 @@ WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandE
 
   WGPUTextureView swp;
   WGPURenderPassDescriptor passDesc = {};
+	ZERO_INIT(passDesc);
+
   passDesc.nextInChain = nullptr;
   passDesc.label = pass->GetProps().DebugName.c_str();
 
   WGPURenderPassColorAttachment colorAttachment{};
+	ZERO_INIT(colorAttachment);
+
   colorAttachment.nextInChain = nullptr;
   colorAttachment.loadOp = WGPULoadOp_Load;
   colorAttachment.storeOp = WGPUStoreOp_Store;
   colorAttachment.clearValue = WGPUColor{0, 0, 0, 1};
   colorAttachment.resolveTarget = nullptr;
+
+#if __EMSCRIPTEN__
+	colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+#endif
 
   if (renderFrameBuffer->HasColorAttachment()) {
     if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget) {
@@ -382,6 +417,7 @@ WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandE
 
   if (renderFrameBuffer->HasDepthAttachment()) {
     WGPURenderPassDepthStencilAttachment depthAttachment = {};
+		ZERO_INIT(depthAttachment );
 
 		auto depth = renderFrameBuffer->GetDepthAttachment();
 		if(depth->m_Views.size() > 1)

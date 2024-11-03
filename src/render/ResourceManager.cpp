@@ -151,6 +151,7 @@ bool Rain::ResourceManager::IsTextureExist(std::string id) {
   return _loadedTextures.find(id) != _loadedTextures.end();
 }
 
+// TOOD: check if file exist or not
 std::shared_ptr<Texture> Rain::ResourceManager::LoadTexture(std::string id, std::string path) {
   RN_PROFILE_FUNC;
 

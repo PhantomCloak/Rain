@@ -16,10 +16,11 @@
 #include "render/Render.h"
 #include "render/ResourceManager.h"
 
-#include <Tracy.hpp>
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
+#else
+#include <Tracy.hpp>
 #endif
 
 std::unique_ptr<Render> render;
@@ -63,7 +64,9 @@ void Application::OnResize(int height, int width) {
 }
 
 void Application::OnUpdate() {
+#ifndef __EMSCRIPTEN__
 	FrameMark;
+#endif
   glfwPollEvents();
   m_Scene->OnUpdate();
   m_Scene->OnRender(m_Renderer);

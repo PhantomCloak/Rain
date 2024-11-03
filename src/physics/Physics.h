@@ -1,4 +1,5 @@
 #pragma once
+#ifndef __EMSCRIPTEN__
 #ifndef NDEBUG
 #define NDEBUG
 #endif
@@ -21,3 +22,4 @@ class Physics {
  private:
   PxFoundation* gFoundation;
 };
+#endif

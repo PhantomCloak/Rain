@@ -1,3 +1,5 @@
+#ifndef __EMSCRIPTEN__
+
 #include "PhysicUtils.h"
 #include <iostream>
 #include <glm/gtc/quaternion.hpp>
@@ -34,3 +36,4 @@ PxTransform PhysicUtils::ConvertPxTransform(glm::vec3 position, glm::vec3 rotati
 
     return PxTransform(PxVec3(position.x, position.y, position.z), pxQuat);
 }
+#endif

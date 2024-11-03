@@ -42,7 +42,7 @@ class Render {
  private:
   void RendererPostInit();
   WGPUInstance CreateGPUInstance();
-  WGPURequiredLimits GetRequiredLimits(WGPUAdapter adapter);
+  WGPURequiredLimits* GetRequiredLimits(WGPUAdapter adapter);
   WGPUAdapter RequestAdapter(WGPUInstance instance, WGPURequestAdapterOptions const* options);
   WGPUDevice RequestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor);
 
@@ -54,6 +54,7 @@ class Render {
   WGPUAdapter m_adapter = nullptr;
   WGPUDevice m_device = nullptr;
   WGPUQueue m_queue = nullptr;
+	WGPUInstance m_Instance = nullptr;
 	WGPUTextureView m_SwapTexture;
 
   WGPUSwapChain m_swapChain = nullptr;

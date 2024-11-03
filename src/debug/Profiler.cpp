@@ -1,3 +1,4 @@
+#ifdef RN_ENABLE_PROFILING
 #include "Profiler.h"
 #include "Tracy.hpp"
 
@@ -23,3 +24,4 @@ void operator delete(void* ptr) noexcept {
 #endif
   free(ptr);
 }
+#endif

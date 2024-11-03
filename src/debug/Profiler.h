@@ -1,6 +1,6 @@
 #pragma once
 
-#define RN_ENABLE_PROFILING 1
+#define RN_ENABLE_PROFILING 0
 
 #define RN_PROFILE_MEM_ENABLED TRUE
 //#define RN_PROFILE_MEM_STACK FALSE

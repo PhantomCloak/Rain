@@ -418,7 +418,7 @@ void SceneRenderer::Init() {
       .DebugName = "LitPass"};
 
   m_LitPass = RenderPass::Create(litPassSpec);
-  m_LitPass->Set("u_scene", m_SceneUniformBuffer);
+  m_LitPass->Set("u_Scene", m_SceneUniformBuffer);
   m_LitPass->Set("u_ShadowMap", m_ShadowPass[0]->GetDepthOutput());
   m_LitPass->Set("u_ShadowSampler", m_ShadowSampler);
   m_LitPass->Set("u_ShadowData", m_ShadowUniformBuffer);
@@ -533,7 +533,11 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
 
 void SceneRenderer::FlushDrawList() {
   RN_PROFILE_FUNC;
-  WGPUCommandEncoderDescriptor commandEncoderDesc = {.nextInChain = nullptr, .label = "Default Command Encoder"};
+  WGPUCommandEncoderDescriptor commandEncoderDesc = {};
+	ZERO_INIT(commandEncoderDesc);
+
+	commandEncoderDesc.label = "Default";
+	commandEncoderDesc.nextInChain = nullptr;
   Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
 
   auto commandEncoder = wgpuDeviceCreateCommandEncoder(renderContext->GetDevice(), &commandEncoderDesc);
