@@ -164,6 +164,8 @@ std::shared_ptr<Texture> Rain::ResourceManager::LoadTexture(std::string id, std:
 	auto texture = Texture::Create(textureProp, p);
 
   _loadedTextures[id] = texture;
+
+	RN_LOG("Texture {} loaded from {}", id, path);
   return texture;
 }
 

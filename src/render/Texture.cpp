@@ -137,6 +137,11 @@ void Texture::Invalidate() {
 }
 
 void Texture::CreateFromFile(const TextureProps& props, const std::filesystem::path& path) {
+
+    if (!std::filesystem::exists(path)) {
+			std::cerr << "Texture file not found: " << path << std::endl;
+				 return;
+    }
   m_ImageData = TextureImporter::ImportFileToBuffer(path, m_TextureProps.Format, m_TextureProps.Width, m_TextureProps.Height);
   Invalidate();
 }

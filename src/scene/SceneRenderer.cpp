@@ -12,21 +12,7 @@
 
 SceneRenderer* SceneRenderer::instance;
 
-std::vector<glm::vec4> SceneRenderer::getFrustumCornersWorldSpace(const glm::mat4& projview) {
-  const auto inv = glm::inverse(projview);
 
-  std::vector<glm::vec4> frustumCorners;
-  for (unsigned int x = 0; x < 2; ++x) {
-    for (unsigned int y = 0; y < 2; ++y) {
-      for (unsigned int z = 0; z < 2; ++z) {
-        const glm::vec4 pt = inv * glm::vec4(2.0f * x - 1.0f, 2.0f * y - 1.0f, 2.0f * z - 1.0f, 1.0f);
-        frustumCorners.push_back(pt / pt.w);
-      }
-    }
-  }
-
-  return frustumCorners;
-}
 		struct CascadeData
 		{
 			glm::mat4 ViewProj;
@@ -59,7 +45,11 @@ void CalculateCascades(CascadeData* cascades, const SceneCamera& sceneCamera, gl
     float ratio = maxZ / minZ;
 
     float CascadeSplitLambda = 0.92f;
-    float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -320.0f;
+    //float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
+    //float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -320.0f;
+    //float CascadeFarPlaneOffset = 250.0f, CascadeNearPlaneOffset = -250.0f;
+    float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
+    //float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -100.0f;
 
     // Calculate split depths based on view camera frustum
     for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++)
@@ -74,9 +64,9 @@ void CalculateCascades(CascadeData* cascades, const SceneCamera& sceneCamera, gl
     cascadeSplits[3] = 0.3f;
 
 		// Manually set cascades here
-		//cascadeSplits[0] = 0.10f;
-		//cascadeSplits[1] = 0.20f;
-		//cascadeSplits[2] = 0.40f;
+		//cascadeSplits[0] = 0.02f;
+		//cascadeSplits[1] = 0.15f;
+		//cascadeSplits[2] = 0.3f;
 		//cascadeSplits[3] = 1.0f;
 
 
@@ -166,76 +156,6 @@ void CalculateCascades(CascadeData* cascades, const SceneCamera& sceneCamera, gl
 
         lastSplitDist = cascadeSplits[i];
     }
-}
-std::vector<glm::vec4> SceneRenderer::getFrustumCornersWorldSpace(const glm::mat4& proj, const glm::mat4& view) {
-  return getFrustumCornersWorldSpace(proj * view);
-}
-
-glm::mat4 SceneRenderer::getLightSpaceMatrix(float nearPlane, float farPlane, float zoom, float w, float h, glm::mat4 viewMat, glm::vec3 lightDir) {
-  const auto proj = glm::perspective(
-      glm::radians(zoom), (float)w / (float)h, nearPlane,
-      farPlane);
-  const auto corners = getFrustumCornersWorldSpace(proj, viewMat);
-
-  glm::vec3 center = glm::vec3(0, 0, 0);
-  for (const auto& v : corners) {
-    center += glm::vec3(v);
-  }
-  center /= corners.size();
-
-  const auto lightView = glm::lookAt(center + lightDir, center, glm::vec3(0.0f, 1.0, 0.0));
-
-  float minX = std::numeric_limits<float>::max();
-  float maxX = std::numeric_limits<float>::lowest();
-  float minY = std::numeric_limits<float>::max();
-  float maxY = std::numeric_limits<float>::lowest();
-  float minZ = std::numeric_limits<float>::max();
-  float maxZ = std::numeric_limits<float>::lowest();
-  for (const auto& v : corners) {
-    const auto trf = lightView * v;
-    minX = std::min(minX, trf.x);
-    maxX = std::max(maxX, trf.x);
-    minY = std::min(minY, trf.y);
-    maxY = std::max(maxY, trf.y);
-    minZ = std::min(minZ, trf.z);
-    maxZ = std::max(maxZ, trf.z);
-  }
-
-  // Tune this parameter according to the scene
-  constexpr float zMult = 10.0f;
-  if (minZ < 0) {
-    minZ *= zMult;
-  } else {
-    minZ /= zMult;
-  }
-  if (maxZ < 0) {
-    maxZ /= zMult;
-  } else {
-    maxZ *= zMult;
-  }
-
-  const glm::mat4 lightProjection = glm::ortho(minX, maxX, minY, maxY, minZ, maxZ);
-  return lightProjection * lightView;
-}
-glm::mat4 GetViewMatrix(glm::vec3 pos, glm::vec3 rot) {
-  glm::vec3 shadowCameraPos = pos;
-  glm::vec3 shadowCameraRot = rot;
-
-  float pitch = shadowCameraRot.x;
-  float yaw = shadowCameraRot.y;
-  float roll = shadowCameraRot.z;
-
-  glm::vec3 front;
-  front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-  front.y = sin(glm::radians(pitch));
-  front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-
-  glm::vec3 Front = glm::normalize(front);
-  glm::vec3 worldUp = glm::vec3(0, 1, 0);
-  glm::vec3 right = glm::normalize(glm::cross(Front, worldUp));
-  glm::vec3 up = glm::rotate(glm::mat4(1.0f), glm::radians(roll), right) * glm::vec4(worldUp, 1.0);
-
-  return glm::lookAt(shadowCameraPos, shadowCameraPos + Front, up);
 }
 
 void SceneRenderer::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform) {

@@ -94,6 +94,8 @@ MeshSource::MeshSource(std::string path) {
       }
 
       std::string textureName = FileSys::GetFileName(texturePath.C_Str());
+			RN_LOG("Texture Name: {}", textureName);
+			std::cout << "aa" << std::endl;
 
       Ref<Texture> matTexture;
       if (Rain::ResourceManager::IsTextureExist(textureName)) {
@@ -213,6 +215,13 @@ MeshSource::MeshSource(std::string path) {
 
     m_SubMeshes[i] = subMesh;
   }
+
+  int s = 0;
+  int i = 0;
+	for(auto& m : m_SubMeshes) {
+		s += m.VertexCount;
+		i += m.IndexCount;
+	}
 
   TraverseNode(scene->mRootNode, scene);
 }

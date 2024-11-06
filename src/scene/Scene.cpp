@@ -17,31 +17,25 @@ Entity Scene::CreateEntity(std::string name) {
   return CreateChildEntity({}, name);
 }
 
-float rotX = -15.0;
-float rotY = 25.0;
-float rotZ = 30.0;
-
-float posX = 0.0;
-float posY = 1000.0;
-float posZ = 0.0;
+float rotX = 85.0;
+float rotY = 0.0;
+float rotZ = -15.0;
 
 UUID entityIdDir = 0.0;
 Entity entityCamera;
 void Scene::Init() {
   m_SceneCamera = std::make_unique<PlayerCamera>();
-  m_SceneCamera->Position.x = 198.84;
+	m_SceneCamera->Position.x = 198.84;
   m_SceneCamera->Position.y = 90.84;
   m_SceneCamera->Position.z = 155;
 
-  Ref<MeshSource> cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/cityz.gltf");
+  Ref<MeshSource> cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/city-test4.gltf");
   Entity map = CreateEntity("Box");
   map.GetComponent<TransformComponent>()->Translation = glm::vec3(0.0, 0.0, 0);
   map.GetComponent<TransformComponent>()->Scale = glm::vec3(0.10);
   BuildMeshEntityHierarchy(map, cityModel);
 
   Entity light = CreateEntity("DirectionalLight");
-  light.GetComponent<TransformComponent>()->Translation = glm::vec3(posX, posY, posZ);
-  light.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(rotX, rotY, rotZ));
   light.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
   light.AddComponent<DirectionalLightComponent>();
   entityIdDir = light.GetUUID();
@@ -64,7 +58,7 @@ Entity Scene::CreateChildEntity(Entity parent, std::string name) {
     entity.SetParent(parent);
   }
 
-  SceneLightInfo.LightPos = glm::vec3(posX, posY, posZ);
+	SceneLightInfo.LightPos = glm::vec3(0.0f);
   m_EntityMap[idComponent->ID] = entity;
 
   return entity;
@@ -88,9 +82,9 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
   static float w = Application::Get()->GetWindowSize().x;
   static float h = Application::Get()->GetWindowSize().y;
 
-  static auto projectionMatrix = glm::perspectiveFov(glm::radians(65.0f), w, h, 0.10f, 2500.0f);
+  static auto projectionMatrix = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1500.0f);
 
-  renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 0.10, 2500.0f});
+  renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 1.10, 1500.0f});
 
   static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
   drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent) {
@@ -103,8 +97,9 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
 
   static flecs::query<TransformComponent, DirectionalLightComponent> lightsQuery = m_World.query<TransformComponent, DirectionalLightComponent>();
   lightsQuery.each([&](flecs::entity entity, TransformComponent& transform, DirectionalLightComponent& directionalLight) {
-    SceneLightInfo.LightDirection = glm::normalize(glm::mat3(transform.GetTransform()) * glm::vec3(1.0f));
-    SceneLightInfo.LightPos = glm::vec3(posX, posY, posZ);
+    //SceneLightInfo.LightDirection = glm::normalize(glm::mat3(transform.GetTransform()) * glm::vec3(1.0f));
+		SceneLightInfo.LightDirection = glm::normalize(glm::mat3(transform.GetTransform()) * glm::vec3(0.0f, 0.0f, -1.0f));
+		SceneLightInfo.LightPos = glm::vec3(0.0f);
   });
 
   ImGui::Begin("Scene Settings");
@@ -127,27 +122,6 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
 
     auto transform2 = ent2.GetComponent<TransformComponent>();
     transform2->SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
-  }
-  if (ImGui::InputFloat("POS X", &posX, 0, 1)) {
-    auto ent2 = TryGetEntityWithUUID(entityIdDir);
-
-    auto transform2 = ent2.GetComponent<TransformComponent>();
-
-    transform2->Translation = glm::vec3(posX, posY, posZ);
-  }
-  if (ImGui::InputFloat("POS Y", &posY, 0, 1)) {
-    auto ent2 = TryGetEntityWithUUID(entityIdDir);
-
-    auto transform2 = ent2.GetComponent<TransformComponent>();
-
-    transform2->Translation = glm::vec3(posX, posY, posZ);
-  }
-  if (ImGui::InputFloat("POS Z", &posZ, 0, 1)) {
-    auto ent2 = TryGetEntityWithUUID(entityIdDir);
-
-    auto transform2 = ent2.GetComponent<TransformComponent>();
-    transform2->Translation = glm::vec3(posX, posY, posZ);
-    RN_LOG("X: {} Y: {} Z{} ", transform2->Translation.x, transform2->Translation.y, transform2->Translation.z);
   }
   ImGui::End();
 

@@ -98,10 +98,6 @@ class SceneRenderer {
   void SetScene(Scene* scene);
   void SetViewportSize(int height, int width);
 
-	glm::mat4 getLightSpaceMatrix(float nearPlane, float farPlane, float zoom, float w, float h, glm::mat4 viewMat, glm::vec3 lightDir);
-	std::vector<glm::vec4> getFrustumCornersWorldSpace(const glm::mat4& projview);
-	std::vector<glm::vec4> getFrustumCornersWorldSpace(const glm::mat4& proj, const glm::mat4& view);
-
   static SceneRenderer* instance;
   Ref<ShaderManager> m_ShaderManager;
 

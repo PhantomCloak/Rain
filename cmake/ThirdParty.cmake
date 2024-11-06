@@ -6,12 +6,20 @@ set(ASSIMP_BUILD_TESTS FALSE)
 set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT FALSE)
 set(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT FALSE)
 
+set(ASSIMP_BUILD_DRACO TRUE)
+set(ASSIMP_ENABLE_DRACO TRUE)
+set(DRACO_GLTF TRUE)
+set(DRACO_VERBOSE TRUE)
+
+
 set(ASSIMP_BUILD_GLTF_IMPORTER TRUE)
 set(ASSIMP_BUILD_GLTF2_IMPORTER TRUE)
 set(ASSIMP_BUILD_SMD_IMPORTER TRUE)
 set(ASSIMP_BUILD_SIB_IMPORTER TRUE)
 set(ASSIMP_BUILD_OBJ_IMPORTER TRUE)
 
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fnon-call-exceptions -Wexceptions -fdiagnostics-show-note-include-stack -fstack-protector-all -Wno-error=implicit-const-int-float-conversion")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=implicit-const-int-float-conversion")
 add_subdirectory(vendor/assimp)
 
 # Dawn WebGPU
@@ -51,6 +59,9 @@ if(EMSCRIPTEN)
 	#string(APPEND CMAKE_EXE_LINKER_FLAGS " ${EMSCRIPTEN_PTHREADS_LINKER_FLAGS}")
 else()
 	add_subdirectory(vendor/PhysX/physx/compiler/public)
+	add_library(TracyClient STATIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/TracyClient.cpp)
+	target_include_directories(TracyClient PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/tracy)
+	target_compile_definitions(TracyClient PUBLIC TRACY_ENABLE=1)
 endif()
 
 # ImGui
@@ -76,9 +87,6 @@ endif()
 #target_link_libraries(imgui PRIVATE webgpu_dawn webgpu_cpp webgpu_glfw glfw)
 
 # Tracy
-add_library(TracyClient STATIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/TracyClient.cpp)
-target_include_directories(TracyClient PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/tracy)
-target_compile_definitions(TracyClient PUBLIC TRACY_ENABLE=1)
 
 # Standalone
 add_subdirectory(vendor/spdlog)

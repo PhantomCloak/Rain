@@ -32,29 +32,34 @@ static WGPURendererData* s_Data = nullptr;
 
 #include "glfw3webgpu.h"
 WGPUInstance Render::CreateGPUInstance() {
-  WGPUInstanceDescriptor* instanceDesc = (WGPUInstanceDescriptor*)malloc(sizeof(WGPUInstanceDescriptor));
+  WGPUInstanceDescriptor* instanceDesc = ZERO_ALLOC(WGPUInstanceDescriptor);
   instanceDesc->nextInChain = nullptr;
 
-  // #if !__EMSCRIPTEN__
-  //   static std::vector<const char*> enabledToggles = {
-  //       "allow_unsafe_apis",
-  //   };
-  //
-  //   WGPUDawnTogglesDescriptor dawnToggleDesc;
-  //   dawnToggleDesc.chain.next = nullptr;
-  //   dawnToggleDesc.chain.sType = WGPUSType_DawnTogglesDescriptor;
-  //
-  //   dawnToggleDesc.enabledToggles = enabledToggles.data();
-  //   dawnToggleDesc.enabledToggleCount = 1;
-  //   dawnToggleDesc.disabledToggleCount = 0;
-  //
-  //   instanceDesc.nextInChain = &dawnToggleDesc.chain;
-  //
-  //   instanceDesc.features.timedWaitAnyEnable = 0;
-  //   instanceDesc.features.timedWaitAnyMaxCount = 64;
-  // #endif
+  #if !__EMSCRIPTEN__
+    static std::vector<const char*> enabledToggles = {
+				"chromium_disable_uniformity_analysis",
+        "allow_unsafe_apis"
+    };
+  
+    WGPUDawnTogglesDescriptor dawnToggleDesc = {};
+    dawnToggleDesc.chain.next = nullptr;
+    dawnToggleDesc.chain.sType = WGPUSType_DawnTogglesDescriptor;
+  
+    dawnToggleDesc.enabledToggles = enabledToggles.data();
+		dawnToggleDesc.enabledToggleCount = enabledToggles.size();
+    dawnToggleDesc.disabledToggleCount = 0;
+  
+    instanceDesc->nextInChain = &dawnToggleDesc.chain;
+  
+    instanceDesc->features.timedWaitAnyEnable = 0;
+    instanceDesc->features.timedWaitAnyMaxCount = 64;
+  #endif
 
+#if !__EMSCRIPTEN__
+  m_Instance = wgpuCreateInstance(instanceDesc);
+#else
   m_Instance = wgpuCreateInstance(nullptr);
+#endif
 
   RN_CORE_ASSERT(m_Instance, "An error occured while acquiring the WebGPU instance.");
 
@@ -257,12 +262,15 @@ void onAdapterRequestEnded(WGPURequestAdapterStatus status, WGPUAdapter adapter,
     WGPUAdapterProperties* properties = ZERO_ALLOC(WGPUAdapterProperties);
     wgpuAdapterGetProperties(adapter, properties);
 
-    //RN_LOG("Adapter Information");
-    //RN_LOG(" - Name: {}", properties.name);
-    //RN_LOG(" - Vendor ID: {}", properties.vendorID);
-    //RN_LOG(" - Device ID: {}", properties.deviceID);
-    //RN_LOG(" - Backend: {}", getBackendTypeString(properties.backendType));
-    //RN_LOG(" - Adapter Type: {}", getAdapterTypeString(properties.adapterType));
+
+#if !__EMSCRIPTEN__
+    RN_LOG("Adapter Information");
+    RN_LOG(" - Name: {}", properties->name);
+    RN_LOG(" - Vendor ID: {}", properties->vendorID);
+    RN_LOG(" - Device ID: {}", properties->deviceID);
+    RN_LOG(" - Backend: {}", getBackendTypeString(properties->backendType));
+    RN_LOG(" - Adapter Type: {}", getAdapterTypeString(properties->adapterType));
+#endif
 }
 
 WGPUAdapter Render::RequestAdapter(WGPUInstance instance, WGPURequestAdapterOptions const* options) {
@@ -350,6 +358,11 @@ WGPURequiredLimits* Render::GetRequiredLimits(WGPUAdapter adapter) {
     requiredLimits->limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);  // Ensure only one assignment
     requiredLimits->limits.maxTextureDimension1D = 4096;
     requiredLimits->limits.maxTextureDimension2D = 4096;
+
+#ifndef __EMSCRIPTEN__
+    requiredLimits->limits.maxTextureDimension1D = 6098;
+    requiredLimits->limits.maxTextureDimension2D = 6098;
+#endif
     // Add any additional specific overrides below
 
 		RN_LOG("Max Texture Limit: {}", supportedLimits.limits.maxTextureDimension2D);
