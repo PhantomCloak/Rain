@@ -27,12 +27,13 @@ void Framebuffer::Invalidate() {
     depthAttachmentSpec.Width = m_FrameBufferSpec.Width;
     depthAttachmentSpec.Height = m_FrameBufferSpec.Height;
     depthAttachmentSpec.CreateSampler = false;
+		depthAttachmentSpec.MultiSample = m_FrameBufferSpec.Multisample;
     depthAttachmentSpec.DebugName = std::string("FBO_DA_") + m_FrameBufferSpec.DebugName;
 
-    m_DepthAttachment = Texture::Create(depthAttachmentSpec);
+    m_DepthAttachment = Texture2D::Create(depthAttachmentSpec);
   }
 
-  if (m_FrameBufferSpec.SwapChainTarget) {
+	if (m_FrameBufferSpec.SwapChainTarget && m_FrameBufferSpec.Multisample == 0) {
     return;
   }
 
@@ -44,9 +45,10 @@ void Framebuffer::Invalidate() {
     colorAttachmentSpec.Width = m_FrameBufferSpec.Width;
     colorAttachmentSpec.Height = m_FrameBufferSpec.Height;
     colorAttachmentSpec.CreateSampler = false;
+		colorAttachmentSpec.MultiSample = m_FrameBufferSpec.Multisample;
     colorAttachmentSpec.DebugName = std::string("FBO_CA_") + m_FrameBufferSpec.DebugName;
 
-    m_ColorAttachment = Texture::Create(colorAttachmentSpec);
+    m_ColorAttachment = Texture2D::Create(colorAttachmentSpec);
   }
 }
 

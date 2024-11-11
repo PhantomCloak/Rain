@@ -1,6 +1,7 @@
 #pragma once
 #include "Scene.h"
 #include "render/Pipeline.h"
+#include "render/PipelineCompute.h"
 #include "render/RenderPass.h"
 #include "render/ShaderManager.h"
 
@@ -82,14 +83,13 @@ struct SceneUniform {
 };
 
 struct ShadowUniform {
-	glm::mat4 ShadowViews[4];
-	glm::vec4 CascadeDistances;
+  glm::mat4 ShadowViews[4];
+  glm::vec4 CascadeDistances;
 };
 
 class SceneRenderer {
  public:
-  SceneRenderer()
-      : m_ShaderManager(CreateRef<ShaderManager>()) { instance = this; };
+  SceneRenderer() { instance = this; };
 
   void Init();
   void SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform);
@@ -99,7 +99,6 @@ class SceneRenderer {
   void SetViewportSize(int height, int width);
 
   static SceneRenderer* instance;
-  Ref<ShaderManager> m_ShaderManager;
 
  private:
   void PreRender();
@@ -113,7 +112,8 @@ class SceneRenderer {
 
   Ref<GPUBuffer> m_TransformBuffer;
   Ref<GPUBuffer> m_SceneUniformBuffer;
-  Ref<GPUBuffer> m_ShadowUniformBuffer;;
+  Ref<GPUBuffer> m_ShadowUniformBuffer;
+  ;
 
   SceneUniform m_SceneUniform;
   ShadowUniform m_ShadowUniform;
@@ -121,30 +121,29 @@ class SceneRenderer {
   std::map<MeshKey, DrawCommand> m_DrawList;
   std::map<MeshKey, TransformMapData> m_MeshTransformMap;
 
-  Ref<Texture> m_ShadowDepthTexture;
-  Ref<Texture> m_LitDepthTexture;
-  Ref<Texture> m_LitPassTexture;
-	SceneCamera Cam;
+  Ref<Texture2D> m_ShadowDepthTexture;
+  Ref<Texture2D> m_LitDepthTexture;
+  Ref<Texture2D> m_LitPassTexture;
+  SceneCamera Cam;
 
   Ref<Sampler> m_ShadowSampler;
 
-	Ref<Framebuffer> m_CompositeFramebuffer;
+  Ref<Framebuffer> m_CompositeFramebuffer;
 
   Ref<RenderPass> m_ShadowPass[4];
   Ref<RenderPass> m_LitPass;
   Ref<RenderPass> m_PpfxPass;
   Ref<RenderPass> m_SkyboxPass;
 
-
-	//Ref<RenderPipeline> m_ShadowPipeline;
-	Ref<RenderPipeline> m_ShadowPipeline[4];
+  // Ref<RenderPipeline> m_ShadowPipeline;
+  Ref<RenderPipeline> m_ShadowPipeline[4];
   Ref<RenderPipeline> m_LitPipeline;
   Ref<RenderPipeline> m_DebugPipeline;
   Ref<RenderPipeline> m_PpfxPipeline;
   Ref<RenderPipeline> m_SkyboxPipeline;
 
   bool m_NeedResize = false;
-	uint32_t m_NumOfCascades = 4;
+  uint32_t m_NumOfCascades = 4;
 
   uint32_t m_ViewportWidth;
   uint32_t m_ViewportHeight;

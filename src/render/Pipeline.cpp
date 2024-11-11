@@ -180,13 +180,17 @@ void RenderPipeline::Invalidate() {
   pipelineDesc->multisample.alphaToCoverageEnabled = false;
 	pipelineDesc->multisample.nextInChain = nullptr;
 
+	if(m_PipelineSpec.DebugName == "RP_Composite" || m_PipelineSpec.DebugName == "RP_Skybox")
+	{
+		pipelineDesc->multisample.count = 4;
+	}
+
   auto device = RenderContext::GetDevice();
 
   std::vector<WGPUBindGroupLayout> bindGroupLayouts;
   for (const auto& [_, layout] : m_PipelineSpec.Shader->GetReflectionInfo().LayoutDescriptors) {
     bindGroupLayouts.push_back(layout);
   }
-
   WGPUPipelineLayoutDescriptor* layoutDesc = (WGPUPipelineLayoutDescriptor*)malloc(sizeof(WGPUPipelineLayoutDescriptor));
   layoutDesc->bindGroupLayoutCount = bindGroupLayouts.size();
   layoutDesc->bindGroupLayouts = bindGroupLayouts.data();

@@ -14,6 +14,8 @@ RenderPassResourceType GetRenderPassTypeFromShaderDecl(BindingType type) {
       return RenderPassResourceType::PT_Sampler;
     case CompareSamplerBindingType:
       return RenderPassResourceType::PT_Sampler;
+    case StorageBindingType:
+      return RenderPassResourceType::PT_Storage;
       break;
   }
 
@@ -38,7 +40,7 @@ BindingManager::BindingManager(const BindingSpec& spec)
   Init();
 }
 
-void BindingManager::Set(const std::string& name, Ref<Texture> texture) {
+void BindingManager::Set(const std::string& name, Ref<Texture2D> texture) {
   const auto* decl = GetInputDeclaration(name);
   if (decl != nullptr) {
     m_Inputs[decl->Group][decl->Location].Type = RenderPassResourceType::PT_Texture;
@@ -99,7 +101,7 @@ void BindingManager::Init() {
 }
 
 bool BindingManager::Validate() {
-	RN_PROFILE_FUNC;
+  RN_PROFILE_FUNC;
   auto& shaderName = m_BindingSpec.ShaderRef->GetName();
   auto& shaderDecls = m_BindingSpec.ShaderRef->GetReflectionInfo().ResourceDeclarations;
 
@@ -134,7 +136,7 @@ bool BindingManager::Validate() {
 }
 
 void BindingManager::Bake() {
-	RN_PROFILE_FUNC;
+  RN_PROFILE_FUNC;
   RN_CORE_ASSERT(Validate(), "Validation failed for {}", m_BindingSpec.Name)
 
   for (const auto& [groupIndex, groupBindings] : m_Inputs) {
@@ -147,11 +149,11 @@ void BindingManager::Bake() {
     }
   }
 
-	InvalidateAndUpdate();
+  InvalidateAndUpdate();
 }
 
 void BindingManager::InvalidateAndUpdate() {
-	RN_PROFILE_FUNC;
+  RN_PROFILE_FUNC;
   for (const auto& [index, inputs] : m_Inputs) {
     for (const auto& [location, input] : inputs) {
       const auto& storedEntry = m_GroupEntryMap[index].at(location);
@@ -182,12 +184,12 @@ void BindingManager::InvalidateAndUpdate() {
 
   for (const auto& [index, inputs] : m_InvalidatedInputs) {
     for (const auto& [location, input] : inputs) {
-			WGPUBindGroupEntry& storedEntry = m_GroupEntryMap[index].at(location);
+      WGPUBindGroupEntry& storedEntry = m_GroupEntryMap[index].at(location);
 
       switch (input.Type) {
         case PT_Uniform:
           storedEntry.buffer = input.UniformIntput->Buffer;
-					storedEntry.size = input.UniformIntput->Size;
+          storedEntry.size = input.UniformIntput->Size;
           break;
         case PT_Texture:
           storedEntry.textureView = input.TextureInput->GetNativeView();
@@ -198,14 +200,15 @@ void BindingManager::InvalidateAndUpdate() {
       }
     }
 
-		std::vector<WGPUBindGroupEntry> entries;
-		for(const auto&[_, entry] : m_GroupEntryMap[index])
-			entries.emplace_back(entry);
+    std::vector<WGPUBindGroupEntry> entries;
+    for (const auto& [_, entry] : m_GroupEntryMap[index]) {
+      entries.emplace_back(entry);
+    }
 
     std::string label = m_BindingSpec.Name;
     WGPUBindGroupDescriptor bgDesc = {.nextInChain = nullptr, .label = label.c_str()};
     bgDesc.layout = m_BindingSpec.ShaderRef->GetReflectionInfo().LayoutDescriptors[index];
-		bgDesc.entryCount = entries.size();
+    bgDesc.entryCount = entries.size();
     bgDesc.entries = entries.data();
 
     auto bindGroup = wgpuDeviceCreateBindGroup(RenderContext::GetDevice(), &bgDesc);
@@ -216,7 +219,7 @@ void BindingManager::InvalidateAndUpdate() {
     m_BindGroups[index] = bindGroup;
   }
 
-	m_InvalidatedInputs.clear();
+  m_InvalidatedInputs.clear();
 }
 
 const RenderPassInputDeclaration* BindingManager::GetInputDeclaration(const std::string& name) const {

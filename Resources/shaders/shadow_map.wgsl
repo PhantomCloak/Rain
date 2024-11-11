@@ -5,9 +5,9 @@ struct VertexInput {
 };
 
 struct InstanceInput {
-	@location(4) a_MRow0: vec4<f32>,
-	@location(5) a_MRow1: vec4<f32>,
-	@location(6) a_MRow2: vec4<f32>,
+	@location(5) a_MRow0: vec4<f32>,
+	@location(6) a_MRow1: vec4<f32>,
+	@location(7) a_MRow2: vec4<f32>,
 }
 
 struct VertexOutput {

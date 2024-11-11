@@ -70,21 +70,24 @@ MeshSource::MeshSource(std::string path) {
 
   for (int i = 0; i < scene->mNumMaterials; i++) {
     aiMaterial* aiMat = scene->mMaterials[i];
+    ai_real metallicFactor = 0.5f;
+    ai_real roughnessFactor = 0.5f;
 
-    aiColor3D color;
-		ai_real metallicFactor = 0.1f;
-		ai_real roughnessFactor = 0.1f;
-    aiReturn result = AI_FAILURE;
+    //if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor) != AI_SUCCESS) {
+    //    metallicFactor = 0.5f; // Fallback if not specified
+    //}
+
+    //if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) != AI_SUCCESS) {
+    //    roughnessFactor = 0.5f; // Fallback if not specified
+    //}
 
     std::string aiMatName(aiMat->GetName().C_Str());
-
-    static auto defaultShader = ShaderManager::Get()->GetShader("SH_DefaultBasicBatch");
+    static auto defaultShader = ShaderManager::GetShader("SH_DefaultBasicBatch");
 
     auto material = Material::CreateMaterial(aiMatName, defaultShader);
-		material->Set("Metallic", 0.5f);
-		material->Set("Roughness", 0.5f);
-		material->Set("Ao", 0.5f);
-		material->Set("UseNormalMap", false);
+    material->Set("Metallic", metallicFactor);
+    material->Set("Roughness", roughnessFactor);
+    material->Set("Ao", 0.5f);
 
     for (int j = 0; j < aiMat->GetTextureCount(aiTextureType_DIFFUSE); j++) {
       aiString texturePath;
@@ -94,17 +97,17 @@ MeshSource::MeshSource(std::string path) {
       }
 
       std::string textureName = FileSys::GetFileName(texturePath.C_Str());
-			RN_LOG("Texture Name: {}", textureName);
-			std::cout << "aa" << std::endl;
+      RN_LOG("Texture Name: {}", textureName);
 
-      Ref<Texture> matTexture;
+      Ref<Texture2D> matTexture;
       if (Rain::ResourceManager::IsTextureExist(textureName)) {
         matTexture = Rain::ResourceManager::GetTexture(textureName);
       } else {
-        matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
+        matTexture = Rain::ResourceManager::LoadTextureExp(textureName, fileDirectory + "/" + texturePath.C_Str());
       }
 
       material->Set("u_AlbedoTex", matTexture);
+			material->Set("u_TextureSampler", matTexture->Sampler);
     }
 
     if (aiMat->GetTextureCount(aiTextureType_NORMALS) > 0) {
@@ -116,14 +119,17 @@ MeshSource::MeshSource(std::string path) {
 
       std::string textureName = FileSys::GetFileName(texturePath.C_Str());
 
-      Ref<Texture> matTexture;
+      Ref<Texture2D> matTexture;
       if (Rain::ResourceManager::IsTextureExist(textureName)) {
         matTexture = Rain::ResourceManager::GetTexture(textureName);
       } else {
         matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
       }
 
-			material->Set("u_NormalTex", matTexture);
+      material->Set("u_NormalTex", matTexture);
+      material->Set("UseNormalMap", true);
+    } else {
+      material->Set("UseNormalMap", false);
     }
 
     if (aiMat->GetTextureCount(aiTextureType_METALNESS) > 0) {
@@ -135,13 +141,13 @@ MeshSource::MeshSource(std::string path) {
 
       std::string textureName = FileSys::GetFileName(texturePath.C_Str());
 
-      Ref<Texture> matTexture;
+      Ref<Texture2D> matTexture;
       if (Rain::ResourceManager::IsTextureExist(textureName)) {
         matTexture = Rain::ResourceManager::GetTexture(textureName);
       } else {
         matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
       }
-			material->Set("u_MetallicTex", matTexture);
+      material->Set("u_MetallicTex", matTexture);
     }
 
     material->Bake();
@@ -176,6 +182,11 @@ MeshSource::MeshSource(std::string path) {
         vector.y = mesh->mTangents[j].y;
         vector.z = mesh->mTangents[j].z;
         vertex.Tangent = vector;
+
+        vector.x = mesh->mBitangents[j].x;
+        vector.y = mesh->mBitangents[j].y;
+        vector.z = mesh->mBitangents[j].z;
+        vertex.Bitangent = vector;
       }
 
       if (mesh->mTextureCoords[0]) {
@@ -218,10 +229,10 @@ MeshSource::MeshSource(std::string path) {
 
   int s = 0;
   int i = 0;
-	for(auto& m : m_SubMeshes) {
-		s += m.VertexCount;
-		i += m.IndexCount;
-	}
+  for (auto& m : m_SubMeshes) {
+    s += m.VertexCount;
+    i += m.IndexCount;
+  }
 
   TraverseNode(scene->mRootNode, scene);
 }

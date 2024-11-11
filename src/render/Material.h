@@ -11,10 +11,10 @@ class Material {
  public:
   UUID Id;
 
-  std::vector<Ref<Texture>> m_diffuseTextures;
-  void SetDiffuseTexture(const std::string& name, const Ref<Texture> value);
+  std::vector<Ref<Texture2D>> m_diffuseTextures;
+  void SetDiffuseTexture(const std::string& name, const Ref<Texture2D> value);
 
-  void Set(const std::string& name, Ref<Texture> texture);
+  void Set(const std::string& name, Ref<Texture2D> texture);
   void Set(const std::string& name, Ref<GPUBuffer> uniform);
   void Set(const std::string& name, Ref<Sampler> sampler);
   void Set(const std::string& name, float value);
@@ -40,6 +40,7 @@ class Material {
 
     auto& buffer = m_UniformStorageBuffer;
     buffer.Write((byte*)&value, decl.Size, decl.Offset);
+		m_UBMaterial->SetData(m_UniformStorageBuffer.Data, m_UniformStorageBuffer.GetSize());
   }
 
   Ref<BindingManager> m_BindManager;

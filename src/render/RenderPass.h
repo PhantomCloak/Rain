@@ -19,13 +19,13 @@ class RenderPass {
  public:
   RenderPass(const RenderPassSpec& props);
 
-  void Set(const std::string& name, Ref<Texture> texture);
+  void Set(const std::string& name, Ref<Texture2D> texture);
   void Set(const std::string& name, Ref<GPUBuffer> uniform);
   void Set(const std::string& name, Ref<Sampler> sampler);
   void Bake();
 
-  const Ref<Texture> GetOutput(int index) { return GetTargetFrameBuffer()->GetAttachment(index); }
-  const Ref<Texture> GetDepthOutput() { return GetTargetFrameBuffer()->GetDepthAttachment(); }
+  const Ref<Texture2D> GetOutput(int index) { return GetTargetFrameBuffer()->GetAttachment(index); }
+  const Ref<Texture2D> GetDepthOutput() { return GetTargetFrameBuffer()->GetDepthAttachment(); }
   const RenderPassSpec& GetProps() { return m_PassSpec; }
   const Ref<BindingManager> GetBindManager() { return m_PassBinds; }
 	const Ref<Framebuffer> GetTargetFrameBuffer() { return m_PassSpec.Pipeline->GetPipelineSpec().TargetFramebuffer; }

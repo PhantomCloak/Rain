@@ -2,13 +2,14 @@ struct VertexInput {
 	@location(0) a_position: vec3f,
 	@location(1) a_normal: vec3f,
 	@location(2) a_uv: vec2f,
-	@location(3) a_tangent: vec3f
+	@location(3) a_tangent: vec3f,
+	@location(4) a_bitangent: vec3f
 };
 
 struct InstanceInput {
-	@location(4) a_MRow0: vec4<f32>,
-	@location(5) a_MRow1: vec4<f32>,
-	@location(6) a_MRow2: vec4<f32>,
+	@location(5) a_MRow0: vec4<f32>,
+	@location(6) a_MRow1: vec4<f32>,
+	@location(7) a_MRow2: vec4<f32>,
 }
 
 struct VertexOutput {
@@ -16,11 +17,14 @@ struct VertexOutput {
 	@location(2) Normal: vec3f,
 	@location(3) Uv: vec2f,
 	@location(4) FragPos: vec3f,
-	@location(5) WorldPos: vec3f,
-    @location(6) ShadowCoord0: vec3f,
-    @location(7) ShadowCoord1: vec3f,
-    @location(8) ShadowCoord2: vec3f,
-    @location(9) ShadowCoord3: vec3f,
+	@location(5) WorldPosition: vec3f,
+	@location(6) WorldNormal: vec3f,
+	@location(7) WorldTangent: vec3f,
+	@location(8) WorldBitangent: vec3f,
+  @location(9)  ShadowCoord0: vec3f,
+  @location(10) ShadowCoord1: vec3f,
+  @location(11) ShadowCoord2: vec3f,
+  @location(12) ShadowCoord3: vec3f,
 };
 
 struct SceneData {
@@ -39,14 +43,15 @@ struct MaterialUniform {
     Metallic: f32,
     Roughness: f32,
     Ao: f32,
-	UseNormalMap: i32
+		UseNormalMap: i32
 };
 
 @group(0) @binding(0) var<uniform> u_Scene: SceneData;
 
-@group(1) @binding(0) var u_AlbedoTex: texture_2d<f32>;
+
+@group(1) @binding(0) var<uniform> uMaterial: MaterialUniform;
 @group(1) @binding(1) var u_TextureSampler: sampler;
-@group(1) @binding(2) var<uniform> uMaterial: MaterialUniform;
+@group(1) @binding(2) var u_AlbedoTex: texture_2d<f32>;
 @group(1) @binding(3) var u_MetallicTex: texture_2d<f32>;
 @group(1) @binding(4) var u_NormalTex: texture_2d<f32>;
 
@@ -56,6 +61,7 @@ struct MaterialUniform {
 
 @group(3) @binding(0) var irradianceMap: texture_cube<f32>;
 @group(3) @binding(1) var irradianceMapSampler: sampler;
+@group(3) @binding(2) var u_BDRFLut: texture_2d<f32>;
 
 
 @vertex
@@ -70,15 +76,13 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
     );
 
     let worldPos = transform * vec4f(in.a_position, 1.0);
-    out.WorldPos = worldPos.xyz;
 
-    let normalMatrix = mat3x3<f32>(
-        transform[0].xyz,
-        transform[1].xyz,
-        transform[2].xyz
-    );
+    out.Normal = normalize((transform * vec4<f32>(in.a_normal, 0.0)).xyz);
+    out.WorldNormal = normalize((transform * vec4<f32>(in.a_normal, 0.0)).xyz);
+    out.WorldTangent = normalize((transform * vec4<f32>(in.a_tangent, 0.0)).xyz);
+    out.WorldBitangent = normalize((transform * vec4<f32>(in.a_bitangent, 0.0)).xyz);
 
-    out.Normal = normalize(normalMatrix * in.a_normal);
+    out.WorldPosition = worldPos.xyz;
     out.Uv = in.a_uv;
 
     out.pos = u_Scene.viewProjection * worldPos;
@@ -93,15 +97,120 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
     out.ShadowCoord2 = shadowCoords2.xyz / shadowCoords2.w;
     out.ShadowCoord3 = shadowCoords3.xyz / shadowCoords3.w;
 
-	out.FragPos = (u_Scene.cameraViewMatrix * vec4f(out.WorldPos, 1.0)).xyz;
+		out.FragPos = (u_Scene.cameraViewMatrix * vec4f(out.WorldPosition, 1.0)).xyz;
 
     return out;
 }
 
+// PBR
+fn GeometrySchlickGGX(NdotV: f32, roughness: f32) -> f32 {
+	let r = roughness + 1.0;
+	let k = (r * r) / 8.0;
+
+	let nom = NdotV;
+	let denom = NdotV * (1.0 - k) + k;
+
+	return nom / denom;
+}
+
+fn GeometrySmith(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, roughness: f32) -> f32 {
+	let NdotV = max(dot(N, V), 0.0);
+	let NdotL = max(dot(N, L), 0.0);
+	let ggx2 = GeometrySchlickGGX(NdotV, roughness);
+	let ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+	return ggx1 * ggx2;
+}
+
+fn getNormalFromMap(normalMap: texture_2d<f32>, defaultSampler: sampler, TexCoords: vec2<f32>, WorldPos: vec3<f32>, Normal: vec3<f32>) -> vec3<f32> {
+    let tangentNormal = textureSample(normalMap, defaultSampler, TexCoords).xyz * 2.0 - 1.0;
+
+    let Q1 = dpdx(WorldPos);
+    let Q2 = dpdy(WorldPos);
+    let st1 = dpdx(TexCoords);
+    let st2 = dpdy(TexCoords);
+
+    let N = normalize(Normal);
+    let T = normalize(Q1 * st2.y - Q2 * st1.y);
+    let B = -normalize(cross(N, T));
+    let TBN = mat3x3<f32>(T, B, N);
+
+    return normalize(TBN * tangentNormal);
+}
+
+fn GaSchlickG1(cosTheta: f32, k: f32) -> f32 {
+    return cosTheta / (cosTheta * (1.0 - k) + k);
+}
+
+fn GaSchlickGGX(cosLi: f32, NdotV: f32, roughness: f32) -> f32 {
+    let r = roughness + 1.0;
+    let k = (r * r) / 8.0;
+    return GaSchlickG1(cosLi, k) * GaSchlickG1(NdotV, k);
+}
+
+fn NdfGGX(cosLh: f32, roughness: f32) -> f32 {
+	const PI: f32 = 3.141592653589793;
+
+    let alpha = roughness * roughness;
+    let alphaSq = alpha * alpha;
+
+    let denom = (cosLh * cosLh) * (alphaSq - 1.0) + 1.0;
+    return alphaSq / (PI * denom * denom);
+}
+
+fn FresnelSchlick(F0: vec3<f32>, cosTheta: f32) -> vec3<f32> {
+	return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
+fn FresnelSchlickRoughness(F0: vec3<f32>, cosTheta: f32, roughness: f32) -> vec3<f32> {
+	return F0 + (max(vec3<f32>(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
+
+fn CalculateDirLights(F0: vec3<f32>, View: vec3<f32>, Normal: vec3<f32>, NdotV:f32, Albedo: vec3<f32>, Roughness: f32, Metalness: f32) -> vec3<f32> {
+	var result: vec3<f32> = vec3<f32>(0.0);
+
+	let Li: vec3<f32> = u_Scene.LightDirection;
+	let Lradiance: vec3<f32> = vec3(1.0) * 1.5f;
+	let Lh: vec3<f32> = normalize(Li + View);
+
+	let cosLi: f32 = max(0.0, dot(Normal, Li));
+	let cosLh: f32 = max(0.0, dot(Normal, Lh));
+
+	let F: vec3<f32> = FresnelSchlickRoughness(F0, max(0.0, dot(Lh, View)), Roughness);
+	let D: f32 = NdfGGX(cosLh, Roughness);
+	let G: f32 = GaSchlickGGX(cosLi, NdotV, Roughness);
+
+	let kd: vec3<f32> = (1.0 - F) * (1.0 - Metalness);
+	let diffuseBRDF: vec3<f32> = kd * Albedo;
+
+	const Epsilon: f32 = 1e-5;
+	let specularBRDF: vec3<f32> = (F * D * G) / max(Epsilon, 4.0 * cosLi * NdotV);
+	let clampedSpecularBRDF = clamp(specularBRDF, vec3<f32>(0.0), vec3<f32>(10.0));
+
+	result += (diffuseBRDF + clampedSpecularBRDF) * Lradiance * cosLi;
+
+	return result;
+}
+
+
+fn RotateVectorAboutY(angle: f32, vec: vec3<f32>) -> vec3<f32> {
+    let rad = radians(angle);
+
+    let rotationMatrix: mat3x3<f32> = mat3x3<f32>(
+        vec3<f32>(cos(rad), 0.0, sin(rad)),
+        vec3<f32>(0.0, 1.0, 0.0),
+        vec3<f32>(-sin(rad), 0.0, cos(rad))
+    );
+
+    return rotationMatrix * vec;
+}
+
+// Shadows
 fn sampleShadow(in: VertexOutput, cascadeIndex: u32, bias: f32) -> f32 {
     let shadowCoords = GetShadowMapCoords(in, cascadeIndex);
     let projCoords = shadowCoords.xy * vec2(0.5, -0.5) + vec2(0.5);
-    let texelSize: vec2<f32> = vec2(1.0 / 4096.0); // Adjust based on your shadow map resolution
+    let texelSize: vec2<f32> = vec2(1.0 / 4096.0);
     let halfKernelWidth: i32 = 1;
 
     var shadow: f32 = 0.0;
@@ -136,24 +245,67 @@ fn sampleShadow(in: VertexOutput, cascadeIndex: u32, bias: f32) -> f32 {
 }
 
 
+fn IBL(F0: vec3<f32>, Lr: vec3<f32>, Normal: vec3<f32>, NdotV: f32, Albedo: vec3<f32>, Roughness: f32, Metalness: f32) -> vec3<f32> {
+    let irradiance: vec3<f32> = textureSample(irradianceMap, irradianceMapSampler, Normal).rgb;
+
+    let F: vec3<f32> = FresnelSchlickRoughness(F0, NdotV, Roughness);
+
+    let kd: vec3<f32> = (1.0 - F) * (1.0 - Metalness);
+    let diffuseIBL: vec3<f32> = Albedo * irradiance;
+
+    let envRadianceTexLevels: u32 = textureNumLevels(irradianceMap);
+
+    let specularIrradiance: vec3<f32> = textureSampleLevel(
+        irradianceMap,
+        irradianceMapSampler,
+        RotateVectorAboutY(0.0, Lr),
+        Roughness * f32(envRadianceTexLevels)
+    ).rgb;
+
+    let specularBRDF: vec2<f32> = textureSample(u_BDRFLut, u_TextureSampler, vec2<f32>(NdotV, Roughness)).rg;
+
+    let specularIBL: vec3<f32> = specularIrradiance * (F0 * specularBRDF.x + specularBRDF.y);
+
+    return kd * diffuseIBL + specularIBL;
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
-    let albedo = textureSample(u_AlbedoTex, u_TextureSampler, in.Uv).rgb;
-    let norm = normalize(in.Normal);
-    let lightDir = normalize(u_Scene.LightDirection);
-    let viewDepth = -in.FragPos.z;
 
-    let ambientStrength = 1.0;
-    let ambientColor = vec3f(0.32, 0.3, 0.25); 
-    let ambient = ambientStrength * ambientColor * albedo;
-    let lightColor = vec3f(1.0, 1.0, 1.0);
-    let diff = max(dot(norm, lightDir), 0.0);
-    let diffuse = diff * lightColor * albedo;
+	// Sample PBR Resources
+	let Albedo = textureSample(u_AlbedoTex, u_TextureSampler, in.Uv).rgb * uMaterial.Ao;
+	let Metalness = textureSample(u_MetallicTex, u_TextureSampler, in.Uv).b * uMaterial.Metallic;
+	let Roughness = textureSample(u_MetallicTex, u_TextureSampler, in.Uv).g * uMaterial.Roughness;
 
-    let MIN_BIAS = 0.005;
-    let bias = max(MIN_BIAS * (1.0 - dot(norm, lightDir)), MIN_BIAS);
-	let cascadeTransitionFade = 1.0;
+	// Cook our variables
 
+	let Fdielectric = vec3(0.04);
+	var Lo = vec3(0.0);
+
+	var Normal = normalize(in.Normal);
+
+	if(uMaterial.UseNormalMap == 1)
+	{
+		let sampled_normal = textureSample(u_NormalTex, u_TextureSampler, in.Uv).rgb * 2.0 - 1.0;
+		Normal = normalize(
+				sampled_normal.x * in.WorldTangent +
+				sampled_normal.y * in.WorldBitangent +
+				sampled_normal.z * in.WorldNormal);
+	}
+
+	let View = normalize(u_Scene.CameraPosition - in.WorldPosition.xyz);
+	let NdotV = max(dot(Normal, View), 0.0);
+	let Lr = 2.0 * NdotV * Normal - View;
+	let FO = mix(Fdielectric, Albedo, Metalness);
+
+	let lightDir = normalize(u_Scene.LightDirection);
+
+	// Shadow Mapping
+
+	let MIN_BIAS = 0.005;
+	let bias = max(MIN_BIAS * (1.0 - dot(Normal, lightDir)), MIN_BIAS);
+
+	let viewDepth = -in.FragPos.z;
 	let SHADOW_MAP_CASCADE_COUNT = 4u;
 	var layer = 0u;
 	for (var i = 0u; i < SHADOW_MAP_CASCADE_COUNT - 1u; i = i + 1u) {
@@ -162,20 +314,26 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 		}
 	}
 
-    //let cascadeColors = array<vec3<f32>, 4>(
-    //    vec3<f32>(1.0, 0.0, 0.0),  // Red
-    //    vec3<f32>(0.0, 1.0, 0.0),  // Green
-    //    vec3<f32>(0.0, 0.0, 1.0),  // Blue
-    //    vec3<f32>(1.0, 1.0, 0.0)   // Yellow
-    //);
+	// Final Color
+	var shadowScale = sampleShadow(in, layer, bias);
+	shadowScale = 1.0 - clamp(1.0 - shadowScale, 0.0f, 1.0f);
+	var lightContribution = CalculateDirLights(FO,
+			View,
+			Normal,
+			NdotV,
+			Albedo,
+			Roughness,
+			Metalness) * shadowScale;
 
-    //var cascadeColor: vec3<f32> = vec3<f32>(1.0);
-	//cascadeColor = cascadeColors[layer];
+	let iblContribution = IBL(FO,
+			Lr,
+			Normal,
+			NdotV,
+			Albedo,
+			Roughness,
+			Metalness);
 
-	let shadowScale = sampleShadow(in, layer, bias);
-    let finalColor = ambient + shadowScale * diffuse;
-
-    return vec4f(finalColor, 1.0);
+	return vec4f(acesFilm(iblContribution + lightContribution), 1.0);
 }
 
 fn GetShadowMapCoords(
@@ -189,4 +347,13 @@ fn GetShadowMapCoords(
         case 3: { return in.ShadowCoord3; }
         default: { return vec3<f32>(0.0); }
     }
+}
+
+fn acesFilm(x: vec3<f32>) -> vec3<f32> {
+    let a = 2.51;
+    let b = 0.03;
+    let c = 2.43;
+    let d = 0.59;
+    let e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(1.0, 1.0, 1.0));
 }

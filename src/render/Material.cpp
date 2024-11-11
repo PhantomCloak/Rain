@@ -50,11 +50,11 @@ const WGPUBindGroup& Material::GetBinding(int index) {
   return m_BindManager->GetBindGroup(index);
 }
 
-void Material::SetDiffuseTexture(const std::string& name, const Ref<Texture> value) {
+void Material::SetDiffuseTexture(const std::string& name, const Ref<Texture2D> value) {
   m_diffuseTextures.push_back(value);
 }
 
-void Material::Set(const std::string& name, Ref<Texture> texture) {
+void Material::Set(const std::string& name, Ref<Texture2D> texture) {
   m_BindManager->Set(name, texture);
 }
 void Material::Set(const std::string& name, Ref<GPUBuffer> uniform) {

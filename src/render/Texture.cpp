@@ -17,36 +17,37 @@
 #include <stb_image_resize2.h>
 
 void WriteMipLevel(Buffer pixelData, const WGPUTexture& target, uint32_t width, uint32_t height, uint32_t mipCount);
+void WriteTexture(void* pixelData, const WGPUTexture& target, uint32_t width, uint32_t height, uint32_t targetMip);
 
-Ref<Texture> Texture::Create(const TextureProps& props) {
-  auto textureRef = CreateRef<Texture>(props);
+Ref<Texture2D> Texture2D::Create(const TextureProps& props) {
+  auto textureRef = CreateRef<Texture2D>(props);
   return textureRef;
 }
 
-Ref<Texture> Texture::Create(const TextureProps& props, const std::filesystem::path& path) {
-  auto textureRef = CreateRef<Texture>(props, path);
+Ref<Texture2D> Texture2D::Create(const TextureProps& props, const std::filesystem::path& path) {
+  auto textureRef = CreateRef<Texture2D>(props, path);
   return textureRef;
 }
 
-Texture::Texture() {
+Texture2D::Texture2D() {
 }
 
-Texture::Texture(const TextureProps& props)
+Texture2D::Texture2D(const TextureProps& props)
     : m_TextureProps(props) {
   Invalidate();
 }
-Texture::Texture(const TextureProps& props, const std::filesystem::path& path)
+Texture2D::Texture2D(const TextureProps& props, const std::filesystem::path& path)
     : m_TextureProps(props) {
   CreateFromFile(props, path);
 }
 
-void Texture::Resize(uint width, uint height) {
+void Texture2D::Resize(uint width, uint height) {
   m_TextureProps.Width = width;
   m_TextureProps.Height = height;
   Invalidate();
 }
 
-void Texture::Release() {
+void Texture2D::Release() {
   wgpuTextureRelease(TextureBuffer);
 
   for (const auto& view : m_Views) {
@@ -59,7 +60,7 @@ void Texture::Release() {
   m_Views.clear();
 }
 
-void Texture::Invalidate() {
+void Texture2D::Invalidate() {
   if (TextureBuffer != NULL && m_Views.size() <= 0) {
     wgpuTextureRelease(TextureBuffer);
     for (const auto& view : m_Views) {
@@ -75,15 +76,25 @@ void Texture::Invalidate() {
 
   textureDesc.nextInChain = nullptr;
   textureDesc.label = m_TextureProps.DebugName.c_str();
-  textureDesc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+
+	if(m_TextureProps.GenerateMips)
+	{
+		textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_StorageBinding | WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst;
+	}
+	else
+	{
+		textureDesc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+	}
+
   textureDesc.dimension = WGPUTextureDimension_2D;
   textureDesc.size.width = m_TextureProps.Width;
   textureDesc.size.height = m_TextureProps.Height;
   textureDesc.size.depthOrArrayLayers = m_TextureProps.layers;
+	textureDesc.sampleCount = m_TextureProps.MultiSample;
 
   textureDesc.format = RenderTypeUtils::ToRenderType(m_TextureProps.Format);
   textureDesc.mipLevelCount = mipCount;
-  textureDesc.sampleCount = 1;
+	textureDesc.sampleCount = m_TextureProps.MultiSample;
 
   if (m_TextureProps.CreateSampler) {
     std::string samplerName = "S_" + m_TextureProps.DebugName;
@@ -103,8 +114,8 @@ void Texture::Invalidate() {
 
   TextureBuffer = wgpuDeviceCreateTexture(renderContext->GetDevice(), &textureDesc);
 
-  if (m_ImageData.GetSize() > 0) {
-    WriteMipLevel(m_ImageData, TextureBuffer, m_TextureProps.Width, m_TextureProps.Height, mipCount);
+	if (m_ImageData.GetSize() > 0) {
+		WriteTexture(m_ImageData.Data, TextureBuffer, m_TextureProps.Width, m_TextureProps.Height, 0);
   }
 
 	m_Views.clear();
@@ -134,9 +145,17 @@ void Texture::Invalidate() {
 
     m_Views.push_back(wgpuTextureCreateView(TextureBuffer, &textureViewDesc));
   }
+
+	if(m_TextureProps.GenerateMips)
+	{
+		if(m_TextureProps.DebugName != "T3D_Skybox")
+		{
+			Render::ComputeMip(this);
+		}
+	}
 }
 
-void Texture::CreateFromFile(const TextureProps& props, const std::filesystem::path& path) {
+void Texture2D::CreateFromFile(const TextureProps& props, const std::filesystem::path& path) {
 
     if (!std::filesystem::exists(path)) {
 			std::cerr << "Texture file not found: " << path << std::endl;
@@ -145,6 +164,31 @@ void Texture::CreateFromFile(const TextureProps& props, const std::filesystem::p
   m_ImageData = TextureImporter::ImportFileToBuffer(path, m_TextureProps.Format, m_TextureProps.Width, m_TextureProps.Height);
   Invalidate();
 }
+
+//Ref<TextureCube> TextureCube::Create(const TextureProps& props, const std::filesystem::path& path) {
+//  auto textureRef = CreateRef<TextureCube>(props, path);
+//  return textureRef;
+//}
+//
+//TextureCube::TextureCube(const TextureProps& props, const std::filesystem::path& path)
+//    : m_TextureProps(props) {
+//  CreateFromFile(props, path);
+//}
+//
+//void TextureCube::CreateFromFile(const TextureProps& props, const std::filesystem::path& path) {
+//
+//    if (!std::filesystem::exists(path)) {
+//			std::cerr << "Texture file not found: " << path << std::endl;
+//				 return;
+//    }
+//  m_ImageData = TextureImporter::ImportFileToBuffer(path, m_TextureProps.Format, m_TextureProps.Width, m_TextureProps.Height);
+//  Invalidate();
+//}
+//
+//void TextureCube::Invalidate() {
+//
+//}
+
 
 void WriteTexture(void* pixelData, const WGPUTexture& target, uint32_t width, uint32_t height, uint32_t targetMip) {
   Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
@@ -166,37 +210,3 @@ void WriteTexture(void* pixelData, const WGPUTexture& target, uint32_t width, ui
   wgpuQueueWriteTexture(*queue, &dest, pixelData, (4 * width * height), &textureLayout, &textureSize);
 }
 
-void WriteMipLevel(Buffer pixelData, const WGPUTexture& target, uint32_t width, uint32_t height, uint32_t mipCount) {
-  WriteTexture(pixelData.Data, target, width, height, 0);
-
-  std::vector<unsigned char> prevPixelBuffer(pixelData.Size);
-  std::memcpy(prevPixelBuffer.data(), pixelData.Data, pixelData.Size);
-
-  uint32_t prevWidth = width, prevHeight = height;
-  uint32_t currentWidth = width;
-  uint32_t currentHeight = height;
-
-  for (uint32_t mipLevel = 1; mipLevel < mipCount; mipLevel++) {
-    currentWidth = currentWidth > 1 ? currentWidth / 2 : 1;
-    currentHeight = currentHeight > 1 ? currentHeight / 2 : 1;
-
-    std::vector<unsigned char> curPixelBuffer(4 * currentWidth * currentHeight);
-
-    stbir_resize_uint8_linear(prevPixelBuffer.data(),
-                              prevWidth,
-                              prevHeight,
-                              0,
-                              curPixelBuffer.data(),
-                              currentWidth,
-                              currentHeight,
-                              0,
-                              STBIR_RGBA);
-
-    WriteTexture(curPixelBuffer.data(), target, currentWidth, currentHeight, mipLevel);
-
-    prevWidth = currentWidth;
-    prevHeight = currentHeight;
-
-    prevPixelBuffer = std::move(curPixelBuffer);
-  }
-}

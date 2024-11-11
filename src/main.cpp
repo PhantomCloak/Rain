@@ -12,8 +12,8 @@ int main(int, char**) {
 #if __EMSCRIPTEN__
   double canvasWidth, canvasHeight;
   emscripten_get_element_css_size("#canvas", &canvasWidth, &canvasHeight);
-	props.Width = canvasWidth;
-	props.Height = canvasHeight;
+	props.Width = canvasWidth * emscripten_get_device_pixel_ratio();
+	props.Height = canvasHeight * emscripten_get_device_pixel_ratio();
 #endif
 
 	if(props.Height < 500 || props.Height < 500)

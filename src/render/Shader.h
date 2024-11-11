@@ -8,6 +8,7 @@
 enum BindingType {
   UniformBindingType,
   TextureBindingType,
+  StorageBindingType,
   TextureDepthBindingType,
   SamplerBindingType,
   CompareSamplerBindingType

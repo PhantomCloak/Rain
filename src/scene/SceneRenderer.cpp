@@ -12,150 +12,142 @@
 
 SceneRenderer* SceneRenderer::instance;
 
+struct CascadeData {
+  glm::mat4 ViewProj;
+  glm::mat4 View;
+  float SplitDepth;
+};
+float m_ScaleShadowCascadesToOrigin = 0.0f;
 
-		struct CascadeData
-		{
-			glm::mat4 ViewProj;
-			glm::mat4 View;
-			float SplitDepth;
-		};
-		float m_ScaleShadowCascadesToOrigin = 0.0f;
+void CalculateCascades(CascadeData* cascades, const SceneCamera& sceneCamera, glm::vec3 lightDirection) {
+  float scaleToOrigin = m_ScaleShadowCascadesToOrigin;
 
-void CalculateCascades(CascadeData* cascades, const SceneCamera& sceneCamera, glm::vec3 lightDirection)
-{
-    float scaleToOrigin = m_ScaleShadowCascadesToOrigin;
+  glm::mat4 viewMatrix = sceneCamera.ViewMatrix;
+  constexpr glm::vec4 origin = glm::vec4(glm::vec3(0.0f), 1.0f);
+  viewMatrix[3] = glm::lerp(viewMatrix[3], origin, scaleToOrigin);
 
-    glm::mat4 viewMatrix = sceneCamera.ViewMatrix;
-    constexpr glm::vec4 origin = glm::vec4(glm::vec3(0.0f), 1.0f);
-    viewMatrix[3] = glm::lerp(viewMatrix[3], origin, scaleToOrigin);
+  auto viewProjection = sceneCamera.Projection * viewMatrix;
 
-    auto viewProjection = sceneCamera.Projection * viewMatrix;
+  const int SHADOW_MAP_CASCADE_COUNT = 4;
+  float cascadeSplits[SHADOW_MAP_CASCADE_COUNT];
 
-    const int SHADOW_MAP_CASCADE_COUNT = 4;
-    float cascadeSplits[SHADOW_MAP_CASCADE_COUNT];
+  float nearClip = sceneCamera.Near;
+  float farClip = sceneCamera.Far;
+  float clipRange = farClip - nearClip;
 
-    float nearClip = sceneCamera.Near;
-    float farClip = sceneCamera.Far;
-    float clipRange = farClip - nearClip;
+  float minZ = nearClip;
+  float maxZ = nearClip + clipRange;
 
-    float minZ = nearClip;
-    float maxZ = nearClip + clipRange;
+  float range = maxZ - minZ;
+  float ratio = maxZ / minZ;
 
-    float range = maxZ - minZ;
-    float ratio = maxZ / minZ;
+  float CascadeSplitLambda = 0.92f;
+  // float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
+  // float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -320.0f;
+  // float CascadeFarPlaneOffset = 250.0f, CascadeNearPlaneOffset = -250.0f;
+  float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
+  // float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -100.0f;
 
-    float CascadeSplitLambda = 0.92f;
-    //float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
-    //float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -320.0f;
-    //float CascadeFarPlaneOffset = 250.0f, CascadeNearPlaneOffset = -250.0f;
-    float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
-    //float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -100.0f;
+  // Calculate split depths based on view camera frustum
+  for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++) {
+    float p = (i + 1) / static_cast<float>(SHADOW_MAP_CASCADE_COUNT);
+    float log = minZ * std::pow(ratio, p);
+    float uniform = minZ + range * p;
+    float d = CascadeSplitLambda * (log - uniform) + uniform;
+    cascadeSplits[i] = (d - nearClip) / clipRange;
+  }
 
-    // Calculate split depths based on view camera frustum
-    for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++)
-    {
-        float p = (i + 1) / static_cast<float>(SHADOW_MAP_CASCADE_COUNT);
-        float log = minZ * std::pow(ratio, p);
-        float uniform = minZ + range * p;
-        float d = CascadeSplitLambda * (log - uniform) + uniform;
-        cascadeSplits[i] = (d - nearClip) / clipRange;
-    }
+  cascadeSplits[3] = 0.3f;
 
-    cascadeSplits[3] = 0.3f;
+  // Manually set cascades here
+  // cascadeSplits[0] = 0.02f;
+  // cascadeSplits[1] = 0.15f;
+  // cascadeSplits[2] = 0.3f;
+  // cascadeSplits[3] = 1.0f;
 
-		// Manually set cascades here
-		//cascadeSplits[0] = 0.02f;
-		//cascadeSplits[1] = 0.15f;
-		//cascadeSplits[2] = 0.3f;
-		//cascadeSplits[3] = 1.0f;
+  // Calculate orthographic projection matrix for each cascade
+  float lastSplitDist = 0.0;
+  for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++) {
+    float splitDist = cascadeSplits[i];
 
-
-    // Calculate orthographic projection matrix for each cascade
-    float lastSplitDist = 0.0;
-    for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++)
-    {
-        float splitDist = cascadeSplits[i];
-
-        glm::vec3 frustumCorners[8] =
+    glm::vec3 frustumCorners[8] =
         {
-            glm::vec3(-1.0f,  1.0f, -1.0f),
-            glm::vec3(1.0f,  1.0f, -1.0f),
+            glm::vec3(-1.0f, 1.0f, -1.0f),
+            glm::vec3(1.0f, 1.0f, -1.0f),
             glm::vec3(1.0f, -1.0f, -1.0f),
             glm::vec3(-1.0f, -1.0f, -1.0f),
-            glm::vec3(-1.0f,  1.0f,  1.0f),
-            glm::vec3(1.0f,  1.0f,  1.0f),
-            glm::vec3(1.0f, -1.0f,  1.0f),
-            glm::vec3(-1.0f, -1.0f,  1.0f),
+            glm::vec3(-1.0f, 1.0f, 1.0f),
+            glm::vec3(1.0f, 1.0f, 1.0f),
+            glm::vec3(1.0f, -1.0f, 1.0f),
+            glm::vec3(-1.0f, -1.0f, 1.0f),
         };
 
-        // Project frustum corners into world space
-        glm::mat4 invCam = glm::inverse(viewProjection);
-        for (uint32_t i = 0; i < 8; i++)
-        {
-            glm::vec4 invCorner = invCam * glm::vec4(frustumCorners[i], 1.0f);
-            frustumCorners[i] = invCorner / invCorner.w;
-        }
-
-        for (uint32_t i = 0; i < 4; i++)
-        {
-            glm::vec3 dist = frustumCorners[i + 4] - frustumCorners[i];
-            frustumCorners[i + 4] = frustumCorners[i] + (dist * splitDist);
-            frustumCorners[i] = frustumCorners[i] + (dist * lastSplitDist);
-        }
-
-        // Get frustum center
-        glm::vec3 frustumCenter = glm::vec3(0.0f);
-        for (uint32_t i = 0; i < 8; i++)
-            frustumCenter += frustumCorners[i];
-
-        frustumCenter /= 8.0f;
-
-        float radius = 0.0f;
-        for (uint32_t i = 0; i < 8; i++)
-        {
-            float distance = glm::length(frustumCorners[i] - frustumCenter);
-            radius = glm::max(radius, distance);
-        }
-        radius = std::ceil(radius * 16.0f) / 16.0f;
-
-        glm::vec3 maxExtents = glm::vec3(radius);
-        glm::vec3 minExtents = -maxExtents;
-
-        glm::vec3 lightDir = -lightDirection;
-
-        // Modified lightViewMatrix
-        glm::mat4 lightViewMatrix = glm::lookAt(
-            frustumCenter - lightDir * radius,
-            frustumCenter,
-            glm::vec3(0.0f, 1.0f, 0.0f));
-
-        // Modified lightOrthoMatrix
-        glm::mat4 lightOrthoMatrix = glm::ortho(
-            minExtents.x, maxExtents.x,
-            minExtents.y, maxExtents.y,
-            minExtents.z + CascadeNearPlaneOffset,
-            maxExtents.z + CascadeFarPlaneOffset);
-
-        // Offset to texel space to avoid shimmering
-        glm::mat4 shadowMatrix = lightOrthoMatrix * lightViewMatrix;
-        float ShadowMapResolution = 4096;
-
-        glm::vec4 shadowOrigin = (shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)) * ShadowMapResolution / 2.0f;
-        glm::vec4 roundedOrigin = glm::round(shadowOrigin);
-        glm::vec4 roundOffset = roundedOrigin - shadowOrigin;
-        roundOffset = roundOffset * 2.0f / ShadowMapResolution;
-        roundOffset.z = 0.0f;
-        roundOffset.w = 0.0f;
-
-        lightOrthoMatrix[3] += roundOffset;
-
-        // Modified SplitDepth calculation
-        cascades[i].SplitDepth = nearClip + splitDist * clipRange;
-        cascades[i].ViewProj = lightOrthoMatrix * lightViewMatrix;
-        cascades[i].View = lightViewMatrix;
-
-        lastSplitDist = cascadeSplits[i];
+    // Project frustum corners into world space
+    glm::mat4 invCam = glm::inverse(viewProjection);
+    for (uint32_t i = 0; i < 8; i++) {
+      glm::vec4 invCorner = invCam * glm::vec4(frustumCorners[i], 1.0f);
+      frustumCorners[i] = invCorner / invCorner.w;
     }
+
+    for (uint32_t i = 0; i < 4; i++) {
+      glm::vec3 dist = frustumCorners[i + 4] - frustumCorners[i];
+      frustumCorners[i + 4] = frustumCorners[i] + (dist * splitDist);
+      frustumCorners[i] = frustumCorners[i] + (dist * lastSplitDist);
+    }
+
+    // Get frustum center
+    glm::vec3 frustumCenter = glm::vec3(0.0f);
+    for (uint32_t i = 0; i < 8; i++) {
+      frustumCenter += frustumCorners[i];
+    }
+
+    frustumCenter /= 8.0f;
+
+    float radius = 0.0f;
+    for (uint32_t i = 0; i < 8; i++) {
+      float distance = glm::length(frustumCorners[i] - frustumCenter);
+      radius = glm::max(radius, distance);
+    }
+    radius = std::ceil(radius * 16.0f) / 16.0f;
+
+    glm::vec3 maxExtents = glm::vec3(radius);
+    glm::vec3 minExtents = -maxExtents;
+
+    glm::vec3 lightDir = -lightDirection;
+
+    // Modified lightViewMatrix
+    glm::mat4 lightViewMatrix = glm::lookAt(
+        frustumCenter - lightDir * radius,
+        frustumCenter,
+        glm::vec3(0.0f, 1.0f, 0.0f));
+
+    // Modified lightOrthoMatrix
+    glm::mat4 lightOrthoMatrix = glm::ortho(
+        minExtents.x, maxExtents.x,
+        minExtents.y, maxExtents.y,
+        minExtents.z + CascadeNearPlaneOffset,
+        maxExtents.z + CascadeFarPlaneOffset);
+
+    // Offset to texel space to avoid shimmering
+    glm::mat4 shadowMatrix = lightOrthoMatrix * lightViewMatrix;
+    float ShadowMapResolution = 4096;
+
+    glm::vec4 shadowOrigin = (shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)) * ShadowMapResolution / 2.0f;
+    glm::vec4 roundedOrigin = glm::round(shadowOrigin);
+    glm::vec4 roundOffset = roundedOrigin - shadowOrigin;
+    roundOffset = roundOffset * 2.0f / ShadowMapResolution;
+    roundOffset.z = 0.0f;
+    roundOffset.w = 0.0f;
+
+    lightOrthoMatrix[3] += roundOffset;
+
+    // Modified SplitDepth calculation
+    cascades[i].SplitDepth = nearClip + splitDist * clipRange;
+    cascades[i].ViewProj = lightOrthoMatrix * lightViewMatrix;
+    cascades[i].View = lightViewMatrix;
+
+    lastSplitDist = cascadeSplits[i];
+  }
 }
 
 void SceneRenderer::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform) {
@@ -183,27 +175,28 @@ void SceneRenderer::Init() {
   m_SceneUniform = {};
 
   // clang-format off
-	VertexBufferLayout vertexLayout = {64, {
+	VertexBufferLayout vertexLayout = {80, {
 			{0, ShaderDataType::Float3, "position", 0},
 			{1, ShaderDataType::Float3, "normal", 16},
 			{2, ShaderDataType::Float2, "uv", 32},
-			{3, ShaderDataType::Float3, "tangent", 48}}};
+			{3, ShaderDataType::Float3, "tangent", 48},
+			{4, ShaderDataType::Float3, "bitangent", 60}}};
 
 	VertexBufferLayout vertexLayoutQuad = {32, {
 			{0, ShaderDataType::Float3, "position", 0},
 			{1, ShaderDataType::Float2, "uv", 16}}};
 
   VertexBufferLayout instanceLayout = {48, {
-      {4, ShaderDataType::Float4, "a_MRow0", 0},
-      {5, ShaderDataType::Float4, "a_MRow1", 16},
-      {6, ShaderDataType::Float4, "a_MRow2", 32}}};
+      {5, ShaderDataType::Float4, "a_MRow0", 0},
+      {6, ShaderDataType::Float4, "a_MRow1", 16},
+      {7, ShaderDataType::Float4, "a_MRow2", 32}}};
 
   // clang-format on
 
-  auto pbrShader = m_ShaderManager->LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/pbr.wgsl");
-  auto shadowShader = m_ShaderManager->LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
-  auto skyboxShader = m_ShaderManager->LoadShader("SH_Skybox", RESOURCE_DIR "/shaders/skybox.wgsl");
-  auto ppfxShader = m_ShaderManager->LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
+  auto pbrShader = ShaderManager::LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/pbr.wgsl");
+  auto shadowShader = ShaderManager::LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
+  auto skyboxShader = ShaderManager::LoadShader("SH_Skybox", RESOURCE_DIR "/shaders/skybox.wgsl");
+  auto ppfxShader = ShaderManager::LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
 
   glm::vec2 screenSize = Application::Get()->GetWindowSize();
   uint32_t screenWidth = static_cast<uint32_t>(screenSize.x);
@@ -218,13 +211,15 @@ void SceneRenderer::Init() {
   // shadowDepthTextureSpec.layers = m_NumOfCascades;
 
   shadowDepthTextureSpec.DebugName = "ShadowMap";
-  m_ShadowDepthTexture = Texture::Create(shadowDepthTextureSpec);
+  m_ShadowDepthTexture = Texture2D::Create(shadowDepthTextureSpec);
 
   // Common
   FramebufferSpec compositeFboSpec;
   compositeFboSpec.ColorFormat = TextureFormat::BRGBA8,
   compositeFboSpec.DepthFormat = TextureFormat::Depth24Plus;
   compositeFboSpec.DebugName = "FB_Composite";
+	compositeFboSpec.Multisample = 4;
+	compositeFboSpec.SwapChainTarget = true;
   m_CompositeFramebuffer = Framebuffer::Create(compositeFboSpec);
 
   m_SceneUniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(SceneUniform));
@@ -238,6 +233,7 @@ void SceneRenderer::Init() {
   skyboxFboSpec.ColorFormat = TextureFormat::BRGBA8,
   skyboxFboSpec.DepthFormat = TextureFormat::Depth24Plus;
   skyboxFboSpec.DebugName = "FB_Skybox";
+	skyboxFboSpec.Multisample = 4;
   skyboxFboSpec.ExistingColorAttachment = m_CompositeFramebuffer->GetAttachment(0);
 
   RenderPipelineSpec skyboxPipeSpec = {
@@ -265,6 +261,8 @@ void SceneRenderer::Init() {
                                                         RESOURCE_DIR "/textures/bottom.jpg",
                                                         RESOURCE_DIR "/textures/front.jpg",
                                                         RESOURCE_DIR "/textures/back.jpg"});
+  auto bdrfLut = Rain::ResourceManager::LoadTexture("BDRF", RESOURCE_DIR "/textures/BRDF_LUT.png");
+
   RenderPassSpec propSkyboxPass = {
       .Pipeline = m_SkyboxPipeline,
       .DebugName = "SykboxPass"};
@@ -342,6 +340,9 @@ void SceneRenderer::Init() {
   m_LitPass->Set("u_ShadowMap", m_ShadowPass[0]->GetDepthOutput());
   m_LitPass->Set("u_ShadowSampler", m_ShadowSampler);
   m_LitPass->Set("u_ShadowData", m_ShadowUniformBuffer);
+  m_LitPass->Set("irradianceMap", skybox);
+  m_LitPass->Set("irradianceMapSampler", skyboxSampler);
+  m_LitPass->Set("u_BDRFLut", bdrfLut);
   m_LitPass->Bake();
 
   // PPFX
@@ -361,13 +362,34 @@ void SceneRenderer::Init() {
 
   m_PpfxPipeline = RenderPipeline::Create(ppfxPipeSpec);
 
-  RenderPassSpec ppfxPassSpec = {.Pipeline = m_PpfxPipeline, .DebugName = "PpfxPass"};
-  m_PpfxPass = RenderPass::Create(ppfxPassSpec);
-  m_PpfxPass->Set("renderTexture", m_LitPass->GetOutput(0));
-  m_PpfxPass->Set("textureSampler", Render::GetDefaultSampler());
-  m_PpfxPass->Bake();
+  //RenderPassSpec ppfxPassSpec = {.Pipeline = m_PpfxPipeline, .DebugName = "PpfxPass"};
+  //m_PpfxPass = RenderPass::Create(ppfxPassSpec);
+  //m_PpfxPass->Set("renderTexture", m_LitPass->GetOutput(0));
+  //m_PpfxPass->Set("textureSampler", Render::GetDefaultSampler());
+  //m_PpfxPass->Bake();
+
+  // ComputePipelineSpec mipmapSpec = {
+  //     .Shader = pbrShader,
+  //     .DebugName = "CP_Mipmap"};
+
+  // m_MipmapPipeline = PipelineCompute::Create(mipmapSpec);
 
   auto renderContext = Render::Instance->GetRenderContext();
+
+  auto placeHolder = Render::GetWhiteTexture();
+
+  // TextureProps textureProp = {};
+  // textureProp.DebugName = "Test";
+  // textureProp.CreateSampler = false;
+  // textureProp.GenerateMips = true;
+  // textureProp.GenerateMipsExperimental = true;
+
+  // auto p = std::filesystem::path(RESOURCE_DIR "/textures/back.jpg");
+
+  // auto texture = Texture::Create(textureProp, p);
+  // Render::ComputeMip(texture);
+  // Render::ComputeMip(texture);
+  // Render::saveTexture(RESOURCE_DIR "matrix2.png", RenderContext::GetDevice(), texture, 3);
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -378,6 +400,12 @@ void SceneRenderer::Init() {
   initInfo.Device = RenderContext::GetDevice();
   // initInfo.RenderTargetFormat = render->m_swapChainFormat;
   initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
+	initInfo.PipelineMultisampleState = {
+		.nextInChain = nullptr,
+		.count = 4,
+		.mask = ~0u,
+		.alphaToCoverageEnabled = false
+	};
   initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
   ImGui_ImplWGPU_Init(&initInfo);
 }
@@ -417,7 +445,7 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
 
   m_SceneUniform.ViewProjection = camera.Projection * camera.ViewMatrix;
   m_SceneUniform.View = camera.ViewMatrix;
-	m_SceneUniform.LightDir = m_Scene->SceneLightInfo.LightDirection;
+  m_SceneUniform.LightDir = m_Scene->SceneLightInfo.LightDirection;
 
   m_SceneUniform.CameraPosition = cameraPosition;
 
@@ -442,7 +470,7 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
   if (m_NeedResize) {
     m_SkyboxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
     m_LitPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
-    m_PpfxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
+    //m_PpfxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
     m_NeedResize = false;
   }
 
@@ -454,10 +482,10 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
 void SceneRenderer::FlushDrawList() {
   RN_PROFILE_FUNC;
   WGPUCommandEncoderDescriptor commandEncoderDesc = {};
-	ZERO_INIT(commandEncoderDesc);
+  ZERO_INIT(commandEncoderDesc);
 
-	commandEncoderDesc.label = "Default";
-	commandEncoderDesc.nextInChain = nullptr;
+  commandEncoderDesc.label = "Default";
+  commandEncoderDesc.nextInChain = nullptr;
   Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
 
   auto commandEncoder = wgpuDeviceCreateCommandEncoder(renderContext->GetDevice(), &commandEncoderDesc);
@@ -487,16 +515,17 @@ void SceneRenderer::FlushDrawList() {
     for (auto& [mk, dc] : m_DrawList) {
       Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
     }
+		ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
     Render::EndRenderPass(m_LitPass, litPassEncoder);
   }
 
-  {
-    RN_PROFILE_FUNCN("Post FX Pass");
-    auto ppfxPassEncoder = Render::BeginRenderPass(m_PpfxPass, commandEncoder);
-    Render::Instance->SubmitFullscreenQuad(ppfxPassEncoder, m_PpfxPipeline->GetPipeline());
-    ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), ppfxPassEncoder);
-    Render::EndRenderPass(m_PpfxPass, ppfxPassEncoder);
-  }
+  //{
+  //  RN_PROFILE_FUNCN("Post FX Pass");
+  //  auto ppfxPassEncoder = Render::BeginRenderPass(m_PpfxPass, commandEncoder);
+  //  Render::Instance->SubmitFullscreenQuad(ppfxPassEncoder, m_PpfxPipeline->GetPipeline());
+  //  ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), ppfxPassEncoder);
+  //  Render::EndRenderPass(m_PpfxPass, ppfxPassEncoder);
+  //}
 
   {
     RN_PROFILE_FUNCN("Submit");

@@ -11,16 +11,17 @@ typedef UUID AssetHandle;
 namespace Rain {
   class ResourceManager {
    public:
-    static std::shared_ptr<Texture> LoadTexture(std::string id, std::string path);
-    static std::shared_ptr<Texture> LoadCubeTexture(std::string id, const std::string (&paths)[6]);
+    static std::shared_ptr<Texture2D> LoadTexture(std::string id, std::string path);
+    static std::shared_ptr<Texture2D> LoadTextureExp(std::string id, std::string path);
+    static std::shared_ptr<Texture2D> LoadCubeTexture(std::string id, const std::string (&paths)[6]);
     static Ref<MeshSource> GetMeshSource(UUID handle);
     static Ref<MeshSource> LoadMeshSource(std::string path);
 
-    static std::shared_ptr<Texture> GetTexture(std::string id);
+    static std::shared_ptr<Texture2D> GetTexture(std::string id);
     static bool IsTextureExist(std::string id);
 
    private:
-    static std::unordered_map<std::string, std::shared_ptr<Texture>> _loadedTextures;
+    static std::unordered_map<std::string, std::shared_ptr<Texture2D>> _loadedTextures;
     static std::unordered_map<AssetHandle, Ref<MeshSource>> m_LoadedMeshSources;
   };
 }  // namespace Rain

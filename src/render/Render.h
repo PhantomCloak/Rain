@@ -14,10 +14,12 @@ class Render {
   WGPUSwapChain BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface);
   Ref<RenderContext> GetRenderContext() { return m_RenderContext; }
 
-	static Ref<Texture> GetWhiteTexture();
+	static Ref<Texture2D> GetWhiteTexture();
 	static Ref<Sampler> GetDefaultSampler();
 
   static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
+	//static WGPUComputePassEncoder BeginComputePass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
+
   static void EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder);
 
   static void RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
@@ -38,6 +40,10 @@ class Render {
   WGPUTextureView GetCurrentSwapChainTexture();
 
   WGPUSurface GetActiveSurface() { return m_surface; }
+
+	static void ComputeMip(Texture2D* output);
+	static void ComputeMipCube(Texture2D* output);
+	static bool saveTexture(const std::filesystem::path path, WGPUDevice device, Ref<Texture2D> texture, int mipLevel);
 
  private:
   void RendererPostInit();

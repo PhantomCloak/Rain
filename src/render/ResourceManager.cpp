@@ -20,7 +20,7 @@
 
 #include "render/Render.h"
 
-std::unordered_map<std::string, std::shared_ptr<Texture>> Rain::ResourceManager::_loadedTextures;
+std::unordered_map<std::string, std::shared_ptr<Texture2D>> Rain::ResourceManager::_loadedTextures;
 std::unordered_map<AssetHandle, Ref<MeshSource>> Rain::ResourceManager::m_LoadedMeshSources;
 
 void WriteTexture2(void* pixelData, const WGPUTexture& target, uint32_t width, uint32_t height, uint32_t targetMip) {
@@ -152,16 +152,16 @@ bool Rain::ResourceManager::IsTextureExist(std::string id) {
 }
 
 // TOOD: check if file exist or not
-std::shared_ptr<Texture> Rain::ResourceManager::LoadTexture(std::string id, std::string path) {
+std::shared_ptr<Texture2D> Rain::ResourceManager::LoadTexture(std::string id, std::string path) {
   RN_PROFILE_FUNC;
 
 	TextureProps textureProp = {};
 	textureProp.DebugName = id;
-	textureProp.CreateSampler = false;
-	textureProp.GenerateMips = false;
+	textureProp.CreateSampler = true;
+	textureProp.GenerateMips = true;
 
   auto p = std::filesystem::path(path);
-	auto texture = Texture::Create(textureProp, p);
+	auto texture = Texture2D::Create(textureProp, p);
 
   _loadedTextures[id] = texture;
 
@@ -169,13 +169,32 @@ std::shared_ptr<Texture> Rain::ResourceManager::LoadTexture(std::string id, std:
   return texture;
 }
 
-std::shared_ptr<Texture> Rain::ResourceManager::GetTexture(std::string id) {
+std::shared_ptr<Texture2D> Rain::ResourceManager::LoadTextureExp(std::string id, std::string path) {
+  RN_PROFILE_FUNC;
+
+	TextureProps textureProp = {};
+	textureProp.DebugName = id;
+	textureProp.CreateSampler = true;
+	textureProp.GenerateMips = true;
+	textureProp.Format = TextureFormat::ASTC6x6;
+
+  auto p = std::filesystem::path(path);
+	auto texture = Texture2D::Create(textureProp, p);
+
+  _loadedTextures[id] = texture;
+
+	RN_LOG("Texture {} loaded from {}", id, path);
+  return texture;
+}
+
+
+std::shared_ptr<Texture2D> Rain::ResourceManager::GetTexture(std::string id) {
   if (_loadedTextures.find(id) == _loadedTextures.end()) {
     std::cout << "GetTexture for id " << id << " does not exist" << std::endl;
     return nullptr;
   }
 
-  std::shared_ptr<Texture>& texture = _loadedTextures[id];
+  std::shared_ptr<Texture2D>& texture = _loadedTextures[id];
 
   if (!texture) {
     std::cout << "Texture is invalid" << std::endl;
@@ -195,7 +214,7 @@ Ref<MeshSource> Rain::ResourceManager::LoadMeshSource(std::string path) {
   return meshSource;
 }
 
-std::shared_ptr<Texture> Rain::ResourceManager::LoadCubeTexture(std::string id, const std::string (&paths)[6]) {
+std::shared_ptr<Texture2D> Rain::ResourceManager::LoadCubeTexture(std::string id, const std::string (&paths)[6]) {
   WGPUExtent3D cubemapSize = {0, 0, (uint32_t)paths->size()};
   std::array<uint8_t*, 6> pixelData;
 
@@ -234,7 +253,7 @@ std::shared_ptr<Texture> Rain::ResourceManager::LoadCubeTexture(std::string id, 
     stbi_image_free(pixelData[layer]);
   }
 
-  auto tex = std::make_shared<Texture>();
+  auto tex = std::make_shared<Texture2D>();
   tex->TextureBuffer = texture;
 
   WGPUTextureViewDescriptor textureViewDesc;
