@@ -33,10 +33,12 @@ set_target_properties(ReEngine PROPERTIES
   EXPORT_COMPILE_COMMANDS ON
 )
 
-
-
 target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui")
 target_compile_definitions(ReEngine PRIVATE RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources")
+
+if(NOT EMSCRIPTEN)
+	add_compile_options(-fstandalone-debug)
+endif()
 
 include("cmake/ThirdParty.cmake")
 target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/dawn/include/tint)
@@ -44,6 +46,6 @@ target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/da
 if(EMSCRIPTEN)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sDISABLE_EXCEPTION_CATCHING=0")
 	target_link_options(ReEngine PRIVATE -sUSE_GLFW=3 -sUSE_WEBGPU=1 -sASYNCIFY=1 -sALLOW_MEMORY_GROWTH=1 -sWASM_BIGINT=1 -sSTACK_SIZE=1mb --preload-file "${CMAKE_CURRENT_SOURCE_DIR}/Resources")
-		set_target_properties(ReEngine PROPERTIES SUFFIX ".html")
+	set_target_properties(ReEngine PROPERTIES SUFFIX ".html")
 endif()
 
