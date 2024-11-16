@@ -103,7 +103,7 @@ MeshSource::MeshSource(std::string path) {
       if (Rain::ResourceManager::IsTextureExist(textureName)) {
         matTexture = Rain::ResourceManager::GetTexture(textureName);
       } else {
-        matTexture = Rain::ResourceManager::LoadTextureExp(textureName, fileDirectory + "/" + texturePath.C_Str());
+        matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
       }
 
       material->Set("u_AlbedoTex", matTexture);

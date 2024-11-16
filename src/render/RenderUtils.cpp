@@ -107,8 +107,6 @@ WGPUTextureFormat RenderTypeUtils::ToRenderType(TextureFormat format) {
       return WGPUTextureFormat_BGRA8Unorm;
     case Depth24Plus:
       return WGPUTextureFormat_Depth24Plus;
-    case ASTC6x6:
-      return WGPUTextureFormat_ASTC6x6Unorm;
     case Undefined:
       return WGPUTextureFormat_Undefined;
     default:

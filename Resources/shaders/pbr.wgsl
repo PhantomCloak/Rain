@@ -97,7 +97,7 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
     out.ShadowCoord2 = shadowCoords2.xyz / shadowCoords2.w;
     out.ShadowCoord3 = shadowCoords3.xyz / shadowCoords3.w;
 
-		out.FragPos = (u_Scene.cameraViewMatrix * vec4f(out.WorldPosition, 1.0)).xyz;
+	out.FragPos = (u_Scene.cameraViewMatrix * vec4f(out.WorldPosition, 1.0)).xyz;
 
     return out;
 }

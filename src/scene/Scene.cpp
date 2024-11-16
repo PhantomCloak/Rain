@@ -28,22 +28,22 @@ Ref<MeshSource> cityModel;
 
 void Scene::Init() {
   m_SceneCamera = std::make_unique<PlayerCamera>();
-  m_SceneCamera->Position.x = -105.414;
-  m_SceneCamera->Position.y = 72.52;
-	m_SceneCamera->Position.z = -139.405;
-	m_SceneCamera->Yaw = 128.699;
-	m_SceneCamera->Pitch = -24.00;
+  //m_SceneCamera->Position.x = -105.414;
+  //m_SceneCamera->Position.y = 72.52;
+	//m_SceneCamera->Position.z = -139.405;
+	//m_SceneCamera->Yaw = 128.699;
+	//m_SceneCamera->Pitch = -24.00;
 
 
 
-  //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/city-test4.gltf");
-  //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/Helment/untitled.gltf");
+  //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/cityz.gltf");
+  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/Helment/untitled.gltf");
   //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/sponza/SponzaExp5.gltf");
-  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
+	//cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test.gltf");
   Entity map = CreateEntity("Box");
-  map.GetComponent<TransformComponent>()->Translation = glm::vec3(0.0, 0.0, 0);
+  //map.GetComponent<TransformComponent>()->Translation = glm::vec3(0.0, 0.0, 0);
   map.GetComponent<TransformComponent>()->Scale = glm::vec3(35.0f);
-	map.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(90.0), glm::radians(0.0), glm::radians(180.0)));
+	//map.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(90.0), glm::radians(0.0), glm::radians(180.0)));
   //map.GetComponent<TransformComponent>()->Scale = glm::vec3(0.10f);
   BuildMeshEntityHierarchy(map, cityModel);
 
@@ -99,9 +99,9 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
   static float w = Application::Get()->GetWindowSize().x;
   static float h = Application::Get()->GetWindowSize().y;
 
-  static auto projectionMatrix = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 700.0f);
+  static auto projectionMatrix = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1700.0f);
 
-  renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 0.10, 700.0f});
+  renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 0.10, 1700.0f});
 
   static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
   drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent) {

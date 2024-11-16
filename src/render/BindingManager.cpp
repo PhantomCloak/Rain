@@ -40,7 +40,7 @@ BindingManager::BindingManager(const BindingSpec& spec)
   Init();
 }
 
-void BindingManager::Set(const std::string& name, Ref<Texture2D> texture) {
+void BindingManager::Set(const std::string& name, Ref<Texture> texture) {
   const auto* decl = GetInputDeclaration(name);
   if (decl != nullptr) {
     m_Inputs[decl->Group][decl->Location].Type = RenderPassResourceType::PT_Texture;

@@ -42,7 +42,7 @@ class Render {
   WGPUSurface GetActiveSurface() { return m_surface; }
 
 	static void ComputeMip(Texture2D* output);
-	static void ComputeMipCube(Texture2D* output);
+	static void ComputeMipCube(TextureCube* output);
 	static bool saveTexture(const std::filesystem::path path, WGPUDevice device, Ref<Texture2D> texture, int mipLevel);
 
  private:

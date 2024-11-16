@@ -106,9 +106,9 @@ bool Render::Init(void* window) {
   deviceDesc->requiredFeatureCount = 0;
 #else
   // deviceDesc.requiredFeaturesCount = 0;
-  static WGPUFeatureName sucker[] = {WGPUFeatureName_TimestampQuery};
+  static WGPUFeatureName sucker[] = {WGPUFeatureName_TimestampQuery, WGPUFeatureName_TextureCompressionBC};
   deviceDesc->requiredFeatures = &sucker[0];
-  deviceDesc->requiredFeatureCount = 1;
+  deviceDesc->requiredFeatureCount = 2;
 #endif
 
   deviceDesc->requiredLimits = requiredLimits;
@@ -568,9 +568,9 @@ void Render::ComputeMip(Texture2D* input) {
     wgpuComputePipelineRelease(pipeline);
 }
 
-void Render::ComputeMipCube(Texture2D* input) {
+void Render::ComputeMipCube(TextureCube* input) {
     auto dir = RESOURCE_DIR "/shaders/ComputeMipCube.wgsl";
-    static Ref<Shader> computeShader = ShaderManager::LoadShader("SH_Compute", dir);
+    static Ref<Shader> computeShader = ShaderManager::LoadShader("SH_ComputeCube", dir);
     auto device = RenderContext::GetDevice();
 
     // Prepare pipeline layout
@@ -611,23 +611,23 @@ void Render::ComputeMipCube(Texture2D* input) {
         // Create texture views for the current and next mip levels
         WGPUTextureViewDescriptor inputViewDesc = {
             .format = WGPUTextureFormat_RGBA8Unorm,
-            .dimension = WGPUTextureViewDimension_Cube,
+            .dimension = WGPUTextureViewDimension_2DArray,
             .baseMipLevel = mipLevel - 1,
             .mipLevelCount = 1,
             .baseArrayLayer = 0,
             .arrayLayerCount = 6  // All faces
         };
-        WGPUTextureView inputTextureView = wgpuTextureCreateView(input->TextureBuffer, &inputViewDesc);
+        WGPUTextureView inputTextureView = wgpuTextureCreateView(input->m_TextureBuffer, &inputViewDesc);
 
         WGPUTextureViewDescriptor outputViewDesc = {
             .format = WGPUTextureFormat_RGBA8Unorm,
-            .dimension = WGPUTextureViewDimension_Cube,
+            .dimension = WGPUTextureViewDimension_2DArray,
             .baseMipLevel = mipLevel,
             .mipLevelCount = 1,
             .baseArrayLayer = 0,
             .arrayLayerCount = 6  // All faces
         };
-        WGPUTextureView outputTextureView = wgpuTextureCreateView(input->TextureBuffer, &outputViewDesc);
+        WGPUTextureView outputTextureView = wgpuTextureCreateView(input->m_TextureBuffer, &outputViewDesc);
 
         // Create and set bind group
         WGPUBindGroupEntry bindGroupEntries[2] = {

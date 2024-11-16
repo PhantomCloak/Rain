@@ -12,8 +12,8 @@ namespace Rain {
   class ResourceManager {
    public:
     static std::shared_ptr<Texture2D> LoadTexture(std::string id, std::string path);
-    static std::shared_ptr<Texture2D> LoadTextureExp(std::string id, std::string path);
-    static std::shared_ptr<Texture2D> LoadCubeTexture(std::string id, const std::string (&paths)[6]);
+    //static std::shared_ptr<Texture2D> LoadCubeTexture(std::string id, const std::string (&paths)[6]);
+    static std::shared_ptr<TextureCube> LoadCubeTexture(std::string id, const std::filesystem::path (&paths)[6]);
     static Ref<MeshSource> GetMeshSource(UUID handle);
     static Ref<MeshSource> LoadMeshSource(std::string path);
 
@@ -22,6 +22,7 @@ namespace Rain {
 
    private:
     static std::unordered_map<std::string, std::shared_ptr<Texture2D>> _loadedTextures;
+    static std::unordered_map<std::string, std::shared_ptr<TextureCube>> _loadedTexturesCube;
     static std::unordered_map<AssetHandle, Ref<MeshSource>> m_LoadedMeshSources;
   };
 }  // namespace Rain

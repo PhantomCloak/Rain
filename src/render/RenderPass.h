@@ -19,7 +19,7 @@ class RenderPass {
  public:
   RenderPass(const RenderPassSpec& props);
 
-  void Set(const std::string& name, Ref<Texture2D> texture);
+  void Set(const std::string& name, Ref<Texture> texture);
   void Set(const std::string& name, Ref<GPUBuffer> uniform);
   void Set(const std::string& name, Ref<Sampler> sampler);
   void Bake();

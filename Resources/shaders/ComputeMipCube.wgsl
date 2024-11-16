@@ -1,20 +1,31 @@
-@group(0) @binding(0) var previousMipLevel: texture_cube<f32>;
-@group(0) @binding(1) var nextMipLevel: texture_storage_cube<rgba8unorm, write>;
+@group(0) @binding(0) var previousMipLevel: texture_2d_array<f32>;
+@group(0) @binding(1) var nextMipLevel: texture_storage_2d_array<rgba8unorm, write>;
 
 @compute @workgroup_size(8, 8, 1)
 fn computeMipMap(@builtin(global_invocation_id) id: vec3<u32>) {
-    let faceIndex = id.z;
-    let texCoord = vec2<u32>(id.x, id.y);
-    let offset = vec2<u32>(0u, 1u);
-    
-    // Sampling the four neighboring texels for averaging
-    let color = (
-        textureLoad(previousMipLevel, faceIndex, 2u * texCoord + offset.xx, 0) +
-        textureLoad(previousMipLevel, faceIndex, 2u * texCoord + offset.xy, 0) +
-        textureLoad(previousMipLevel, faceIndex, 2u * texCoord + offset.yx, 0) +
-        textureLoad(previousMipLevel, faceIndex, 2u * texCoord + offset.yy, 0)
-    ) * 0.25;
+    let faceIndex: i32 = i32(id.z); 
+    let texCoord: vec2<i32> = vec2<i32>(id.xy); 
 
-    // Storing the mipmapped color in the next mip level of the cube map
-    textureStore(nextMipLevel, faceIndex, texCoord, color);
+    let prevMipDimensions: vec2<i32> = vec2<i32>(textureDimensions(previousMipLevel).xy);
+
+    let coord = 2 * texCoord;
+    let offsets = array<vec2<i32>, 4>(
+        vec2<i32>(0, 0),
+        vec2<i32>(1, 0),
+        vec2<i32>(0, 1),
+        vec2<i32>(1, 1)
+    );
+
+    var color: vec4<f32> = vec4<f32>(0.0);
+
+    for (var i = 0; i < 4; i = i + 1) {
+        let sampleCoord = coord + offsets[i];
+        let clampedCoord = clamp(sampleCoord, vec2<i32>(0, 0), prevMipDimensions - vec2<i32>(1, 1));
+
+        color = color + textureLoad(previousMipLevel, clampedCoord, faceIndex, 0);
+    }
+
+    color = color * 0.25; // Average the colors
+    textureStore(nextMipLevel, texCoord, faceIndex, color);
 }
+

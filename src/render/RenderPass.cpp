@@ -16,9 +16,10 @@ Ref<RenderPass> RenderPass::Create(const RenderPassSpec& spec) {
   return renderPass;
 }
 
-void RenderPass::Set(const std::string& name, Ref<Texture2D> texture) {
+void RenderPass::Set(const std::string& name, Ref<Texture> texture) {
   m_PassBinds->Set(name, texture);
 }
+
 void RenderPass::Set(const std::string& name, Ref<GPUBuffer> uniform) {
   m_PassBinds->Set(name, uniform);
 }

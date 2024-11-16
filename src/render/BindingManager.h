@@ -22,7 +22,7 @@ struct BindingSpec {
 
 struct RenderPassInput {
 	RenderPassResourceType Type;
-  Ref<Texture2D> TextureInput = nullptr;
+  Ref<Texture> TextureInput = nullptr;
   Ref<GPUBuffer> UniformIntput = nullptr;
   Ref<Sampler> SamplerInput = nullptr;
 };
@@ -43,7 +43,7 @@ class BindingManager {
 
   std::map<int, WGPUBindGroup>& GetBindGroups() { return m_BindGroups; }
   const WGPUBindGroup& GetBindGroup(int group) { return m_BindGroups[group]; }
-  void Set(const std::string& name, Ref<Texture2D> texture);
+  void Set(const std::string& name, Ref<Texture> texture);
   void Set(const std::string& name, Ref<GPUBuffer> uniform);
   void Set(const std::string& name, Ref<Sampler> sampler);
 	void Init();

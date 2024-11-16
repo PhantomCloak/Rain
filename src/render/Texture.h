@@ -11,8 +11,7 @@ enum TextureFormat {
   RGBA8,
   BRGBA8,
   Depth24Plus,
-  Undefined,
-	ASTC6x6
+  Undefined
 };
 
 enum TextureType {
@@ -45,6 +44,9 @@ class Texture {
   virtual uint32_t GetMipLevelCount() const = 0;
 
   virtual glm::uvec2 GetSize() const = 0;
+
+	public:
+	virtual WGPUTextureView GetNativeView(int layer = 0) = 0;
 };
 
 class Texture2D : public Texture {
@@ -66,8 +68,7 @@ class Texture2D : public Texture {
   Texture2D(const TextureProps& props, const std::filesystem::path& path);
 
   const int GetViewCount() { return m_Views.size(); }
-  WGPUTextureView GetNativeView(int layer = 0) { return m_Views[layer]; }
-  const TextureProps& GetSpec() { return m_TextureProps; }
+  WGPUTextureView GetNativeView(int layer = 0) override { return m_Views[layer]; }
 
   glm::uvec2 GetSize() const override { return glm::uvec2(m_TextureProps.Width, m_TextureProps.Height); }
 
@@ -78,33 +79,44 @@ class Texture2D : public Texture {
   TextureFormat GetFormat() const override { return m_TextureProps.Format; }
   TextureType GetType() const override { return TextureType::TextureDim2D; }
 
+  const TextureProps& GetSpec() { return m_TextureProps; }
+
   std::vector<WGPUTextureView> m_Views;
   WGPUTextureView m_ArrayView;
 
  private:
   TextureProps m_TextureProps;
   Buffer m_ImageData;
+
   void CreateFromFile(const TextureProps& props, const std::filesystem::path& path);
   void Invalidate();
 };
 
-// class TextureCube : public Texture {
-//  public:
-//   static Ref<TextureCube> Create(const TextureProps& props, const std::filesystem::path& path);
-//   TextureCube(const TextureProps& props, const std::filesystem::path& path);
-//
-//   glm::uvec2 GetSize() const override { return glm::uvec2(m_TextureProps.Width, m_TextureProps.Height); }
-//
-//   uint32_t GetWidth() const override { return GetSize().x; }
-//   uint32_t GetHeight() const override { return GetSize().y; }
-//
-//   TextureFormat GetFormat() const override { return m_TextureProps.Format; }
-//   TextureType GetType() const override { return TextureType::TextureDimCube; }
-//
-//	void CreateFromFile(const TextureProps& props, const std::filesystem::path& path);
-//   void Invalidate();
-//
-//  private:
-//   TextureProps m_TextureProps;
-//   Buffer m_ImageData;
-// };
+class TextureCube : public Texture {
+ public:
+  static Ref<TextureCube> Create(const TextureProps& props, const std::filesystem::path (&paths)[6]);
+  TextureCube(const TextureProps& props, const std::filesystem::path (&paths)[6]);
+  TextureCube() {};
+
+  glm::uvec2 GetSize() const override { return glm::uvec2(m_TextureProps.Width, m_TextureProps.Height); }
+
+  uint32_t GetWidth() const override { return GetSize().x; }
+  uint32_t GetHeight() const override { return GetSize().y; }
+  uint32_t GetMipLevelCount() const override { return 15; }
+
+  TextureFormat GetFormat() const override { return m_TextureProps.Format; }
+  TextureType GetType() const override { return TextureType::TextureDimCube; }
+
+  const TextureProps& GetSpec() { return m_TextureProps; }
+
+  WGPUTextureView GetNativeView(int layer = 0) override { return m_Views[layer]; }
+
+  WGPUTexture m_TextureBuffer = NULL;
+  std::vector<WGPUTextureView> m_Views;
+ private:
+  TextureProps m_TextureProps;
+  Buffer m_ImageData[6];
+
+  void CreateFromFile(const TextureProps& props, const std::filesystem::path (&paths)[6]);
+  void Invalidate();
+};

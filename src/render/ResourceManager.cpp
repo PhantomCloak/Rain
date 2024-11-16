@@ -21,6 +21,8 @@
 #include "render/Render.h"
 
 std::unordered_map<std::string, std::shared_ptr<Texture2D>> Rain::ResourceManager::_loadedTextures;
+std::unordered_map<std::string, std::shared_ptr<TextureCube>> Rain::ResourceManager::_loadedTexturesCube;
+
 std::unordered_map<AssetHandle, Ref<MeshSource>> Rain::ResourceManager::m_LoadedMeshSources;
 
 void WriteTexture2(void* pixelData, const WGPUTexture& target, uint32_t width, uint32_t height, uint32_t targetMip) {
@@ -169,25 +171,6 @@ std::shared_ptr<Texture2D> Rain::ResourceManager::LoadTexture(std::string id, st
   return texture;
 }
 
-std::shared_ptr<Texture2D> Rain::ResourceManager::LoadTextureExp(std::string id, std::string path) {
-  RN_PROFILE_FUNC;
-
-	TextureProps textureProp = {};
-	textureProp.DebugName = id;
-	textureProp.CreateSampler = true;
-	textureProp.GenerateMips = true;
-	textureProp.Format = TextureFormat::ASTC6x6;
-
-  auto p = std::filesystem::path(path);
-	auto texture = Texture2D::Create(textureProp, p);
-
-  _loadedTextures[id] = texture;
-
-	RN_LOG("Texture {} loaded from {}", id, path);
-  return texture;
-}
-
-
 std::shared_ptr<Texture2D> Rain::ResourceManager::GetTexture(std::string id) {
   if (_loadedTextures.find(id) == _loadedTextures.end()) {
     std::cout << "GetTexture for id " << id << " does not exist" << std::endl;
@@ -214,60 +197,74 @@ Ref<MeshSource> Rain::ResourceManager::LoadMeshSource(std::string path) {
   return meshSource;
 }
 
-std::shared_ptr<Texture2D> Rain::ResourceManager::LoadCubeTexture(std::string id, const std::string (&paths)[6]) {
-  WGPUExtent3D cubemapSize = {0, 0, (uint32_t)paths->size()};
-  std::array<uint8_t*, 6> pixelData;
+std::shared_ptr<TextureCube> Rain::ResourceManager::LoadCubeTexture(std::string id, const std::filesystem::path (&paths)[6]) {
 
-  for (uint32_t layer = 0; layer < 6; ++layer) {
-    int width, height, channels;
-    pixelData[layer] = stbi_load(paths[layer].c_str(), &width, &height, &channels, 4);
+	TextureProps textureProp = {};
+	textureProp.DebugName = id;
+	textureProp.CreateSampler = true;
+	textureProp.GenerateMips = true;
 
-    RN_ASSERT(pixelData[layer] != nullptr, "Cubemap texture couldn't found at {}!", paths[layer]);
+	auto texture = TextureCube::Create(textureProp, paths);
 
-    if (layer == 0) {
-      cubemapSize.width = (uint32_t)width;
-      cubemapSize.height = (uint32_t)height;
-    } else {
-      RN_ASSERT(cubemapSize.width == (uint32_t)width && cubemapSize.height == (uint32_t)height, "All cubemap texture faces should be in the same size.", paths[layer]);
-    }
-  }
+  _loadedTexturesCube[id] = texture;
 
-  WGPUTextureDescriptor textureDesc;
-  textureDesc.label = "bb";
-  textureDesc.dimension = WGPUTextureDimension_2D;
-  //textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
-  textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
-  textureDesc.size = cubemapSize;
-  textureDesc.mipLevelCount = (uint32_t)(floor((float)(log2(glm::max(textureDesc.size.width, textureDesc.size.height))))) + 1;  // can be replaced with bit_width in C++ 20
-  textureDesc.sampleCount = 1;
-  textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
-  textureDesc.viewFormatCount = 0;
-  textureDesc.viewFormats = nullptr;
-  textureDesc.nextInChain = nullptr;
-  WGPUTexture texture = wgpuDeviceCreateTexture(RenderContext::GetDevice(), &textureDesc);
-
-  WGPUExtent3D cubemapLayerSize = {cubemapSize.width, cubemapSize.height, 1};
-  for (uint32_t layer = 0; layer < 6; ++layer) {
-    WGPUOrigin3D origin = {0, 0, layer};
-    writeMipMaps(RenderContext::GetDevice(), texture, cubemapLayerSize, textureDesc.mipLevelCount, pixelData[layer], origin);
-    stbi_image_free(pixelData[layer]);
-  }
-
-  auto tex = std::make_shared<Texture2D>();
-  tex->TextureBuffer = texture;
-
-  WGPUTextureViewDescriptor textureViewDesc;
-  textureViewDesc.label = "nn";
-  textureViewDesc.aspect = WGPUTextureAspect_All;
-  textureViewDesc.baseArrayLayer = 0;
-  textureViewDesc.arrayLayerCount = 6;
-  textureViewDesc.baseMipLevel = 0;
-  textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
-  textureViewDesc.dimension = WGPUTextureViewDimension_Cube;
-  textureViewDesc.format = textureDesc.format;
-  textureViewDesc.nextInChain = nullptr;
-  //tex->View = ;
-	tex->m_Views.push_back(wgpuTextureCreateView(texture, &textureViewDesc));
-
-  return tex;
+	return texture;
 }
+
+//std::shared_ptr<TextureCube> Rain::ResourceManager::LoadCubeTexture(std::string id, const std::filesystem::path (&paths)[6]) {
+//  WGPUExtent3D cubemapSize = {0, 0, 6};
+//  std::array<uint8_t*, 6> pixelData;
+//
+//  for (uint32_t layer = 0; layer < 6; ++layer) {
+//    int width, height, channels;
+//    pixelData[layer] = stbi_load(paths[layer].c_str(), &width, &height, &channels, 4);
+//
+//    //RN_ASSERT(pixelData[layer] != nullptr, "Cubemap texture couldn't found at {}!", paths[layer]);
+//
+//    if (layer == 0) {
+//      cubemapSize.width = (uint32_t)width;
+//      cubemapSize.height = (uint32_t)height;
+//    } else {
+//     // RN_ASSERT(cubemapSize.width == (uint32_t)width && cubemapSize.height == (uint32_t)height, "All cubemap texture faces should be in the same size.", paths[layer]);
+//    }
+//  }
+//
+//  WGPUTextureDescriptor textureDesc;
+//  textureDesc.label = "bb";
+//  textureDesc.dimension = WGPUTextureDimension_2D;
+//  //textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
+//  textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
+//  textureDesc.size = cubemapSize;
+//  textureDesc.mipLevelCount = (uint32_t)(floor((float)(log2(glm::max(textureDesc.size.width, textureDesc.size.height))))) + 1;  // can be replaced with bit_width in C++ 20
+//  textureDesc.sampleCount = 1;
+//  textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+//  textureDesc.viewFormatCount = 0;
+//  textureDesc.viewFormats = nullptr;
+//  textureDesc.nextInChain = nullptr;
+//  WGPUTexture texture = wgpuDeviceCreateTexture(RenderContext::GetDevice(), &textureDesc);
+//
+//  WGPUExtent3D cubemapLayerSize = {cubemapSize.width, cubemapSize.height, 1};
+//  for (uint32_t layer = 0; layer < 6; ++layer) {
+//    WGPUOrigin3D origin = {0, 0, layer};
+//    writeMipMaps(RenderContext::GetDevice(), texture, cubemapLayerSize, textureDesc.mipLevelCount, pixelData[layer], origin);
+//    stbi_image_free(pixelData[layer]);
+//  }
+//
+//  auto tex = std::make_shared<TextureCube>();
+//  tex->m_TextureBuffer = texture;
+//
+//  WGPUTextureViewDescriptor textureViewDesc;
+//  textureViewDesc.label = "nn";
+//  textureViewDesc.aspect = WGPUTextureAspect_All;
+//  textureViewDesc.baseArrayLayer = 0;
+//  textureViewDesc.arrayLayerCount = 6;
+//  textureViewDesc.baseMipLevel = 0;
+//  textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
+//  textureViewDesc.dimension = WGPUTextureViewDimension_Cube;
+//  textureViewDesc.format = textureDesc.format;
+//  textureViewDesc.nextInChain = nullptr;
+//  //tex->View = ;
+//	tex->m_Views.push_back(wgpuTextureCreateView(texture, &textureViewDesc));
+//
+//  return tex;
+//}

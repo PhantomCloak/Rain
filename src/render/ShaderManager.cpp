@@ -252,7 +252,9 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
         case StorageBindingType:
 					groupEntry.storageTexture.access = WGPUStorageTextureAccess_WriteOnly;
 					groupEntry.storageTexture.format = WGPUTextureFormat_RGBA8Unorm;
-					groupEntry.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
+					//groupEntry.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
+          groupEntry.storageTexture.viewDimension = GetDimensionType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].dim);
+
 					groupEntry.visibility = WGPUShaderStage_Compute;
 					break;
       }
