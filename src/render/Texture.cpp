@@ -219,7 +219,7 @@ void TextureCube::Invalidate() {
   m_Views.push_back(wgpuTextureCreateView(m_TextureBuffer, &textureViewDesc));
 
   if (m_TextureProps.GenerateMips) {
-    Render::ComputeMipCube(this);
+    Render::PreFilter(this);
   }
 }
 

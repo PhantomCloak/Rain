@@ -4,6 +4,7 @@
 #include "GLFW/glfw3.h"
 #include "Material.h"
 #include "render/Mesh.h"
+#include "render/Pipeline.h"
 #include "render/RenderPass.h"
 
 class Render {
@@ -14,26 +15,26 @@ class Render {
   WGPUSwapChain BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface);
   Ref<RenderContext> GetRenderContext() { return m_RenderContext; }
 
-	static Ref<Texture2D> GetWhiteTexture();
-	static Ref<Sampler> GetDefaultSampler();
+  static Ref<Texture2D> GetWhiteTexture();
+  static Ref<Sampler> GetDefaultSampler();
 
   static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
-	//static WGPUComputePassEncoder BeginComputePass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
+  // static WGPUComputePassEncoder BeginComputePass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
 
   static void EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder);
 
   static void RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
-                  WGPURenderPipeline pipeline,
-                  Ref<MeshSource> mesh,
-                  uint32_t submeshIndex,
-                  Ref<MaterialTable> material,
-                  Ref<GPUBuffer> transformBuffer,
-                  uint32_t transformOffset,
-                  uint32_t instanceCount);
+                         WGPURenderPipeline pipeline,
+                         Ref<MeshSource> mesh,
+                         uint32_t submeshIndex,
+                         Ref<MaterialTable> material,
+                         Ref<GPUBuffer> transformBuffer,
+                         uint32_t transformOffset,
+                         uint32_t instanceCount);
   static void SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WGPURenderPipeline pipeline);
 
-	static void AddShaderDependency(Ref<Shader> shader, Ref<Material> material);
-	static void AddShaderDependency(Ref<Shader> shader, Ref<RenderPipeline> material);
+  static void AddShaderDependency(Ref<Shader> shader, Ref<Material> material);
+  static void AddShaderDependency(Ref<Shader> shader, Ref<RenderPipeline> material);
 
   std::unordered_map<UUID, Material> Materials;
 
@@ -41,9 +42,15 @@ class Render {
 
   WGPUSurface GetActiveSurface() { return m_surface; }
 
-	static void ComputeMip(Texture2D* output);
-	static void ComputeMipCube(TextureCube* output);
-	static bool saveTexture(const std::filesystem::path path, WGPUDevice device, Ref<Texture2D> texture, int mipLevel);
+  static void ComputeMip(Texture2D* output);
+  static void ComputeMipCube(TextureCube* output);
+  static void PreFilter(TextureCube* output);
+  static bool saveTexture(const std::filesystem::path path, WGPUDevice device, Ref<Texture2D> texture, int mipLevel);
+
+  static void RegisterShaderDependency(Ref<Shader> shader, Ref<Material> material);
+  static void RegisterShaderDependency(Ref<Shader> shader, Ref<RenderPipeline> material);
+  static void ReloadShaders();
+  static void ReloadShader(Ref<Shader> shader);
 
  private:
   void RendererPostInit();
@@ -60,8 +67,9 @@ class Render {
   WGPUAdapter m_adapter = nullptr;
   WGPUDevice m_device = nullptr;
   WGPUQueue m_queue = nullptr;
-	WGPUInstance m_Instance = nullptr;
-	WGPUTextureView m_SwapTexture;
+  WGPUInstance m_Instance = nullptr;
+  WGPUTextureView m_SwapTexture;
+	WGPULimits m_Limits;
 
   WGPUSwapChain m_swapChain = nullptr;
   WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_Undefined;

@@ -1,7 +1,6 @@
 #include "Material.h"
 #include "render/Render.h"
 
-
 Material::Material(const std::string& name, Ref<Shader> shader)
     : m_Name(name) {
   const BindingSpec spec = {
@@ -10,7 +9,7 @@ Material::Material(const std::string& name, Ref<Shader> shader)
       .DefaultResources = true};
 
   m_BindManager = BindingManager::Create(spec);
-	m_Shader = shader;
+  m_Shader = shader;
 
   for (const auto& [name, decl] : m_BindManager->InputDeclarations) {
     if (decl.Group != 1) {
@@ -24,16 +23,15 @@ Material::Material(const std::string& name, Ref<Shader> shader)
     }
   }
 
-	int size = 0;
-	for(const auto& [_, member] : m_Shader->GetReflectionInfo().UserTypes[MATERIAL_UNIFORM_KEY])
-	{
-		size += member.Size;
-	}
-	m_UniformStorageBuffer.Allocate(size);
-	m_UniformStorageBuffer.ZeroInitialize();
+  int size = 0;
+  for (const auto& [_, member] : m_Shader->GetReflectionInfo().UserTypes[MATERIAL_UNIFORM_KEY]) {
+    size += member.Size;
+  }
+  m_UniformStorageBuffer.Allocate(size);
+  m_UniformStorageBuffer.ZeroInitialize();
 
   m_UBMaterial = GPUAllocator::GAlloc(name, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, size);
-	m_BindManager->Set("uMaterial", m_UBMaterial);
+  m_BindManager->Set("uMaterial", m_UBMaterial);
 }
 
 Ref<Material> Material::CreateMaterial(const std::string& name, Ref<Shader> shader) {
@@ -41,12 +39,12 @@ Ref<Material> Material::CreateMaterial(const std::string& name, Ref<Shader> shad
 };
 
 void Material::Bake() {
-	m_UBMaterial->SetData(m_UniformStorageBuffer.Data, m_UniformStorageBuffer.GetSize());
+  m_UBMaterial->SetData(m_UniformStorageBuffer.Data, m_UniformStorageBuffer.GetSize());
   m_BindManager->Bake();
 }
 
 const WGPUBindGroup& Material::GetBinding(int index) {
-	m_BindManager->InvalidateAndUpdate();
+  m_BindManager->InvalidateAndUpdate();
   return m_BindManager->GetBindGroup(index);
 }
 
@@ -65,17 +63,17 @@ void Material::Set(const std::string& name, Ref<Sampler> sampler) {
 }
 
 void Material::Set(const std::string& name, float value) {
-	Set<float>(name, value);
+  Set<float>(name, value);
 }
 
 void Material::Set(const std::string& name, int value) {
-	Set<int>(name, value);
+  Set<int>(name, value);
 }
 
 void Material::Set(const std::string& name, bool value) {
-	Set<int>(name, (int)value);
+  Set<int>(name, (int)value);
 }
 
 const ShaderTypeDecl& Material::FindShaderUniformDecl(const std::string& name) {
-	return m_Shader->GetReflectionInfo().UserTypes[MATERIAL_UNIFORM_KEY][name];
+  return m_Shader->GetReflectionInfo().UserTypes[MATERIAL_UNIFORM_KEY][name];
 }

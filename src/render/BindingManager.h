@@ -7,11 +7,12 @@
 #include "render/Shader.h"
 #include "render/Texture.h"
 
-enum RenderPassResourceType  {
-	PT_Uniform,
-	PT_Texture,
-	PT_Sampler,
-	PT_Storage
+enum RenderPassResourceType {
+  PT_Uniform,
+  PT_DynamicUniform,
+  PT_Texture,
+  PT_Sampler,
+  PT_Storage
 };
 
 struct BindingSpec {
@@ -21,18 +22,17 @@ struct BindingSpec {
 };
 
 struct RenderPassInput {
-	RenderPassResourceType Type;
+  RenderPassResourceType Type;
   Ref<Texture> TextureInput = nullptr;
   Ref<GPUBuffer> UniformIntput = nullptr;
   Ref<Sampler> SamplerInput = nullptr;
 };
 
-
-struct RenderPassInputDeclaration { 
-	std::string Name;
-	RenderPassResourceType Type;
-	uint32_t Group;
-	uint32_t Location;
+struct RenderPassInputDeclaration {
+  std::string Name;
+  RenderPassResourceType Type;
+  uint32_t Group;
+  uint32_t Location;
 };
 
 class BindingManager {
@@ -46,14 +46,15 @@ class BindingManager {
   void Set(const std::string& name, Ref<Texture> texture);
   void Set(const std::string& name, Ref<GPUBuffer> uniform);
   void Set(const std::string& name, Ref<Sampler> sampler);
-	void Init();
-	bool Validate();
+  void Init();
+  bool Validate();
   void Bake();
-	void InvalidateAndUpdate();
+  void InvalidateAndUpdate();
 
-	const RenderPassInputDeclaration* GetInputDeclaration(const std::string& name) const;
+  const RenderPassInputDeclaration* GetInputDeclaration(const std::string& name) const;
 
-	std::map<std::string, RenderPassInputDeclaration> InputDeclarations;
+  std::map<std::string, RenderPassInputDeclaration> InputDeclarations;
+
  private:
   const ResourceDeclaration& GetInfo(const std::string& name) const;
 

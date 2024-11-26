@@ -226,10 +226,11 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
       switch (entry.Type) {
         case UniformBindingType:
           groupEntry.buffer.type = WGPUBufferBindingType_Uniform;
-          groupEntry.buffer.hasDynamicOffset = false;
+
+          groupEntry.buffer.hasDynamicOffset = !entry.Name.empty() && entry.Name[0] == 'u' && entry.Name[1] == 'd';
           groupEntry.buffer.nextInChain = nullptr;
           groupEntry.buffer.minBindingSize = 0;
-          groupEntry.visibility = WGPUShaderStage_Fragment | WGPUShaderStage_Vertex;
+          groupEntry.visibility = WGPUShaderStage_Fragment | WGPUShaderStage_Vertex | WGPUShaderStage_Compute;
           break;
         case TextureBindingType:
           groupEntry.texture.sampleType = GetSampleType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].sampled_kind);
@@ -243,20 +244,20 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
           break;
         case SamplerBindingType:
           groupEntry.sampler.type = WGPUSamplerBindingType_Filtering;
-          groupEntry.visibility = WGPUShaderStage_Fragment;
+          groupEntry.visibility = WGPUShaderStage_Fragment | WGPUShaderStage_Compute;
           break;
         case CompareSamplerBindingType:
           groupEntry.sampler.type = WGPUSamplerBindingType_Comparison;
           groupEntry.visibility = WGPUShaderStage_Fragment;
           break;
         case StorageBindingType:
-					groupEntry.storageTexture.access = WGPUStorageTextureAccess_WriteOnly;
-					groupEntry.storageTexture.format = WGPUTextureFormat_RGBA8Unorm;
-					//groupEntry.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
+          groupEntry.storageTexture.access = WGPUStorageTextureAccess_WriteOnly;
+          groupEntry.storageTexture.format = WGPUTextureFormat_RGBA8Unorm;
+          // groupEntry.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
           groupEntry.storageTexture.viewDimension = GetDimensionType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].dim);
 
-					groupEntry.visibility = WGPUShaderStage_Compute;
-					break;
+          groupEntry.visibility = WGPUShaderStage_Compute;
+          break;
       }
 
       layoutEntries.push_back(groupEntry);
