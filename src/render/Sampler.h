@@ -28,6 +28,7 @@ struct SamplerProps {
   CompareMode Compare;
   float LodMinClamp = 0.0f;
   float LodMaxClamp = 10.0f;
+	float Ans = 1.0f;
 };
 
 class Sampler {

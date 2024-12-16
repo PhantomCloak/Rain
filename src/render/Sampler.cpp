@@ -51,7 +51,7 @@ Ref<Sampler> Sampler::Create(SamplerProps props) {
       samplerDesc.compare = WGPUCompareFunction_Less;
       break;
   }
-  samplerDesc.maxAnisotropy = 1;
+	samplerDesc.maxAnisotropy = props.Ans;
 
   auto nativeSampler = CreateRef<WGPUSampler>(wgpuDeviceCreateSampler(RenderContext::GetDevice(), &samplerDesc));
   auto sampler = CreateRef<Sampler>(nativeSampler);

@@ -669,6 +669,8 @@ void Render::PreFilter(TextureCube* input) {
       std::max((uint32_t)sizeof(PrefilterUniform),
                (uint32_t)Instance->m_Limits.minUniformBufferOffsetAlignment);
 
+  int mipCount = RenderUtils::CalculateMipCount(input->GetSpec().Width, input->GetSpec().Height);
+
   auto sampler = Sampler::Create({.Name = "S_Skybox",
                                   .WrapFormat = TextureWrappingFormat::ClampToEdges,
                                   .MagFilterFormat = FilterMode::Linear,
@@ -676,7 +678,8 @@ void Render::PreFilter(TextureCube* input) {
                                   .MipFilterFormat = FilterMode::Linear,
                                   .Compare = CompareMode::CompareUndefined,
                                   .LodMinClamp = 0.0f,
-                                  .LodMaxClamp = 1.0f});
+																	.LodMaxClamp = 1.0f,
+																	.Ans = 16.0f});
 
   // Prepare pipeline layout
   std::vector<WGPUBindGroupLayout> bindGroupLayouts;
@@ -698,7 +701,6 @@ void Render::PreFilter(TextureCube* input) {
   computePipelineDesc.layout = pipelineLayout;
   WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(device, &computePipelineDesc);
 
-  int mipCount = RenderUtils::CalculateMipCount(input->GetSpec().Width, input->GetSpec().Height);
 
   PrefilterUniform uniform = {
       .currentMipLevel = 0,
@@ -716,7 +718,9 @@ void Render::PreFilter(TextureCube* input) {
 
 	uniformBuffer->SetData(&uniform, 0, sizeof(uniform));
   for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
-    uniform.currentMipLevel = mipLevel - 1;
+    //uniform.currentMipLevel = mipLevel - 1;
+    uniform.currentMipLevel = mipLevel;
+		uniform.mipLevelCount = mipCount;
     uniformBuffer->SetData(&uniform, mipLevel * m_uniformStride, sizeof(uniform));
   }
 
@@ -770,7 +774,7 @@ void Render::PreFilter(TextureCube* input) {
 
     dynamicOffset = mipLevel * m_uniformStride;
     wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 1, &dynamicOffset);
-    wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupCountX, workgroupCountY, 6);  // Dispatch across all faces
+    wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupCountX, workgroupCountY, 1);  // Dispatch across all faces
     wgpuComputePassEncoderEnd(computePass);
 
     WGPUCommandBufferDescriptor cmdBufferDesc = {};
