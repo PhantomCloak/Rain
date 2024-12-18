@@ -33,9 +33,6 @@ class Render {
                          uint32_t instanceCount);
   static void SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WGPURenderPipeline pipeline);
 
-  static void AddShaderDependency(Ref<Shader> shader, Ref<Material> material);
-  static void AddShaderDependency(Ref<Shader> shader, Ref<RenderPipeline> material);
-
   std::unordered_map<UUID, Material> Materials;
 
   WGPUTextureView GetCurrentSwapChainTexture();
@@ -47,8 +44,8 @@ class Render {
   static void PreFilter(TextureCube* output);
   static bool saveTexture(const std::filesystem::path path, WGPUDevice device, Ref<Texture2D> texture, int mipLevel);
 
-  static void RegisterShaderDependency(Ref<Shader> shader, Ref<Material> material);
-  static void RegisterShaderDependency(Ref<Shader> shader, Ref<RenderPipeline> material);
+  static void RegisterShaderDependency(Ref<Shader> shader, Material* material);
+  static void RegisterShaderDependency(Ref<Shader> shader, RenderPipeline* material);
   static void ReloadShaders();
   static void ReloadShader(Ref<Shader> shader);
 

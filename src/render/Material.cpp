@@ -32,6 +32,8 @@ Material::Material(const std::string& name, Ref<Shader> shader)
 
   m_UBMaterial = GPUAllocator::GAlloc(name, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, size);
   m_BindManager->Set("uMaterial", m_UBMaterial);
+
+	Render::RegisterShaderDependency(shader, this);
 }
 
 Ref<Material> Material::CreateMaterial(const std::string& name, Ref<Shader> shader) {
@@ -72,6 +74,10 @@ void Material::Set(const std::string& name, int value) {
 
 void Material::Set(const std::string& name, bool value) {
   Set<int>(name, (int)value);
+}
+
+void Material::OnShaderReload() {
+
 }
 
 const ShaderTypeDecl& Material::FindShaderUniformDecl(const std::string& name) {

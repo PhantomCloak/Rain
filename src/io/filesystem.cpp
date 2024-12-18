@@ -1,7 +1,10 @@
 #include "filesystem.h"
+#include <atomic>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <sstream>
+#include <thread>
 
 std::vector<std::string> FileSys::GetFilesInDirectory(std::string path) {
   std::vector<std::string> fileList;
@@ -67,3 +70,31 @@ bool FileSys::IsFileExist(std::string path) {
   std::ifstream file(path);
   return file.good();
 };
+
+void FileSys::WatchFile(const std::string& path, std::function<void(std::string fileName)> callback) {
+    std::thread([path, callback]() {
+        if (!std::filesystem::exists(path)) {
+            std::cerr << "File does not exist: " << path << std::endl;
+            return;
+        }
+
+        auto last_modified_time = std::filesystem::last_write_time(path);
+        std::atomic<bool> running{true};
+
+        while (running) {
+            std::this_thread::sleep_for(std::chrono::seconds(1)); // Check every second
+
+            try {
+                auto current_modified_time = std::filesystem::last_write_time(path);
+                if (last_modified_time != current_modified_time) {
+                    callback(path);
+                    last_modified_time = current_modified_time; // Update last modified time
+                }
+            } catch (const std::filesystem::filesystem_error& e) {
+                std::cerr << "Error accessing file: " << e.what() << std::endl;
+                running = false; // Optionally stop on error
+            }
+        }
+
+    }).detach();
+}

@@ -21,3 +21,15 @@ Ref<Shader> Shader::CreateFromSring(const std::string& name, const std::string& 
 	shader->m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);
   return shader;
 }
+
+void Shader::Reload(std::string& content) {
+
+  WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
+  shaderCodeDesc.chain.next = nullptr;
+  shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
+  shaderCodeDesc.code = content.c_str();
+  WGPUShaderModuleDescriptor shaderDesc;
+	shaderDesc.label = "PPK";
+  shaderDesc.nextInChain = &shaderCodeDesc.chain;
+	m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);
+}

@@ -25,7 +25,7 @@ class Material {
 
   void Bake();
   const std::string& GetName() { return m_Name; }
-	//void OnShaderReload();
+	void OnShaderReload();
 
   const WGPUBindGroup& GetBinding(int index);
   static Ref<Material> CreateMaterial(const std::string& name, Ref<Shader> shader);

@@ -1,4 +1,5 @@
 #pragma once
+#define IMGUI_IMPL_WEBGPU_BACKEND_DAWN
 #include "Scene.h"
 #include "render/Pipeline.h"
 #include "render/PipelineCompute.h"

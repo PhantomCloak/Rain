@@ -1,4 +1,5 @@
 #include "Pipeline.h"
+#include "render/Render.h"
 #include "render/RenderContext.h"
 
 // In some environments (such as Emscriptten) underlying implementation details of the WebGPU API might require HEAP pointers
@@ -38,9 +39,14 @@ WGPUVertexFormat ConvertWGPUVertexFormat(ShaderDataType type) {
 RenderPipeline::RenderPipeline(const RenderPipelineSpec& props)
     : m_PipelineSpec(props) {
   Invalidate();
+	Render::RegisterShaderDependency(props.Shader, this);
 }
 
 void RenderPipeline::Invalidate() {
+  if (m_Pipeline != nullptr) {
+    wgpuRenderPipelineRelease(m_Pipeline);
+  }
+
   WGPURenderPipelineDescriptor* pipelineDesc = (WGPURenderPipelineDescriptor*)malloc(sizeof(WGPURenderPipelineDescriptor));
   pipelineDesc->label = m_PipelineSpec.DebugName.c_str();
 
@@ -96,13 +102,13 @@ void RenderPipeline::Invalidate() {
 
   for (const auto& [key, value] : m_PipelineSpec.Overrides) {
     WGPUConstantEntry constant;
-		constant.key = key.c_str();
+    constant.key = key.c_str();
     constant.value = static_cast<double>(value);
-		constant.nextInChain = nullptr;
-		constants->push_back(constant);
+    constant.nextInChain = nullptr;
+    constants->push_back(constant);
   }
-	pipelineDesc->vertex.constantCount = constants->size();
-	pipelineDesc->vertex.constants = constants->size() > 0 ? constants->data() : NULL;
+  pipelineDesc->vertex.constantCount = constants->size();
+  pipelineDesc->vertex.constants = constants->size() > 0 ? constants->data() : NULL;
 
   WGPUCullMode mode;
   if (m_PipelineSpec.CullingMode == PipelineCullingMode::BACK) {
@@ -142,7 +148,7 @@ void RenderPipeline::Invalidate() {
 
   fragmentState->targetCount = m_PipelineSpec.TargetFramebuffer->HasColorAttachment() ? 1 : 0;
 
-	if (m_PipelineSpec.TargetFramebuffer->HasDepthAttachment()) {
+  if (m_PipelineSpec.TargetFramebuffer->HasDepthAttachment()) {
     WGPUDepthStencilState* depthStencilState = (WGPUDepthStencilState*)malloc(sizeof(WGPUDepthStencilState));
     depthStencilState->format = WGPUTextureFormat_Depth24Plus;
     depthStencilState->stencilReadMask = 0xFFFFFFFF;
@@ -167,7 +173,7 @@ void RenderPipeline::Invalidate() {
 
     depthStencilState->stencilReadMask = 0xFFFFFFFF;
     depthStencilState->stencilWriteMask = 0xFFFFFFFF;
-		depthStencilState->nextInChain = nullptr;
+    depthStencilState->nextInChain = nullptr;
 
     pipelineDesc->depthStencil = depthStencilState;
   } else {
@@ -178,12 +184,11 @@ void RenderPipeline::Invalidate() {
   pipelineDesc->multisample.count = 1;
   pipelineDesc->multisample.mask = ~0u;
   pipelineDesc->multisample.alphaToCoverageEnabled = false;
-	pipelineDesc->multisample.nextInChain = nullptr;
+  pipelineDesc->multisample.nextInChain = nullptr;
 
-	if(m_PipelineSpec.DebugName == "RP_Composite" || m_PipelineSpec.DebugName == "RP_Skybox")
-	{
-		pipelineDesc->multisample.count = 4;
-	}
+  if (m_PipelineSpec.DebugName == "RP_Composite" || m_PipelineSpec.DebugName == "RP_Skybox") {
+    pipelineDesc->multisample.count = 4;
+  }
 
   auto device = RenderContext::GetDevice();
 

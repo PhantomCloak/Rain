@@ -1,14 +1,15 @@
 #include "SceneRenderer.h"
 #include "Application.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_wgpu.h"
 #include "debug/Profiler.h"
 #include "glm/gtx/rotate_vector.hpp"
+#include "imgui.h"
+#include "io/filesystem.h"
+#include "io/keyboard.h"
 #include "render/Framebuffer.h"
 #include "render/Render.h"
 #include "render/ResourceManager.h"
-
-#include "backends/imgui_impl_glfw.h"
-#include "backends/imgui_impl_wgpu.h"
-#include "imgui.h"
 
 SceneRenderer* SceneRenderer::instance;
 
@@ -27,6 +28,7 @@ void CalculateCascades(CascadeData* cascades, const SceneCamera& sceneCamera, gl
   viewMatrix[3] = glm::lerp(viewMatrix[3], origin, scaleToOrigin);
 
   auto viewProjection = sceneCamera.Projection * viewMatrix;
+	//Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder &encoder)
 
   const int SHADOW_MAP_CASCADE_COUNT = 4;
   float cascadeSplits[SHADOW_MAP_CASCADE_COUNT];
@@ -169,6 +171,7 @@ void SceneRenderer::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex
   drawCommand.Materials = materialTable;
   drawCommand.InstanceCount++;
 }
+std::vector<std::function<void(std::string fileName)>> callbacks;
 
 void SceneRenderer::Init() {
   m_TransformBuffer = GPUAllocator::GAlloc("scene_global_transform", WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex, 1024 * sizeof(TransformVertexData));
@@ -198,6 +201,15 @@ void SceneRenderer::Init() {
   auto skyboxShader = ShaderManager::LoadShader("SH_Skybox", RESOURCE_DIR "/shaders/skybox.wgsl");
   auto ppfxShader = ShaderManager::LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
 
+  // Add Watchers
+
+  FileSys::WatchFile(RESOURCE_DIR "/shaders/pbr.wgsl", [pbrShader](std::string filePath) {
+			std::string b = FileSys::ReadFile(filePath);
+			pbrShader->Reload(b);
+			Render::ReloadShader(pbrShader);
+			//callbacks()
+  });
+
   glm::vec2 screenSize = Application::Get()->GetWindowSize();
   uint32_t screenWidth = static_cast<uint32_t>(screenSize.x);
   uint32_t screenHeight = static_cast<uint32_t>(screenSize.y);
@@ -218,8 +230,8 @@ void SceneRenderer::Init() {
   compositeFboSpec.ColorFormat = TextureFormat::BRGBA8,
   compositeFboSpec.DepthFormat = TextureFormat::Depth24Plus;
   compositeFboSpec.DebugName = "FB_Composite";
-	compositeFboSpec.Multisample = 4;
-	compositeFboSpec.SwapChainTarget = true;
+  compositeFboSpec.Multisample = 4;
+  compositeFboSpec.SwapChainTarget = true;
   m_CompositeFramebuffer = Framebuffer::Create(compositeFboSpec);
 
   m_SceneUniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(SceneUniform));
@@ -233,7 +245,7 @@ void SceneRenderer::Init() {
   skyboxFboSpec.ColorFormat = TextureFormat::BRGBA8,
   skyboxFboSpec.DepthFormat = TextureFormat::Depth24Plus;
   skyboxFboSpec.DebugName = "FB_Skybox";
-	skyboxFboSpec.Multisample = 4;
+  skyboxFboSpec.Multisample = 4;
   skyboxFboSpec.ExistingColorAttachment = m_CompositeFramebuffer->GetAttachment(0);
 
   RenderPipelineSpec skyboxPipeSpec = {
@@ -362,11 +374,11 @@ void SceneRenderer::Init() {
 
   m_PpfxPipeline = RenderPipeline::Create(ppfxPipeSpec);
 
-  //RenderPassSpec ppfxPassSpec = {.Pipeline = m_PpfxPipeline, .DebugName = "PpfxPass"};
-  //m_PpfxPass = RenderPass::Create(ppfxPassSpec);
-  //m_PpfxPass->Set("renderTexture", m_LitPass->GetOutput(0));
-  //m_PpfxPass->Set("textureSampler", Render::GetDefaultSampler());
-  //m_PpfxPass->Bake();
+  // RenderPassSpec ppfxPassSpec = {.Pipeline = m_PpfxPipeline, .DebugName = "PpfxPass"};
+  // m_PpfxPass = RenderPass::Create(ppfxPassSpec);
+  // m_PpfxPass->Set("renderTexture", m_LitPass->GetOutput(0));
+  // m_PpfxPass->Set("textureSampler", Render::GetDefaultSampler());
+  // m_PpfxPass->Bake();
 
   // ComputePipelineSpec mipmapSpec = {
   //     .Shader = pbrShader,
@@ -400,12 +412,11 @@ void SceneRenderer::Init() {
   initInfo.Device = RenderContext::GetDevice();
   // initInfo.RenderTargetFormat = render->m_swapChainFormat;
   initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
-	initInfo.PipelineMultisampleState = {
-		.nextInChain = nullptr,
-		.count = 4,
-		.mask = ~0u,
-		.alphaToCoverageEnabled = false
-	};
+  initInfo.PipelineMultisampleState = {
+      .nextInChain = nullptr,
+      .count = 4,
+      .mask = ~0u,
+      .alphaToCoverageEnabled = false};
   initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
   ImGui_ImplWGPU_Init(&initInfo);
 }
@@ -470,7 +481,7 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
   if (m_NeedResize) {
     m_SkyboxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
     m_LitPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
-    //m_PpfxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
+    // m_PpfxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
     m_NeedResize = false;
   }
 
@@ -515,7 +526,7 @@ void SceneRenderer::FlushDrawList() {
     for (auto& [mk, dc] : m_DrawList) {
       Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
     }
-		ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
+    ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
     Render::EndRenderPass(m_LitPass, litPassEncoder);
   }
 

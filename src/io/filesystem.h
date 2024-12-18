@@ -16,4 +16,5 @@ class FileSys {
     static void OpenFileSaveDialog(std::string defaultName, std::string defaultPath, std::function<void(std::string filePath)>&& callback);
     static void OpenFileOSDefaults(std::string path);
 		static bool IsFileExist(std::string path);
+		static void WatchFile(const std::string& path, std::function<void(std::string fileName)> callback);
 };

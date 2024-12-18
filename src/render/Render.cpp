@@ -25,8 +25,8 @@ struct WGPURendererData {
 };
 
 struct ShaderDependencies {
-  std::vector<Ref<RenderPipeline>> Pipelines;
-  std::vector<Ref<Material>> Materials;
+  std::vector<RenderPipeline*> Pipelines;
+  std::vector<Material*> Materials;
 };
 
 static std::map<std::string, ShaderDependencies> s_ShaderDependencies;
@@ -678,8 +678,8 @@ void Render::PreFilter(TextureCube* input) {
                                   .MipFilterFormat = FilterMode::Linear,
                                   .Compare = CompareMode::CompareUndefined,
                                   .LodMinClamp = 0.0f,
-																	.LodMaxClamp = 1.0f,
-																	.Ans = 16.0f});
+                                  .LodMaxClamp = 1.0f,
+                                  .Ans = 16.0f});
 
   // Prepare pipeline layout
   std::vector<WGPUBindGroupLayout> bindGroupLayouts;
@@ -701,7 +701,6 @@ void Render::PreFilter(TextureCube* input) {
   computePipelineDesc.layout = pipelineLayout;
   WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(device, &computePipelineDesc);
 
-
   PrefilterUniform uniform = {
       .currentMipLevel = 0,
       .mipLevelCount = (uint32_t)mipCount,
@@ -716,11 +715,11 @@ void Render::PreFilter(TextureCube* input) {
   invocationCountX = input->GetSpec().Width;
   invocationCountY = input->GetSpec().Height;
 
-	uniformBuffer->SetData(&uniform, 0, sizeof(uniform));
+  uniformBuffer->SetData(&uniform, 0, sizeof(uniform));
   for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
-    //uniform.currentMipLevel = mipLevel - 1;
+    // uniform.currentMipLevel = mipLevel - 1;
     uniform.currentMipLevel = mipLevel;
-		uniform.mipLevelCount = mipCount;
+    uniform.mipLevelCount = mipCount;
     uniformBuffer->SetData(&uniform, mipLevel * m_uniformStride, sizeof(uniform));
   }
 
@@ -854,14 +853,10 @@ WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandE
   if (renderFrameBuffer->HasColorAttachment()) {
     if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget) {
       Instance->m_SwapTexture = Render::Instance->GetCurrentSwapChainTexture();
-      // asume MSAA
-      // colorAttachment.resolveTarget = Instance->m_SwapTexture;
-      colorAttachment.view = renderFrameBuffer->GetAttachment(0)->GetNativeView();
       colorAttachment.resolveTarget = Instance->m_SwapTexture;
-    } else {
-      colorAttachment.view = renderFrameBuffer->GetAttachment(0)->GetNativeView();
     }
 
+    colorAttachment.view = renderFrameBuffer->GetAttachment(0)->GetNativeView();
     passDesc.colorAttachmentCount = 1;
     passDesc.colorAttachments = &colorAttachment;
   }
@@ -965,18 +960,18 @@ void Render::SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WG
   wgpuRenderPassEncoderDrawIndexed(renderCommandBuffer, 6, 1, 0, 0, 0);
 }
 
-void Render::AddShaderDependency(Ref<Shader> shader, Ref<Material> material) {
+void Render::RegisterShaderDependency(Ref<Shader> shader, Material* material) {
   s_ShaderDependencies[shader->GetName()].Materials.push_back(material);
 }
 
-void Render::RegisterShaderDependency(Ref<Shader> shader, Ref<RenderPipeline> material) {
+void Render::RegisterShaderDependency(Ref<Shader> shader, RenderPipeline* material) {
   s_ShaderDependencies[shader->GetName()].Pipelines.push_back(material);
 }
 
 void Render::ReloadShader(Ref<Shader> shader) {
   auto dependencies = s_ShaderDependencies[shader->GetName()];
   for (auto& material : dependencies.Materials) {
-    // material->OnShaderReload();
+		material->OnShaderReload();
   }
 
   for (auto& pipeline : dependencies.Pipelines) {

@@ -55,6 +55,8 @@ class Shader {
   const std::string& GetName() const { return m_Name; }
   const std::string& GetSource() const { return m_Content; }
 
+	void Reload(std::string& content);
+
   static Ref<Shader> Create(const std::string& name, const std::string& filePath);
   static Ref<Shader> CreateFromSring(const std::string& name, const std::string& content);
   static WGPUBindGroupLayout GetLayout(uint32_t index);
@@ -72,5 +74,6 @@ class Shader {
   ShaderReflectionInfo m_ReflectionInfo;
   std::string m_Name;
   std::string m_Content;
+  std::string m_Path;
   WGPUShaderModule m_ShaderModule;
 };
