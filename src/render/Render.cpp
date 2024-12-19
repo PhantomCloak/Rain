@@ -100,7 +100,7 @@ bool Render::Init(void* window) {
   WGPURequiredLimits* requiredLimits = GetRequiredLimits(m_adapter);
   WGPUDeviceDescriptor* deviceDesc = ZERO_ALLOC(WGPUDeviceDescriptor);
 
-  deviceDesc->label = "MyDevice";
+  // deviceDesc->label = "MyDevice";
 #if __EMSCRIPTEN__
   // deviceDesc.requiredFeaturesCount = 0;
   deviceDesc->requiredFeatureCount = 0;
@@ -112,7 +112,7 @@ bool Render::Init(void* window) {
 #endif
 
   deviceDesc->requiredLimits = requiredLimits;
-  deviceDesc->defaultQueue.label = "defq";
+  // deviceDesc->defaultQueue.label = "defq";
   deviceDesc->nextInChain = nullptr;
 
   std::cout << "req limit" << requiredLimits << std::endl;
@@ -127,34 +127,29 @@ bool Render::Init(void* window) {
   int width, height;
   glfwGetFramebufferSize((GLFWwindow*)window, &width, &height);
 
-  WGPUTextureFormat swapChainFormat;
 #if __EMSCRIPTEN__
-  swapChainFormat = wgpuSurfaceGetPreferredFormat(m_surface, m_adapter);
+  WGPUTextureFormat preferredFormat = wgpuSurfaceGetPreferredFormat(m_surface, m_adapter);
 #else
-  swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
+  WGPUTextureFormat preferredFormat = WGPUTextureFormat_BGRA8Unorm;
 #endif
 
-  m_swapChainFormat = swapChainFormat;
-  m_swapChainDesc = {};
+  m_swapChainFormat = preferredFormat;
 
-  m_swapChainDesc.width = (uint32_t)width;
-  m_swapChainDesc.height = (uint32_t)height;
-  m_swapChainDesc.usage = WGPUTextureUsage_RenderAttachment;
-  m_swapChainDesc.format = swapChainFormat;
-  m_swapChainDesc.presentMode = WGPUPresentMode_Fifo;
+  // Define the surface configuration
+  WGPUSurfaceConfiguration surfaceConfig = {};
+  surfaceConfig.usage = WGPUTextureUsage_RenderAttachment;
+  surfaceConfig.format = m_swapChainFormat;
+  surfaceConfig.width = static_cast<uint32_t>(width);
+  surfaceConfig.height = static_cast<uint32_t>(height);
+  surfaceConfig.presentMode = WGPUPresentMode_Fifo;
+  wgpuSurfaceConfigure(m_surface, &surfaceConfig);
 
-  if (m_swapChain != NULL) {
-    wgpuSwapChainRelease(m_swapChain);
-  }
-
-  m_swapChain = BuildSwapChain(m_swapChainDesc, m_device, m_surface);
-
-  wgpuDeviceSetUncapturedErrorCallback(
-      m_device, [](WGPUErrorType errorType, const char* message, void* userdata) {
-        fprintf(stderr, "Dawn error: %s\n", message);
-        exit(0);
-      },
-      nullptr);
+  // wgpuDeviceSetUncapturedErrorCallback(
+  //     m_device, [](WGPUErrorType errorType, const char* message, void* userdata) {
+  //       fprintf(stderr, "Dawn error: %s\n", message);
+  //       exit(0);
+  //     },
+  //     nullptr);
 
   RendererPostInit();
   return true;
@@ -247,54 +242,60 @@ struct UserData {
   bool requestEnded = false;
 };
 
-void onAdapterRequestEnded(WGPURequestAdapterStatus status, WGPUAdapter adapter, const char* message, void* pUserData) {
-  auto userData = (UserData*)pUserData;
+struct AdapterRequestData {
+  WGPUAdapter adapter = nullptr;
+  bool requestEnded = false;
+};
 
-  RN_CORE_ASSERT(status == WGPURequestAdapterStatus_Success, "An error occurred while acquiring WebGPU adapter");
+void onAdapterRequestEnded(
+    WGPURequestAdapterStatus status,
+    WGPUAdapter adapter,
+    struct WGPUStringView message,
+    void* userdata) {
+  auto* requestData = static_cast<AdapterRequestData*>(userdata);
 
-  userData->adapter = adapter;
-  userData->requestEnded = true;
+  if (status == WGPURequestAdapterStatus_Success) {
+    requestData->adapter = adapter;
+  } else {
+    // Convert WGPUStringView to a standard string for logging
+    std::string errorMessage(message.data, message.length);
+    std::cerr << "Failed to request adapter: " << errorMessage << std::endl;
+  }
 
-  RN_LOG("Adapter Status: {}", (ulong)status);
-  RN_LOG("Adapter: {}", (ulong)adapter);
-  std::cout << "USER DATA: " << userData << std::endl;
-  std::cout << "USER DATA OBJ ADAPTER: " << userData->adapter << std::endl;
-  std::cout << "USER DATA ENDED: " << userData->requestEnded << std::endl;
-  std::cout << "ADAPTER: " << adapter << std::endl;
-  std::cout << "MSG: " << message << std::endl;
-  std::cout << "STATUS: " << status << std::endl;
-  WGPUAdapterProperties* properties = ZERO_ALLOC(WGPUAdapterProperties);
-  wgpuAdapterGetProperties(adapter, properties);
-
-#if !__EMSCRIPTEN__
-  RN_LOG("Adapter Information");
-  RN_LOG(" - Name: {}", properties->name);
-  RN_LOG(" - Vendor ID: {}", properties->vendorID);
-  RN_LOG(" - Device ID: {}", properties->deviceID);
-  RN_LOG(" - Backend: {}", getBackendTypeString(properties->backendType));
-  RN_LOG(" - Adapter Type: {}", getAdapterTypeString(properties->adapterType));
-#endif
+  requestData->requestEnded = true;
 }
 
-WGPUAdapter Render::RequestAdapter(WGPUInstance instance, WGPURequestAdapterOptions const* options) {
-  UserData* userData = (UserData*)malloc(sizeof(UserData));
+WGPUAdapter Render::RequestAdapter(WGPUInstance instance, const WGPURequestAdapterOptions* options) {
+    AdapterRequestData requestData{};
 
-  // std::cout << "INSTANCE: " << instance << std::endl;
-  wgpuInstanceRequestAdapter(instance, options, onAdapterRequestEnded, userData);
+    // Request the adapter asynchronously
+    wgpuInstanceRequestAdapter(instance, options, onAdapterRequestEnded, &requestData);
 
+    // Wait for the callback to complete
 #if __EMSCRIPTEN__
-  while (!userData->requestEnded) {
-    emscripten_sleep(300);
-  }
-  emscripten_sleep(1000);
-#endif
-  std::cout << "aa" << std::endl;
-#if __EMSCRIPTEN__
-  emscripten_sleep(200);
+    while (!requestData.requestEnded) {
+        emscripten_sleep(100);  // Sleep until the adapter request ends
+    }
+#else
+    while (!requestData.requestEnded) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));  // Sleep for non-Emscripten platforms
+    }
 #endif
 
-  assert(userData->requestEnded);
-  return userData->adapter;
+    // Verify that the adapter was acquired
+    assert(requestData.adapter != nullptr && "Failed to acquire WebGPU adapter");
+
+    // Retrieve adapter properties
+    //WGPUAdapterPropertiesVk properties = {};
+    //properties.nextInChain = nullptr; // Ensure compatibility with newer Dawn APIs
+
+    // New API call to get properties
+    //wgpuAdapterGetProperties(requestData.adapter, &properties);
+
+    //std::cout << "Adapter acquired: " << properties.name << std::endl;
+    //std::cout << "Backend type: " << properties.backendType << std::endl;
+
+    return requestData.adapter;
 }
 
 WGPUDevice Render::RequestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor) {
@@ -305,13 +306,13 @@ WGPUDevice Render::RequestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const
   UserData* userData = (UserData*)malloc(sizeof(UserData));
 
   auto onDeviceRequestEnded = [](WGPURequestDeviceStatus status,
-                                 WGPUDevice device, char const* message,
+                                 WGPUDevice device, WGPUStringView message,
                                  void* pUserData) {
     RN_LOG("Devicee callback received");
-    std::cout << "device: " << device << std::endl;
-    std::cout << "msg: " << message << std::endl;
-    std::cout << "status: " << status << std::endl;
-    std::cout << "ud: " << pUserData << std::endl;
+    //std::cout << "device: " << device << std::endl;
+		//std::cout << "msg: " << message.data << std::endl;
+    //std::cout << "status: " << status << std::endl;
+    //std::cout << "ud: " << pUserData << std::endl;
 
     auto userData = (UserData*)pUserData;
 
@@ -374,13 +375,13 @@ WGPURequiredLimits* Render::GetRequiredLimits(WGPUAdapter adapter) {
   return requiredLimits;
 }
 
-WGPUSwapChain Render::BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface) {
-  if (m_swapChain != NULL) {
-    wgpuSwapChainRelease(m_swapChain);
-  }
-
-  return wgpuDeviceCreateSwapChain(m_device, surface, &m_swapChainDesc);
-}
+//WGPUSwapChain Render::BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface) {
+//  if (m_swapChain != NULL) {
+//    wgpuSwapChainRelease(m_swapChain);
+//  }
+//
+//  return wgpuDeviceCreateSwapChain(m_device, surface, &m_swapChainDesc);
+//}
 
 Ref<Texture2D> Render::GetWhiteTexture() {
   static auto whiteTexture = Rain::ResourceManager::GetTexture("T_Default");
@@ -493,7 +494,7 @@ void Render::ComputeMip(Texture2D* input) {
   WGPUComputePipelineDescriptor computePipelineDesc = {};
   computePipelineDesc.compute.constantCount = 0;
   computePipelineDesc.compute.constants = nullptr;
-  computePipelineDesc.compute.entryPoint = "computeMipMap";
+  //computePipelineDesc.compute.entryPoint = "computeMipMap";
   computePipelineDesc.compute.module = computeShader->GetNativeShaderModule();
   computePipelineDesc.layout = pipelineLayout;
   WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(device, &computePipelineDesc);
@@ -583,7 +584,7 @@ void Render::ComputeMipCube(TextureCube* input) {
   WGPUComputePipelineDescriptor computePipelineDesc = {};
   computePipelineDesc.compute.constantCount = 0;
   computePipelineDesc.compute.constants = nullptr;
-  computePipelineDesc.compute.entryPoint = "computeMipMap";
+  //computePipelineDesc.compute.entryPoint = "computeMipMap";
   computePipelineDesc.compute.module = computeShader->GetNativeShaderModule();
   computePipelineDesc.layout = pipelineLayout;
   WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(device, &computePipelineDesc);
@@ -696,7 +697,7 @@ void Render::PreFilter(TextureCube* input) {
   WGPUComputePipelineDescriptor computePipelineDesc = {};
   computePipelineDesc.compute.constantCount = 0;
   computePipelineDesc.compute.constants = nullptr;
-  computePipelineDesc.compute.entryPoint = "prefilterCubeMap";
+  //computePipelineDesc.compute.entryPoint = "prefilterCubeMap";
   computePipelineDesc.compute.module = computeShader->GetNativeShaderModule();
   computePipelineDesc.layout = pipelineLayout;
   WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(device, &computePipelineDesc);
@@ -835,7 +836,7 @@ WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandE
   ZERO_INIT(passDesc);
 
   passDesc.nextInChain = nullptr;
-  passDesc.label = pass->GetProps().DebugName.c_str();
+  //passDesc.label = pass->GetProps().DebugName.c_str();
 
   WGPURenderPassColorAttachment colorAttachment{};
   ZERO_INIT(colorAttachment);
@@ -971,7 +972,7 @@ void Render::RegisterShaderDependency(Ref<Shader> shader, RenderPipeline* materi
 void Render::ReloadShader(Ref<Shader> shader) {
   auto dependencies = s_ShaderDependencies[shader->GetName()];
   for (auto& material : dependencies.Materials) {
-		material->OnShaderReload();
+    material->OnShaderReload();
   }
 
   for (auto& pipeline : dependencies.Pipelines) {
@@ -980,6 +981,6 @@ void Render::ReloadShader(Ref<Shader> shader) {
 }
 
 WGPUTextureView Render::GetCurrentSwapChainTexture() {
-  WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(m_swapChain);
-  return nextTexture;
+  //WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(m_swapChain);
+  //return nextTexture;
 }

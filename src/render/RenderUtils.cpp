@@ -75,7 +75,7 @@ WGPUBindGroupLayout LayoutUtils::CreateBindGroup(std::string label, WGPUDevice d
   // TODO(memory): We need to introduce custom allocator in the future
   // or alternatively use callbacks to handle release
   WGPUBindGroupLayoutDescriptor* descriptor = new WGPUBindGroupLayoutDescriptor{};
-  descriptor->label = label.c_str();
+  //descriptor->label = label.c_str();
   descriptor->entries = entries.data();
   descriptor->entryCount = entries.size();
 

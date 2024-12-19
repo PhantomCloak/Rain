@@ -75,7 +75,7 @@ void Texture2D::Invalidate() {
   ZERO_INIT(textureDesc);
 
   textureDesc.nextInChain = nullptr;
-  textureDesc.label = m_TextureProps.DebugName.c_str();
+  //textureDesc.label = m_TextureProps.DebugName.c_str();
 
   if (m_TextureProps.GenerateMips) {
     textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_StorageBinding | WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst;
@@ -185,7 +185,7 @@ void TextureCube::Invalidate() {
 	WGPUExtent3D cubemapSize = {m_TextureProps.Width, m_TextureProps.Height, 6};
 
   WGPUTextureDescriptor textureDesc;
-  textureDesc.label = "MMB";
+  //textureDesc.label = "MMB";
   textureDesc.dimension = WGPUTextureDimension_2D;
   textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
   // textureDesc.format = RenderTypeUtils::ToRenderType(m_TextureProps.Format);
@@ -206,7 +206,7 @@ void TextureCube::Invalidate() {
   }
 
   WGPUTextureViewDescriptor textureViewDesc;
-  textureViewDesc.label = "MMB_View";
+  //textureViewDesc.label = "MMB_View";
   textureViewDesc.aspect = WGPUTextureAspect_All;
   textureViewDesc.baseArrayLayer = 0;
   textureViewDesc.arrayLayerCount = 6;

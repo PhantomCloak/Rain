@@ -6,7 +6,7 @@ Ref<Sampler> Sampler::Create(SamplerProps props) {
   WGPUSamplerDescriptor samplerDesc = {};
 
   if (!props.Name.empty()) {
-    samplerDesc.label = props.Name.c_str();
+    //samplerDesc.label = props.Name.c_str();
   }
 
 	samplerDesc.addressModeU = RenderTypeUtils::ToRenderType(props.WrapFormat);

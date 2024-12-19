@@ -55,11 +55,11 @@ class Entity {
   bool RemoveChild(Entity child) {
     UUID childId = child.GetUUID();
     std::vector<UUID>& children = Children();
-    auto it = std::find(children.begin(), children.end(), childId);
-    if (it != children.end()) {
-      children.erase(it);
-      return true;
-    }
+    //auto it = std::find(children.begin(), children.end(), childId);
+    //if (it != children.end()) {
+    //  children.erase(it);
+    //  return true;
+    //}
 
     return false;
   }
@@ -80,9 +80,9 @@ class Entity {
     if (parent) {
       auto& parentChildren = parent.Children();
       UUID uuid = GetUUID();
-      if (std::find(parentChildren.begin(), parentChildren.end(), uuid) == parentChildren.end()) {
-        parentChildren.emplace_back(GetUUID());
-      }
+      //if (std::find(parentChildren.begin(), parentChildren.end(), uuid) == parentChildren.end()) {
+      //  parentChildren.emplace_back(GetUUID());
+      //}
     }
   }
 

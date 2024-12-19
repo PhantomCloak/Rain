@@ -9,8 +9,8 @@ class GPUBuffer;
 class GPUAllocator {
  public:
   static void Init();
-  static Ref<GPUBuffer> GAlloc(std::string label, WGPUBufferUsageFlags usage, int size);
-  static Ref<GPUBuffer> GAlloc(WGPUBufferUsageFlags usage, int size);
+  static Ref<GPUBuffer> GAlloc(std::string label, WGPUBufferUsage usage, int size);
+  static Ref<GPUBuffer> GAlloc(WGPUBufferUsage usage, int size);
 
   static int allocatedBufferCount;
   static int allocatedBufferTotalSize;

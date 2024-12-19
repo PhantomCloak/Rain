@@ -13,7 +13,7 @@ set(DRACO_VERBOSE TRUE)
 
 
 set(ASSIMP_BUILD_GLTF_IMPORTER TRUE)
-set(ASSIMP_BUILD_GLTF2_IMPORTER TRUE)
+set(SSIMP_BUILD_GLTF2_IMPORTER TRUE)
 set(ASSIMP_BUILD_SMD_IMPORTER TRUE)
 set(ASSIMP_BUILD_SIB_IMPORTER TRUE)
 set(ASSIMP_BUILD_OBJ_IMPORTER TRUE)
@@ -58,7 +58,7 @@ if(EMSCRIPTEN)
 	#string(APPEND CMAKE_CXX_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
 	#string(APPEND CMAKE_EXE_LINKER_FLAGS " ${EMSCRIPTEN_PTHREADS_LINKER_FLAGS}")
 else()
-	add_subdirectory(vendor/PhysX/physx/compiler/public)
+	#add_subdirectory(vendor/PhysX/physx/compiler/public)
 	add_library(TracyClient STATIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/TracyClient.cpp)
 	target_include_directories(TracyClient PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/tracy)
 	target_compile_definitions(TracyClient PUBLIC TRACY_ENABLE=1)
@@ -85,6 +85,7 @@ endif()
 #
 #target_include_directories(imgui PUBLIC $<INSTALL_INTERFACE:${IMGUI_DIR}> $<BUILD_INTERFACE:${IMGUI_DIR}>)
 #target_link_libraries(imgui PRIVATE webgpu_dawn webgpu_cpp webgpu_glfw glfw)
+#target_link_libraries(imgui PRIVATE webgpu_dawn webgpu_cpp webgpu_glfw glfw)
 
 # Tracy
 
@@ -102,7 +103,7 @@ else()
   dawn_headers
   dawn_native
   dawn_platform
-  dawn_utils
+  #dawn_utils
   dawn_wire
   dawncpp
   dawncpp_headers
@@ -112,11 +113,11 @@ else()
 	flecs
 	TracyClient
 	glfw
-	assimp
-	PhysX
-	PhysXCooking 
-	PhysXCommon
-	PhysXExtensions)
+	assimp)
+	#PhysX
+	#PhysXCooking 
+	#PhysXCommon
+	#3PhysXExtensions)
 endif()
 
 

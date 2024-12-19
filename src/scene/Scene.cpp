@@ -5,7 +5,7 @@
 #include "SceneRenderer.h"
 #include "debug/Profiler.h"
 #include "glm/gtc/type_ptr.hpp"
-#include "imgui.h"
+//#include "imgui.h"
 #include "io/cursor.h"
 #include "io/keyboard.h"
 #include "render/ResourceManager.h"
@@ -122,37 +122,37 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
     SceneLightInfo.LightPos = glm::vec3(0.0f);
   });
 
-  ImGui::Begin("Scene Settings");
+  //ImGui::Begin("Scene Settings");
 
-  glm::vec3 rotation = glm::vec3(rotX, rotY, rotZ);
-  if (ImGui::InputFloat3("Light Direction", glm::value_ptr(rotation), "%.3f")) {
-    rotX = rotation.x;
-    rotY = rotation.y;
-    rotZ = rotation.z;
+  //glm::vec3 rotation = glm::vec3(rotX, rotY, rotZ);
+  //if (ImGui::InputFloat3("Light Direction", glm::value_ptr(rotation), "%.3f")) {
+  //  rotX = rotation.x;
+  //  rotY = rotation.y;
+  //  rotZ = rotation.z;
 
-    auto ent2 = TryGetEntityWithUUID(entityIdDir);
-    auto transform2 = ent2.GetComponent<TransformComponent>();
-    transform2->SetRotationEuler(glm::radians(rotation));
-  }
+  //  auto ent2 = TryGetEntityWithUUID(entityIdDir);
+  //  auto transform2 = ent2.GetComponent<TransformComponent>();
+  //  transform2->SetRotationEuler(glm::radians(rotation));
+  //}
 
-  static float metallic = 0.0, roughness = 0.0, ao = 0.0;
+  //static float metallic = 0.0, roughness = 0.0, ao = 0.0;
 
-  if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
-    auto mat = cityModel->Materials->GetMaterial(0);
-    mat->Set("Metallic", metallic);
-  }
+  //if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
+  //  auto mat = cityModel->Materials->GetMaterial(0);
+  //  mat->Set("Metallic", metallic);
+  //}
 
-  if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
-    auto mat = cityModel->Materials->GetMaterial(0);
-    mat->Set("Roughness", roughness);
-  }
+  //if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
+  //  auto mat = cityModel->Materials->GetMaterial(0);
+  //  mat->Set("Roughness", roughness);
+  //}
 
-  if (ImGui::SliderFloat("Ao", &ao, 0.0f, 1.0f)) {
-    auto mat = cityModel->Materials->GetMaterial(0);
-    mat->Set("Ao", ao);
-  }
+  //if (ImGui::SliderFloat("Ao", &ao, 0.0f, 1.0f)) {
+  //  auto mat = cityModel->Materials->GetMaterial(0);
+  //  mat->Set("Ao", ao);
+  //}
 
-  ImGui::End();
+  //ImGui::End();
 
   renderer->EndScene();
 }

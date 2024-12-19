@@ -33,7 +33,7 @@ WGPUVertexFormat ConvertWGPUVertexFormat(ShaderDataType type) {
       break;
   }
   RN_CORE_ASSERT("Undefined Vertex Format");
-  return WGPUVertexFormat_Undefined;
+  return WGPUVertexFormat_Float32; // TODO: BUg
 }
 
 RenderPipeline::RenderPipeline(const RenderPipelineSpec& props)
@@ -48,7 +48,7 @@ void RenderPipeline::Invalidate() {
   }
 
   WGPURenderPipelineDescriptor* pipelineDesc = (WGPURenderPipelineDescriptor*)malloc(sizeof(WGPURenderPipelineDescriptor));
-  pipelineDesc->label = m_PipelineSpec.DebugName.c_str();
+  //pipelineDesc->label = m_PipelineSpec.DebugName.c_str();
 
   std::vector<WGPUVertexAttribute> vertexAttributes;
   std::vector<WGPUVertexAttribute> instanceAttributes;
@@ -91,7 +91,12 @@ void RenderPipeline::Invalidate() {
   pipelineDesc->vertex.bufferCount = vertexLayouts.size();
   pipelineDesc->vertex.buffers = vertexLayouts.data();
   pipelineDesc->vertex.module = m_PipelineSpec.Shader->GetNativeShaderModule();
-  pipelineDesc->vertex.entryPoint = "vs_main";  // let be constant for now
+	std::string m = "vs_main";
+	WGPUStringView view = {
+		.data = m.data(),
+		.length = m.length()
+	};
+  pipelineDesc->vertex.entryPoint = view;
   pipelineDesc->vertex.nextInChain = nullptr;
   pipelineDesc->primitive.topology = WGPUPrimitiveTopology_TriangleList;
   pipelineDesc->primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
@@ -102,7 +107,7 @@ void RenderPipeline::Invalidate() {
 
   for (const auto& [key, value] : m_PipelineSpec.Overrides) {
     WGPUConstantEntry constant;
-    constant.key = key.c_str();
+    //constant.key = key.c_str();
     constant.value = static_cast<double>(value);
     constant.nextInChain = nullptr;
     constants->push_back(constant);
@@ -123,7 +128,12 @@ void RenderPipeline::Invalidate() {
 
   WGPUFragmentState* fragmentState = (WGPUFragmentState*)malloc(sizeof(WGPUFragmentState));
   fragmentState->module = m_PipelineSpec.Shader->GetNativeShaderModule();
-  fragmentState->entryPoint = "fs_main";
+	std::string m2 = "fs_main";
+	WGPUStringView view2 = {
+		.data = m.data(),
+		.length = m.length()
+	};
+  fragmentState->entryPoint = view2;
   fragmentState->constantCount = 0;
   fragmentState->constants = NULL;
   fragmentState->nextInChain = nullptr;
@@ -169,7 +179,7 @@ void RenderPipeline::Invalidate() {
     depthStencilState->stencilBack.passOp = WGPUStencilOperation_Keep;
 
     depthStencilState->depthCompare = WGPUCompareFunction_Less;
-    depthStencilState->depthWriteEnabled = true;
+    //depthStencilState->depthWriteEnabled = true;
 
     depthStencilState->stencilReadMask = 0xFFFFFFFF;
     depthStencilState->stencilWriteMask = 0xFFFFFFFF;

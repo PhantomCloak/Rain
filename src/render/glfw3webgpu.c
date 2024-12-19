@@ -110,7 +110,7 @@ WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window) {
                 .chain =
                     (WGPUChainedStruct){
                         .next = NULL,
-                        .sType = WGPUSType_SurfaceDescriptorFromXlibWindow,
+                        .sType = WGPUSType_SurfaceDescriptorFromWindowsCoreWindow,
                 },
                 .display = x11_display,
                 .window = x11_window,

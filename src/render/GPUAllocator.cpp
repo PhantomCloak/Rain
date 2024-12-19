@@ -12,11 +12,11 @@ void GPUAllocator::Init() {
   m_Context = Render::Instance->GetRenderContext();
 }
 
-Ref<GPUBuffer> GPUAllocator::GAlloc(WGPUBufferUsageFlags usage, int size) {
+Ref<GPUBuffer> GPUAllocator::GAlloc(WGPUBufferUsage usage, int size) {
   return GAlloc("", usage, size);
 }
 
-Ref<GPUBuffer> GPUAllocator::GAlloc(std::string label, WGPUBufferUsageFlags usage, int size) {
+Ref<GPUBuffer> GPUAllocator::GAlloc(std::string label, WGPUBufferUsage usage, int size) {
 	// TODO check context
   WGPUBufferDescriptor bufferDesc = {};
   bufferDesc.size = size;
@@ -24,7 +24,7 @@ Ref<GPUBuffer> GPUAllocator::GAlloc(std::string label, WGPUBufferUsageFlags usag
   bufferDesc.mappedAtCreation = false;
 
   if (!label.empty()) {
-    bufferDesc.label = label.c_str();
+    //bufferDesc.label = label.c_str();
   }
 
   allocatedBufferCount++;

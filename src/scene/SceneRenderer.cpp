@@ -1,10 +1,10 @@
 #include "SceneRenderer.h"
 #include "Application.h"
-#include "backends/imgui_impl_glfw.h"
-#include "backends/imgui_impl_wgpu.h"
+//#include "backends/imgui_impl_glfw.h"
+//#include "backends/imgui_impl_wgpu.h"
 #include "debug/Profiler.h"
 #include "glm/gtx/rotate_vector.hpp"
-#include "imgui.h"
+//#include "imgui.h"
 #include "io/filesystem.h"
 #include "io/keyboard.h"
 #include "render/Framebuffer.h"
@@ -403,22 +403,22 @@ void SceneRenderer::Init() {
   // Render::ComputeMip(texture);
   // Render::saveTexture(RESOURCE_DIR "matrix2.png", RenderContext::GetDevice(), texture, 3);
 
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  auto& io = ImGui::GetIO();
-  ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
+  //IMGUI_CHECKVERSION();
+  //ImGui::CreateContext();
+  //auto& io = ImGui::GetIO();
+  //ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
 
-  ImGui_ImplWGPU_InitInfo initInfo;
-  initInfo.Device = RenderContext::GetDevice();
-  // initInfo.RenderTargetFormat = render->m_swapChainFormat;
-  initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
-  initInfo.PipelineMultisampleState = {
-      .nextInChain = nullptr,
-      .count = 4,
-      .mask = ~0u,
-      .alphaToCoverageEnabled = false};
-  initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
-  ImGui_ImplWGPU_Init(&initInfo);
+  //ImGui_ImplWGPU_InitInfo initInfo;
+  //initInfo.Device = RenderContext::GetDevice();
+  //// initInfo.RenderTargetFormat = render->m_swapChainFormat;
+  //initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
+  //initInfo.PipelineMultisampleState = {
+  //    .nextInChain = nullptr,
+  //    .count = 4,
+  //    .mask = ~0u,
+  //    .alphaToCoverageEnabled = false};
+  //initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
+  //ImGui_ImplWGPU_Init(&initInfo);
 }
 
 void SceneRenderer::PreRender() {
@@ -485,9 +485,9 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
     m_NeedResize = false;
   }
 
-  ImGui_ImplWGPU_NewFrame();
-  ImGui_ImplGlfw_NewFrame();
-  ImGui::NewFrame();
+  //ImGui_ImplWGPU_NewFrame();
+  //ImGui_ImplGlfw_NewFrame();
+  //ImGui::NewFrame();
 }
 
 void SceneRenderer::FlushDrawList() {
@@ -495,7 +495,7 @@ void SceneRenderer::FlushDrawList() {
   WGPUCommandEncoderDescriptor commandEncoderDesc = {};
   ZERO_INIT(commandEncoderDesc);
 
-  commandEncoderDesc.label = "Default";
+  //commandEncoderDesc.label = "Default";
   commandEncoderDesc.nextInChain = nullptr;
   Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
 
@@ -526,7 +526,7 @@ void SceneRenderer::FlushDrawList() {
     for (auto& [mk, dc] : m_DrawList) {
       Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
     }
-    ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
+    //ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
     Render::EndRenderPass(m_LitPass, litPassEncoder);
   }
 
@@ -548,7 +548,7 @@ void SceneRenderer::FlushDrawList() {
     wgpuCommandEncoderRelease(commandEncoder);
 
 #ifndef __EMSCRIPTEN__
-    wgpuSwapChainPresent(Render::Instance->m_swapChain);
+    //wgpuSwapChainPresent(Render::Instance->m_swapChain);
     wgpuDeviceTick(renderContext->GetDevice());
 #endif
   }
@@ -558,8 +558,8 @@ void SceneRenderer::FlushDrawList() {
 }
 
 void SceneRenderer::EndScene() {
-  ImGui::EndFrame();
-  ImGui::Render();
+  //ImGui::EndFrame();
+  //ImGui::Render();
   PreRender();
   FlushDrawList();
 }

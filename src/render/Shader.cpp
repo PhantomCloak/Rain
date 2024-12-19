@@ -10,26 +10,26 @@ Ref<Shader> Shader::Create(const std::string& name, const std::string& filePath)
 Ref<Shader> Shader::CreateFromSring(const std::string& name, const std::string& content) {
   Ref<Shader> shader = CreateRef<Shader>(name, content);
 
-  WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
-  shaderCodeDesc.chain.next = nullptr;
-  shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-  shaderCodeDesc.code = content.c_str();
-  WGPUShaderModuleDescriptor shaderDesc;
-	shaderDesc.label = name.c_str();
-  shaderDesc.nextInChain = &shaderCodeDesc.chain;
+  //WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
+  //shaderCodeDesc.chain.next = nullptr;
+  //shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
+  //shaderCodeDesc.code = content.c_str();
+  //WGPUShaderModuleDescriptor shaderDesc;
+	//shaderDesc.label = name.c_str();
+  //shaderDesc.nextInChain = &shaderCodeDesc.chain;
 
-	shader->m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);
-  return shader;
+	//shader->m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);
+  //return shader;
 }
 
 void Shader::Reload(std::string& content) {
 
-  WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
-  shaderCodeDesc.chain.next = nullptr;
-  shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-  shaderCodeDesc.code = content.c_str();
-  WGPUShaderModuleDescriptor shaderDesc;
-	shaderDesc.label = "PPK";
-  shaderDesc.nextInChain = &shaderCodeDesc.chain;
-	m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);
+  //WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
+  //shaderCodeDesc.chain.next = nullptr;
+  //shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
+  //shaderCodeDesc.code = content.c_str();
+  //WGPUShaderModuleDescriptor shaderDesc;
+	//shaderDesc.label = "PPK";
+  //shaderDesc.nextInChain = &shaderCodeDesc.chain;
+	//m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);
 }
