@@ -46,7 +46,9 @@ class Texture {
   virtual glm::uvec2 GetSize() const = 0;
 
 	public:
+  virtual bool Hack() const = 0;
 	virtual WGPUTextureView GetNativeView(int layer = 0) = 0;
+	virtual WGPUTextureView GetNativeViewAlt(int layer = 0) = 0;
 };
 
 class Texture2D : public Texture {
@@ -69,12 +71,14 @@ class Texture2D : public Texture {
 
   const int GetViewCount() { return m_Views.size(); }
   WGPUTextureView GetNativeView(int layer = 0) override { return m_Views[layer]; }
+  WGPUTextureView GetNativeViewAlt(int layer = 0) override { return m_Views[layer]; }
 
   glm::uvec2 GetSize() const override { return glm::uvec2(m_TextureProps.Width, m_TextureProps.Height); }
 
   uint32_t GetWidth() const override { return GetSize().x; }
   uint32_t GetHeight() const override { return GetSize().y; }
   uint32_t GetMipLevelCount() const override { return 15; }
+  bool Hack() const override { return false; }
 
   TextureFormat GetFormat() const override { return m_TextureProps.Format; }
   TextureType GetType() const override { return TextureType::TextureDim2D; }
@@ -108,11 +112,15 @@ class TextureCube : public Texture {
   TextureType GetType() const override { return TextureType::TextureDimCube; }
 
   const TextureProps& GetSpec() { return m_TextureProps; }
+  bool Hack() const override { return true; }
 
   WGPUTextureView GetNativeView(int layer = 0) override { return m_Views[layer]; }
+  WGPUTextureView GetNativeViewAlt(int layer = 0) override { return m_ViewsAlt[layer]; }
 
   WGPUTexture m_TextureBuffer = NULL;
+  WGPUTexture m_TextureBufferAlt = NULL;
   std::vector<WGPUTextureView> m_Views;
+  std::vector<WGPUTextureView> m_ViewsAlt;
  private:
   TextureProps m_TextureProps;
   Buffer m_ImageData[6];

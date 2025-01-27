@@ -39,7 +39,7 @@ class RenderPipeline {
   void Invalidate();
 
   RenderPipelineSpec m_PipelineSpec;
-  WGPURenderPipeline m_Pipeline;
+  WGPURenderPipeline m_Pipeline = nullptr;
 
  private:
 };

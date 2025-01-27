@@ -185,7 +185,7 @@ void TextureCube::Invalidate() {
 	WGPUExtent3D cubemapSize = {m_TextureProps.Width, m_TextureProps.Height, 6};
 
   WGPUTextureDescriptor textureDesc;
-  textureDesc.label = "MMB";
+  textureDesc.label = "MMB1";
   textureDesc.dimension = WGPUTextureDimension_2D;
   textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
   // textureDesc.format = RenderTypeUtils::ToRenderType(m_TextureProps.Format);
@@ -197,13 +197,22 @@ void TextureCube::Invalidate() {
   textureDesc.viewFormatCount = 0;
   textureDesc.viewFormats = nullptr;
   textureDesc.nextInChain = nullptr;
+
   m_TextureBuffer = wgpuDeviceCreateTexture(RenderContext::GetDevice(), &textureDesc);
+	textureDesc.label = "MMB2";
+	textureDesc.format = WGPUTextureFormat_RGBA32Float;
+	textureDesc.mipLevelCount = 1;
+  m_TextureBufferAlt = wgpuDeviceCreateTexture(RenderContext::GetDevice(), &textureDesc);
+  textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
+  textureDesc.mipLevelCount = (uint32_t)(floor((float)(log2(glm::max(textureDesc.size.width, textureDesc.size.height))))) + 1;  // can be replaced with bit_width in C++ 20
 
   WGPUExtent3D cubemapLayerSize = {cubemapSize.width, cubemapSize.height, 1};
   for (uint32_t faceIndex = 0; faceIndex < 6; ++faceIndex) {
     WGPUOrigin3D origin = {0, 0, faceIndex};
     WriteTexture(m_ImageData[faceIndex].Data, m_TextureBuffer, m_TextureProps.Width, m_TextureProps.Height, 0, faceIndex);
   }
+
+  textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
 
   WGPUTextureViewDescriptor textureViewDesc;
   textureViewDesc.label = "MMB_View";
@@ -213,13 +222,20 @@ void TextureCube::Invalidate() {
   textureViewDesc.baseMipLevel = 0;
   textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
   textureViewDesc.dimension = WGPUTextureViewDimension_Cube;
-  textureViewDesc.format = textureDesc.format;
+  //textureViewDesc.format = textureDesc.format;
+	textureViewDesc.format = WGPUTextureFormat_RGBA8Unorm;
   textureViewDesc.nextInChain = nullptr;
 
+	textureViewDesc.format = WGPUTextureFormat_RGBA8Unorm;
   m_Views.push_back(wgpuTextureCreateView(m_TextureBuffer, &textureViewDesc));
+
+	textureViewDesc.mipLevelCount = 1;
+	textureViewDesc.format = WGPUTextureFormat_RGBA32Float;
+  m_ViewsAlt.push_back(wgpuTextureCreateView(m_TextureBufferAlt, &textureViewDesc));
 
   if (m_TextureProps.GenerateMips) {
     Render::PreFilter(this);
+    Render::PreFilterAlt(this);
   }
 }
 

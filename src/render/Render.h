@@ -42,6 +42,7 @@ class Render {
   static void ComputeMip(Texture2D* output);
   static void ComputeMipCube(TextureCube* output);
   static void PreFilter(TextureCube* output);
+  static void PreFilterAlt(TextureCube* output);
   static bool saveTexture(const std::filesystem::path path, WGPUDevice device, Ref<Texture2D> texture, int mipLevel);
 
   static void RegisterShaderDependency(Ref<Shader> shader, Material* material);

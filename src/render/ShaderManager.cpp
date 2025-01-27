@@ -51,6 +51,18 @@ WGPUTextureViewDimension GetDimensionType(tint::inspector::ResourceBinding::Text
   }
 }
 
+ WGPUTextureFormat GetImageFormat(tint::inspector::ResourceBinding::TexelFormat type) {
+  switch (type) {
+    case tint::inspector::ResourceBinding::TexelFormat::kRgba8Unorm:
+      return WGPUTextureFormat_RGBA8Unorm;
+    case tint::inspector::ResourceBinding::TexelFormat::kRgba32Float:
+      return WGPUTextureFormat_RGBA32Float;
+      break;
+			default:
+			 exit(1);
+  }
+}
+
 ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
   ShaderReflectionInfo reflectionInfo;
   tint::wgsl::reader::Options options;
@@ -251,10 +263,13 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
           groupEntry.visibility = WGPUShaderStage_Fragment;
           break;
         case StorageBindingType:
+					auto v = inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].image_format;
           groupEntry.storageTexture.access = WGPUStorageTextureAccess_WriteOnly;
-          groupEntry.storageTexture.format = WGPUTextureFormat_RGBA8Unorm;
-          // groupEntry.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
+          groupEntry.storageTexture.format = GetImageFormat(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].image_format);
           groupEntry.storageTexture.viewDimension = GetDimensionType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].dim);
+
+          //groupEntry.storageTexture.format = WGPUTextureFormat_RGBA8Unorm;
+          // groupEntry.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
 
           groupEntry.visibility = WGPUShaderStage_Compute;
           break;

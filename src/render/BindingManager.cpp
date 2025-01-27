@@ -137,7 +137,7 @@ bool BindingManager::Validate() {
 
 void BindingManager::Bake() {
   RN_PROFILE_FUNC;
-  RN_CORE_ASSERT(Validate(), "Validation failed for {}", m_BindingSpec.Name)
+  //RN_CORE_ASSERT(Validate(), "Validation failed for {}", m_BindingSpec.Name)
 
   for (const auto& [groupIndex, groupBindings] : m_Inputs) {
     for (const auto& [locationIndex, input] : groupBindings) {
@@ -165,6 +165,11 @@ void BindingManager::InvalidateAndUpdate() {
           }
           break;
         case PT_Texture:
+
+					if (input.TextureInput->Hack() && storedEntry.textureView != input.TextureInput->GetNativeView()) {
+            m_InvalidatedInputs[index][location] = input;
+          }
+
           if (storedEntry.textureView != input.TextureInput->GetNativeView()) {
             m_InvalidatedInputs[index][location] = input;
           }

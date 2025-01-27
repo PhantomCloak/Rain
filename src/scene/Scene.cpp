@@ -38,22 +38,27 @@ void Scene::Init() {
 
   //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/cityz.gltf");
   cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/Helment/untitled.gltf");
+	//cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/glTF/DamagedHelmet.gltf");
+  //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/weapon.gltf");
   //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/sponza/SponzaExp5.gltf");
 	//cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test.gltf");
   //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
-  //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/scene.gltf");
+  //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/pbr_spheres/scene.gltf");
   Entity map = CreateEntity("Box");
   //map.GetComponent<TransformComponent>()->Translation = glm::vec3(0.0, 0.0, 0);
-  //map.GetComponent<TransformComponent>()->Scale = glm::vec3(35.0f);
-  map.GetComponent<TransformComponent>()->Scale = glm::vec3(25.0f);
+  //map.GetComponent<TransformComponent>()->Scale = glm::vec3(300.0f);
+  //map.GetComponent<TransformComponent>()->Scale = glm::vec3(0.10f);
+  //map.GetComponent<TransformComponent>()->Scale = glm::vec3(25.0f);
+	//map.GetComponent<TransformComponent>()->Scale = glm::vec3(350.0f);
+	map.GetComponent<TransformComponent>()->Scale = glm::vec3(15.0f);
 	//map.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(90.0), glm::radians(0.0), glm::radians(180.0)));
   //map.GetComponent<TransformComponent>()->Scale = glm::vec3(0.10f);
   BuildMeshEntityHierarchy(map, cityModel);
 
 
-	auto mat = cityModel->Materials->GetMaterial(0);
-	mat->Set("Metallic", 0.1);
-	mat->Set("Roughness", 1.0);
+	//auto mat = cityModel->Materials->GetMaterial(0);
+	//mat->Set("Metallic", 0.1);
+	//mat->Set("Roughness", 1.0);
 
   Entity light = CreateEntity("DirectionalLight");
   light.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
@@ -102,9 +107,9 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
   static float w = Application::Get()->GetWindowSize().x;
   static float h = Application::Get()->GetWindowSize().y;
 
-  static auto projectionMatrix = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1700.0f);
+  static auto projectionMatrix = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 2400.0f);
 
-  renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 0.10, 1700.0f});
+  renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 0.10, 2400.0f});
 
   static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
   drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent) {

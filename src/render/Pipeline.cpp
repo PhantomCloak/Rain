@@ -43,9 +43,9 @@ RenderPipeline::RenderPipeline(const RenderPipelineSpec& props)
 }
 
 void RenderPipeline::Invalidate() {
-  if (m_Pipeline != nullptr) {
-    wgpuRenderPipelineRelease(m_Pipeline);
-  }
+  //if (m_Pipeline != nullptr) {
+  //  wgpuRenderPipelineRelease(m_Pipeline);
+  //}
 
   WGPURenderPipelineDescriptor* pipelineDesc = (WGPURenderPipelineDescriptor*)malloc(sizeof(WGPURenderPipelineDescriptor));
   pipelineDesc->label = m_PipelineSpec.DebugName.c_str();

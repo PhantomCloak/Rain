@@ -28,7 +28,6 @@ void CalculateCascades(CascadeData* cascades, const SceneCamera& sceneCamera, gl
   viewMatrix[3] = glm::lerp(viewMatrix[3], origin, scaleToOrigin);
 
   auto viewProjection = sceneCamera.Projection * viewMatrix;
-	//Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder &encoder)
 
   const int SHADOW_MAP_CASCADE_COUNT = 4;
   float cascadeSplits[SHADOW_MAP_CASCADE_COUNT];
@@ -45,9 +44,11 @@ void CalculateCascades(CascadeData* cascades, const SceneCamera& sceneCamera, gl
 
   float CascadeSplitLambda = 0.92f;
   // float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
-  // float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -320.0f;
+   //float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -320.0f;
   // float CascadeFarPlaneOffset = 250.0f, CascadeNearPlaneOffset = -250.0f;
-  float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
+	//float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
+	float CascadeFarPlaneOffset = 50.0f, CascadeNearPlaneOffset = -50.0f;
+	//float CascadeFarPlaneOffset = 50.0f, CascadeNearPlaneOffset = -50.0f;
   // float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -100.0f;
 
   // Calculate split depths based on view camera frustum
@@ -264,8 +265,15 @@ void SceneRenderer::Init() {
                                         .MipFilterFormat = FilterMode::Linear,
                                         .Compare = CompareMode::CompareUndefined,
                                         .LodMinClamp = 0.0f,
+                                        .LodMaxClamp = 12.0f});
+  auto skyboxSampler2 = Sampler::Create({.Name = "S_Skybox2",
+                                        .WrapFormat = TextureWrappingFormat::ClampToEdges,
+                                        .MagFilterFormat = FilterMode::Linear,
+                                        .MinFilterFormat = FilterMode::Linear,
+                                        .MipFilterFormat = FilterMode::Linear,
+                                        .Compare = CompareMode::CompareUndefined,
+                                        .LodMinClamp = 0.0f,
                                         .LodMaxClamp = 1.0f});
-
   auto skybox = Rain::ResourceManager::LoadCubeTexture("T3D_Skybox",
                                                        {RESOURCE_DIR "/textures/right.jpg",
                                                         RESOURCE_DIR "/textures/left.jpg",
@@ -352,8 +360,10 @@ void SceneRenderer::Init() {
   m_LitPass->Set("u_ShadowMap", m_ShadowPass[0]->GetDepthOutput());
   m_LitPass->Set("u_ShadowSampler", m_ShadowSampler);
   m_LitPass->Set("u_ShadowData", m_ShadowUniformBuffer);
-  m_LitPass->Set("irradianceMap", skybox);
-  m_LitPass->Set("irradianceMapSampler", skyboxSampler);
+  m_LitPass->Set("u_radianceMap", skybox);
+  m_LitPass->Set("u_irradianceMap", skybox);
+  m_LitPass->Set("u_radianceMapSampler", skyboxSampler);
+  m_LitPass->Set("u_irradianceMapSampler", skyboxSampler2);
   m_LitPass->Set("u_BDRFLut", bdrfLut);
   m_LitPass->Bake();
 

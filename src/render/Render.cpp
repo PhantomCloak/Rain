@@ -564,94 +564,94 @@ void Render::ComputeMip(Texture2D* input) {
 }
 
 void Render::ComputeMipCube(TextureCube* input) {
-  auto dir = RESOURCE_DIR "/shaders/ComputeMipCube.wgsl";
-  static Ref<Shader> computeShader = ShaderManager::LoadShader("SH_ComputeCube", dir);
-  auto device = RenderContext::GetDevice();
+    auto device = RenderContext::GetDevice();
+    auto computeShader = ShaderManager::LoadShader(
+        "SH_ComputeCube", 
+        RESOURCE_DIR "/shaders/ComputeMipCube.wgsl"
+    );
 
-  // Prepare pipeline layout
-  std::vector<WGPUBindGroupLayout> bindGroupLayouts;
-  for (const auto& [_, layout] : computeShader->GetReflectionInfo().LayoutDescriptors) {
-    bindGroupLayouts.push_back(layout);
-  }
+    // Create pipeline layout
+    auto bindGroupLayout = computeShader->GetReflectionInfo().LayoutDescriptors.begin()->second;
+    WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
+    pipelineLayoutDesc.bindGroupLayoutCount = 1;
+    pipelineLayoutDesc.bindGroupLayouts = &bindGroupLayout;
+    auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
 
-  WGPUPipelineLayoutDescriptor layoutDesc = {};
-  layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
-  layoutDesc.bindGroupLayouts = bindGroupLayouts.data();
-  WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &layoutDesc);
+    // Create compute pipeline
+    WGPUComputePipelineDescriptor pipelineDesc = {};
+    pipelineDesc.layout = pipelineLayout;
+    pipelineDesc.compute.entryPoint = "computeMipMap";
+    pipelineDesc.compute.module = computeShader->GetNativeShaderModule();
+    auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
 
-  // Prepare compute pipeline
-  WGPUComputePipelineDescriptor computePipelineDesc = {};
-  computePipelineDesc.compute.constantCount = 0;
-  computePipelineDesc.compute.constants = nullptr;
-  computePipelineDesc.compute.entryPoint = "computeMipMap";
-  computePipelineDesc.compute.module = computeShader->GetNativeShaderModule();
-  computePipelineDesc.layout = pipelineLayout;
-  WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(device, &computePipelineDesc);
-
-  int mipCount = RenderUtils::CalculateMipCount(input->GetSpec().Width, input->GetSpec().Height);
-  const uint32_t workgroupSizePerDim = 8;
-
-  for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
-    auto encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
-
-    WGPUComputePassDescriptor computePassDesc = {};
-    WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder, &computePassDesc);
-    wgpuComputePassEncoderSetPipeline(computePass, pipeline);
-
-    auto textureWidth = std::max(input->GetSpec().Width >> mipLevel, (uint32_t)1);
-    auto textureHeight = std::max(input->GetSpec().Height >> mipLevel, (uint32_t)1);
-    uint32_t workgroupCountX = (textureWidth + workgroupSizePerDim - 1) / workgroupSizePerDim;
-    uint32_t workgroupCountY = (textureHeight + workgroupSizePerDim - 1) / workgroupSizePerDim;
-
-    // Create texture views for the current and next mip levels
-    WGPUTextureViewDescriptor inputViewDesc = {
+    // Common view descriptor template
+    WGPUTextureViewDescriptor viewDesc = {
         .format = WGPUTextureFormat_RGBA8Unorm,
         .dimension = WGPUTextureViewDimension_2DArray,
-        .baseMipLevel = mipLevel - 1,
         .mipLevelCount = 1,
         .baseArrayLayer = 0,
         .arrayLayerCount = 6  // All faces
     };
-    WGPUTextureView inputTextureView = wgpuTextureCreateView(input->m_TextureBuffer, &inputViewDesc);
 
-    WGPUTextureViewDescriptor outputViewDesc = {
-        .format = WGPUTextureFormat_RGBA8Unorm,
-        .dimension = WGPUTextureViewDimension_2DArray,
-        .baseMipLevel = mipLevel,
-        .mipLevelCount = 1,
-        .baseArrayLayer = 0,
-        .arrayLayerCount = 6  // All faces
-    };
-    WGPUTextureView outputTextureView = wgpuTextureCreateView(input->m_TextureBuffer, &outputViewDesc);
+    // Process mip chain
+    const uint32_t mipCount = RenderUtils::CalculateMipCount(
+        input->GetSpec().Width, 
+        input->GetSpec().Height
+    );
+    const uint32_t workgroupSize = 8;
 
-    // Create and set bind group
-    WGPUBindGroupEntry bindGroupEntries[2] = {
-        {.binding = 0, .textureView = inputTextureView},
-        {.binding = 1, .textureView = outputTextureView}};
+    for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
+        // Calculate dimensions for current mip level
+        const uint32_t width = std::max(input->GetSpec().Width >> mipLevel, 1u);
+        const uint32_t height = std::max(input->GetSpec().Height >> mipLevel, 1u);
+        const uint32_t workgroupsX = (width + workgroupSize - 1) / workgroupSize;
+        const uint32_t workgroupsY = (height + workgroupSize - 1) / workgroupSize;
 
-    WGPUBindGroupDescriptor bindGroupDesc = {};
-    bindGroupDesc.layout = bindGroupLayouts[0];
-    bindGroupDesc.entryCount = 2;
-    bindGroupDesc.entries = bindGroupEntries;
-    WGPUBindGroup bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
+        // Create input view (previous mip level)
+        viewDesc.baseMipLevel = mipLevel - 1;
+        auto inputView = wgpuTextureCreateView(input->m_TextureBuffer, &viewDesc);
 
-    wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, nullptr);
-    wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupCountX, workgroupCountY, 6);  // Dispatch across all faces
-    wgpuComputePassEncoderEnd(computePass);
+        // Create output view (current mip level)
+        viewDesc.baseMipLevel = mipLevel;
+        auto outputView = wgpuTextureCreateView(input->m_TextureBuffer, &viewDesc);
 
-    WGPUCommandBufferDescriptor cmdBufferDesc = {};
-    WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
-    wgpuQueueSubmit(*RenderContext::GetQueue(), 1, &commandBuffer);
+        // Create bind group
+        WGPUBindGroupEntry bindGroupEntries[2] = {
+            {.binding = 0, .textureView = inputView},
+            {.binding = 1, .textureView = outputView}
+        };
 
-    wgpuBindGroupRelease(bindGroup);
-    wgpuTextureViewRelease(inputTextureView);
-    wgpuTextureViewRelease(outputTextureView);
-    wgpuCommandEncoderRelease(encoder);
-    wgpuCommandBufferRelease(commandBuffer);
-  }
+        WGPUBindGroupDescriptor bindGroupDesc = {};
+        bindGroupDesc.layout = bindGroupLayout;
+        bindGroupDesc.entryCount = 2;
+        bindGroupDesc.entries = bindGroupEntries;
+        auto bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
 
-  wgpuPipelineLayoutRelease(pipelineLayout);
-  wgpuComputePipelineRelease(pipeline);
+        // Record and submit commands
+        auto encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
+        {
+            auto computePass = wgpuCommandEncoderBeginComputePass(encoder, nullptr);
+            wgpuComputePassEncoderSetPipeline(computePass, pipeline);
+            wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, nullptr);
+            // Dispatch across all faces (6 in Z dimension)
+            wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupsX, workgroupsY, 6);
+            wgpuComputePassEncoderEnd(computePass);
+        }
+
+        auto commandBuffer = wgpuCommandEncoderFinish(encoder, nullptr);
+        wgpuQueueSubmit(*RenderContext::GetQueue(), 1, &commandBuffer);
+
+        // Cleanup per-mip resources
+        wgpuBindGroupRelease(bindGroup);
+        wgpuTextureViewRelease(inputView);
+        wgpuTextureViewRelease(outputView);
+        wgpuCommandEncoderRelease(encoder);
+        wgpuCommandBufferRelease(commandBuffer);
+    }
+
+    // Cleanup shared resources
+    wgpuPipelineLayoutRelease(pipelineLayout);
+    wgpuComputePipelineRelease(pipeline);
 }
 
 struct PrefilterUniform {
@@ -661,134 +661,205 @@ struct PrefilterUniform {
 };
 
 void Render::PreFilter(TextureCube* input) {
-  auto dir = RESOURCE_DIR "/shaders/CubePreFilter.wgsl";
-  static Ref<Shader> computeShader = ShaderManager::LoadShader("SH_ComputeCube2", dir);
   auto device = RenderContext::GetDevice();
+  auto computeShader = ShaderManager::LoadShader(
+      "SH_ComputeCube2",
+      RESOURCE_DIR "/shaders/CubePreFilter.wgsl");
 
-  float m_uniformStride =
-      std::max((uint32_t)sizeof(PrefilterUniform),
-               (uint32_t)Instance->m_Limits.minUniformBufferOffsetAlignment);
+  // Calculate mip parameters
+  const uint32_t mipCount = RenderUtils::CalculateMipCount(input->GetSpec().Width, input->GetSpec().Height);
+  const uint32_t uniformStride = std::max(
+      (uint32_t)sizeof(PrefilterUniform),
+      (uint32_t)Instance->m_Limits.minUniformBufferOffsetAlignment);
 
-  int mipCount = RenderUtils::CalculateMipCount(input->GetSpec().Width, input->GetSpec().Height);
+  // Create uniform buffer for all mip levels
+  auto uniformBuffer = GPUAllocator::GAlloc(
+      WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
+      uniformStride * mipCount);
 
+  // Initialize uniforms for all mip levels
+  for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
+    PrefilterUniform uniform = {
+        .currentMipLevel = mipLevel,
+        .mipLevelCount = mipCount};
+    uniformBuffer->SetData(&uniform, mipLevel * uniformStride, sizeof(uniform));
+  }
+
+  // Create sampler
   auto sampler = Sampler::Create({.Name = "S_Skybox",
                                   .WrapFormat = TextureWrappingFormat::ClampToEdges,
                                   .MagFilterFormat = FilterMode::Linear,
                                   .MinFilterFormat = FilterMode::Linear,
-                                  .MipFilterFormat = FilterMode::Linear,
-                                  .Compare = CompareMode::CompareUndefined,
-                                  .LodMinClamp = 0.0f,
-                                  .LodMaxClamp = 1.0f,
-                                  .Ans = 16.0f});
+                                  .MipFilterFormat = FilterMode::Linear});
 
-  // Prepare pipeline layout
-  std::vector<WGPUBindGroupLayout> bindGroupLayouts;
-  for (const auto& [_, layout] : computeShader->GetReflectionInfo().LayoutDescriptors) {
-    bindGroupLayouts.push_back(layout);
-  }
+  // Create pipeline layout
+  auto bindGroupLayout = computeShader->GetReflectionInfo().LayoutDescriptors.begin()->second;
+  WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
+  pipelineLayoutDesc.bindGroupLayoutCount = 1;
+  pipelineLayoutDesc.bindGroupLayouts = &bindGroupLayout;
+  auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
 
-  WGPUPipelineLayoutDescriptor layoutDesc = {};
-  layoutDesc.bindGroupLayoutCount = bindGroupLayouts.size();
-  layoutDesc.bindGroupLayouts = bindGroupLayouts.data();
-  WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &layoutDesc);
+  // Create compute pipeline
+  WGPUComputePipelineDescriptor pipelineDesc = {};
+  pipelineDesc.layout = pipelineLayout;
+  pipelineDesc.compute.entryPoint = "prefilterCubeMap";
+  pipelineDesc.compute.module = computeShader->GetNativeShaderModule();
+  auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
 
-  // Prepare compute pipeline
-  WGPUComputePipelineDescriptor computePipelineDesc = {};
-  computePipelineDesc.compute.constantCount = 0;
-  computePipelineDesc.compute.constants = nullptr;
-  computePipelineDesc.compute.entryPoint = "prefilterCubeMap";
-  computePipelineDesc.compute.module = computeShader->GetNativeShaderModule();
-  computePipelineDesc.layout = pipelineLayout;
-  WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(device, &computePipelineDesc);
+  // Common view descriptor template
+  WGPUTextureViewDescriptor viewDesc = {
+      .format = WGPUTextureFormat_RGBA8Unorm,
+      .dimension = WGPUTextureViewDimension_Cube,  // Will be overridden for output
+      .mipLevelCount = 1,
+      .baseArrayLayer = 0,
+      .arrayLayerCount = 6};
 
-  PrefilterUniform uniform = {
-      .currentMipLevel = 0,
-      .mipLevelCount = (uint32_t)mipCount,
-  };
-
-  auto bufSize = sizeof(PrefilterUniform) * m_uniformStride;
-  auto uniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, bufSize);
-  uniformBuffer->SetData(&uniform, sizeof(uniform));
-
-  uint32_t dynamicOffset = 0;
-  uint32_t invocationCountX = 0, invocationCountY = 0, workgroupSizePerDim = 4;
-  invocationCountX = input->GetSpec().Width;
-  invocationCountY = input->GetSpec().Height;
-
-  uniformBuffer->SetData(&uniform, 0, sizeof(uniform));
-  for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
-    // uniform.currentMipLevel = mipLevel - 1;
-    uniform.currentMipLevel = mipLevel;
-    uniform.mipLevelCount = mipCount;
-    uniformBuffer->SetData(&uniform, mipLevel * m_uniformStride, sizeof(uniform));
-  }
+  // Process each mip level
+  uint32_t width = input->GetSpec().Width;
+  uint32_t height = input->GetSpec().Height;
+  const uint32_t workgroupSize = 4;
 
   for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
-    auto encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
+    // Update dimensions for current mip level
+    width /= 2;
+    height /= 2;
+    const uint32_t workgroupsX = (width + workgroupSize - 1) / workgroupSize;
+    const uint32_t workgroupsY = (height + workgroupSize - 1) / workgroupSize;
 
-    WGPUComputePassDescriptor computePassDesc = {};
-    WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder, &computePassDesc);
-    wgpuComputePassEncoderSetPipeline(computePass, pipeline);
+    // Create input view (previous mip level)
+    viewDesc.dimension = WGPUTextureViewDimension_Cube;
+    viewDesc.baseMipLevel = mipLevel - 1;
+    auto inputView = wgpuTextureCreateView(input->m_TextureBuffer, &viewDesc);
 
-    // Create texture views for the current and next mip levels
-    WGPUTextureViewDescriptor inputViewDesc = {
-        .format = WGPUTextureFormat_RGBA8Unorm,
-        .dimension = WGPUTextureViewDimension_Cube,
-        .baseMipLevel = mipLevel - 1,
-        .mipLevelCount = 1,
-        .baseArrayLayer = 0,
-        .arrayLayerCount = 6  // All faces
-    };
-    WGPUTextureView inputTextureView = wgpuTextureCreateView(input->m_TextureBuffer, &inputViewDesc);
+    // Create output view (current mip level)
+    viewDesc.dimension = WGPUTextureViewDimension_2DArray;
+    viewDesc.baseMipLevel = mipLevel;
+    auto outputView = wgpuTextureCreateView(input->m_TextureBuffer, &viewDesc);
 
-    WGPUTextureViewDescriptor outputViewDesc = {
-        .format = WGPUTextureFormat_RGBA8Unorm,
-        .dimension = WGPUTextureViewDimension_2DArray,
-        .baseMipLevel = mipLevel,
-        .mipLevelCount = 1,
-        .baseArrayLayer = 0,
-        .arrayLayerCount = 6  // All faces
-    };
-    WGPUTextureView outputTextureView = wgpuTextureCreateView(input->m_TextureBuffer, &outputViewDesc);
-
-    // Create and set bind group
+    // Create bind group
     WGPUBindGroupEntry bindGroupEntries[4] = {
-        {.binding = 0, .textureView = inputTextureView},
-        {.binding = 1, .textureView = outputTextureView},
+        {.binding = 0, .textureView = inputView},
+        {.binding = 1, .textureView = outputView},
         {.binding = 2, .sampler = *sampler->GetNativeSampler()},
         {.binding = 3, .buffer = uniformBuffer->Buffer, .size = sizeof(PrefilterUniform)}};
 
     WGPUBindGroupDescriptor bindGroupDesc = {};
-    bindGroupDesc.layout = bindGroupLayouts[0];
+    bindGroupDesc.layout = bindGroupLayout;
     bindGroupDesc.entryCount = 4;
     bindGroupDesc.entries = bindGroupEntries;
-    WGPUBindGroup bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
+    auto bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
 
-    invocationCountX = invocationCountX / 2;
-    invocationCountY = invocationCountY / 2;
-    uint32_t workgroupCountX =
-        (invocationCountX + workgroupSizePerDim - 1) / workgroupSizePerDim;
-    uint32_t workgroupCountY =
-        (invocationCountY + workgroupSizePerDim - 1) / workgroupSizePerDim;
+    // Record and submit commands
+    auto encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
+    {
+      auto computePass = wgpuCommandEncoderBeginComputePass(encoder, nullptr);
+      wgpuComputePassEncoderSetPipeline(computePass, pipeline);
 
-    dynamicOffset = mipLevel * m_uniformStride;
-    wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 1, &dynamicOffset);
-    wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupCountX, workgroupCountY, 1);  // Dispatch across all faces
-    wgpuComputePassEncoderEnd(computePass);
+      uint32_t dynamicOffset = mipLevel * uniformStride;
+      wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 1, &dynamicOffset);
+      wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupsX, workgroupsY, 1);
+      wgpuComputePassEncoderEnd(computePass);
+    }
 
-    WGPUCommandBufferDescriptor cmdBufferDesc = {};
-    WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
+    auto commandBuffer = wgpuCommandEncoderFinish(encoder, nullptr);
     wgpuQueueSubmit(*RenderContext::GetQueue(), 1, &commandBuffer);
 
+    // Cleanup per-mip resources
     wgpuBindGroupRelease(bindGroup);
-    wgpuTextureViewRelease(inputTextureView);
-    wgpuTextureViewRelease(outputTextureView);
+    wgpuTextureViewRelease(inputView);
+    wgpuTextureViewRelease(outputView);
     wgpuCommandEncoderRelease(encoder);
     wgpuCommandBufferRelease(commandBuffer);
   }
 
+  // Cleanup shared resources
   wgpuPipelineLayoutRelease(pipelineLayout);
   wgpuComputePipelineRelease(pipeline);
+}
+
+void Render::PreFilterAlt(TextureCube* input) {
+  auto device = RenderContext::GetDevice();
+  auto computeShader = ShaderManager::LoadShader(
+      "SH_ComputeCube3",
+      RESOURCE_DIR "/shaders/CubePreFilter2.wgsl");
+
+  // Create common texture view descriptor for both input and output
+  WGPUTextureViewDescriptor viewDesc = {
+      .dimension = WGPUTextureViewDimension_Cube,  // Will be overridden for output
+      .baseMipLevel = 0,
+      .mipLevelCount = 1,
+      .baseArrayLayer = 0,
+      .arrayLayerCount = 6};
+
+  // Create input and output views
+  viewDesc.format = WGPUTextureFormat_RGBA8Unorm;
+  auto inputView = wgpuTextureCreateView(input->m_TextureBuffer, &viewDesc);
+
+  viewDesc.format = WGPUTextureFormat_RGBA32Float;
+  viewDesc.dimension = WGPUTextureViewDimension_2DArray;
+  auto outputView = wgpuTextureCreateView(input->m_TextureBufferAlt, &viewDesc);
+
+  // Create sampler
+  auto sampler = Sampler::Create({.Name = "S_Skybox",
+                                  .WrapFormat = TextureWrappingFormat::ClampToEdges,
+                                  .MagFilterFormat = FilterMode::Linear,
+                                  .MinFilterFormat = FilterMode::Linear,
+                                  .MipFilterFormat = FilterMode::Linear});
+
+  // Create pipeline layout
+  auto bindGroupLayout = computeShader->GetReflectionInfo().LayoutDescriptors.begin()->second;
+  WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
+  pipelineLayoutDesc.bindGroupLayoutCount = 1;
+  pipelineLayoutDesc.bindGroupLayouts = &bindGroupLayout;
+  auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
+
+  // Create bind group
+  WGPUBindGroupEntry bindGroupEntries[3] = {
+      {.binding = 0, .textureView = outputView},
+      {.binding = 1, .textureView = inputView},
+      {.binding = 2, .sampler = *sampler->GetNativeSampler()}};
+
+  WGPUBindGroupDescriptor bindGroupDesc = {};
+  bindGroupDesc.layout = bindGroupLayout;
+  bindGroupDesc.entryCount = 3;
+  bindGroupDesc.entries = bindGroupEntries;
+  auto bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
+
+  // Create compute pipeline
+  WGPUComputePipelineDescriptor pipelineDesc = {};
+  pipelineDesc.layout = pipelineLayout;
+  pipelineDesc.compute.module = computeShader->GetNativeShaderModule();
+  pipelineDesc.compute.entryPoint = "prefilterCubeMap";
+  auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
+
+  // Set up compute parameters
+  const uint32_t workgroupSize = 4;
+  const uint32_t width = input->GetSpec().Width;
+  const uint32_t height = input->GetSpec().Height;
+  const uint32_t workgroupsX = (width + workgroupSize - 1) / workgroupSize;
+  const uint32_t workgroupsY = (height + workgroupSize - 1) / workgroupSize;
+
+  // Record and submit commands
+  auto encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
+  {
+    auto computePass = wgpuCommandEncoderBeginComputePass(encoder, nullptr);
+    wgpuComputePassEncoderSetPipeline(computePass, pipeline);
+    wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, nullptr);
+    wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupsX, workgroupsY, 1);
+    wgpuComputePassEncoderEnd(computePass);
+  }
+
+  auto commandBuffer = wgpuCommandEncoderFinish(encoder, nullptr);
+  wgpuQueueSubmit(*RenderContext::GetQueue(), 1, &commandBuffer);
+
+  // Cleanup WebGPU resources
+  wgpuBindGroupRelease(bindGroup);
+  wgpuTextureViewRelease(inputView);
+  wgpuTextureViewRelease(outputView);
+  wgpuPipelineLayoutRelease(pipelineLayout);
+  wgpuComputePipelineRelease(pipeline);
+  wgpuCommandEncoderRelease(encoder);
+  wgpuCommandBufferRelease(commandBuffer);
 }
 
 // WGPUComputePassEncoder BeginComputePass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder) {
@@ -971,7 +1042,7 @@ void Render::RegisterShaderDependency(Ref<Shader> shader, RenderPipeline* materi
 void Render::ReloadShader(Ref<Shader> shader) {
   auto dependencies = s_ShaderDependencies[shader->GetName()];
   for (auto& material : dependencies.Materials) {
-		material->OnShaderReload();
+    material->OnShaderReload();
   }
 
   for (auto& pipeline : dependencies.Pipelines) {

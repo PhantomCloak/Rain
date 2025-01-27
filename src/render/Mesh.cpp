@@ -73,13 +73,13 @@ MeshSource::MeshSource(std::string path) {
     ai_real metallicFactor = 0.5f;
     ai_real roughnessFactor = 0.5f;
 
-    //if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor) != AI_SUCCESS) {
-    //    metallicFactor = 0.5f; // Fallback if not specified
-    //}
+    if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor) != AI_SUCCESS) {
+        metallicFactor = 0.5f; // Fallback if not specified
+    }
 
-    //if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) != AI_SUCCESS) {
-    //    roughnessFactor = 0.5f; // Fallback if not specified
-    //}
+    if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) != AI_SUCCESS) {
+        roughnessFactor = 0.5f; // Fallback if not specified
+    }
 
     std::string aiMatName(aiMat->GetName().C_Str());
     static auto defaultShader = ShaderManager::GetShader("SH_DefaultBasicBatch");
