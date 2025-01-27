@@ -59,9 +59,11 @@ struct MaterialUniform {
 @group(2) @binding(1) var u_ShadowSampler: sampler_comparison;
 @group(2) @binding(2) var<uniform> u_ShadowData: ShadowData;
 
-@group(3) @binding(0) var irradianceMap: texture_cube<f32>;
-@group(3) @binding(1) var irradianceMapSampler: sampler;
+@group(3) @binding(0) var u_radianceMap: texture_cube<f32>;
+@group(3) @binding(1) var u_radianceMapSampler: sampler;
 @group(3) @binding(2) var u_BDRFLut: texture_2d<f32>;
+@group(3) @binding(3) var u_irradianceMap: texture_cube<f32>;
+@group(3) @binding(4) var u_irradianceMapSampler: sampler;
 
 
 @vertex
@@ -246,18 +248,18 @@ fn sampleShadow(in: VertexOutput, cascadeIndex: u32, bias: f32) -> f32 {
 
 
 fn IBL(F0: vec3<f32>, Lr: vec3<f32>, Normal: vec3<f32>, NdotV: f32, Albedo: vec3<f32>, Roughness: f32, Metalness: f32) -> vec3<f32> {
-    let irradiance: vec3<f32> = textureSample(irradianceMap, irradianceMapSampler, Normal).rgb;
+    let irradiance: vec3<f32> = textureSample(u_irradianceMap, u_irradianceMapSampler, Normal).rgb;
 
     let F: vec3<f32> = FresnelSchlickRoughness(F0, NdotV, Roughness);
 
     let kd: vec3<f32> = (1.0 - F) * (1.0 - Metalness);
     let diffuseIBL: vec3<f32> = Albedo * irradiance;
 
-    let envRadianceTexLevels: u32 = textureNumLevels(irradianceMap);
+    let envRadianceTexLevels: u32 = textureNumLevels(u_radianceMap);
 
     let specularIrradiance: vec3<f32> = textureSampleLevel(
-        irradianceMap,
-        irradianceMapSampler,
+        u_radianceMap,
+        u_radianceMapSampler,
         RotateVectorAboutY(0.0, Lr),
         Roughness * f32(envRadianceTexLevels)
     ).rgb;
@@ -268,6 +270,7 @@ fn IBL(F0: vec3<f32>, Lr: vec3<f32>, Normal: vec3<f32>, NdotV: f32, Albedo: vec3
 
     return kd * diffuseIBL + specularIBL;
 }
+
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4f {
@@ -282,11 +285,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	let Fdielectric = vec3(0.04);
 	var Lo = vec3(0.0);
 
-	var Normal = normalize(in.Normal);
+	var Normal = normalize(in.WorldNormal);
 
 	if(uMaterial.UseNormalMap == 1)
 	{
-		let sampled_normal = textureSample(u_NormalTex, u_TextureSampler, in.Uv).rgb * 2.0 - 1.0;
+		let sampled_normal = normalize(textureSample(u_NormalTex, u_TextureSampler, in.Uv).rgb * 2.0 - 1.0);
 		Normal = normalize(
 				sampled_normal.x * in.WorldTangent +
 				sampled_normal.y * in.WorldBitangent +
@@ -296,6 +299,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	let View = normalize(u_Scene.CameraPosition - in.WorldPosition.xyz);
 	let NdotV = max(dot(Normal, View), 0.0);
 	let Lr = 2.0 * NdotV * Normal - View;
+	//let Lr = normalize(2.0 * dot(Normal, View) * Normal - View);
 	let FO = mix(Fdielectric, Albedo, Metalness);
 
 	let lightDir = normalize(u_Scene.LightDirection);
@@ -314,9 +318,29 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 		}
 	}
 
+	// Debug cascade visualization colors
+	let cascadeColors = array<vec3f, 4>(
+			vec3f(1.0, 0.0, 0.0),  // Red for cascade 0
+			vec3f(0.0, 1.0, 0.0),  // Green for cascade 1
+			vec3f(0.0, 0.0, 1.0),  // Blue for cascade 2
+			vec3f(1.0, 1.0, 0.0)   // Yellow for cascade 3
+			);
+
+//#ifdef DEBUG_CASCADES
+//	return vec4f(cascadeColors[layer], 1.0);
+//#endif
+
 	// Final Color
-	var shadowScale = sampleShadow(in, layer, bias);
+	//var shadowScale = sampleShadow(in, layer, bias);
+
+var shadowScale = PCSS_DirectionalLight(
+    u_ShadowMap, 
+    layer, 
+    GetShadowMapCoords(in, layer),
+    10.0f  // Or whatever uniform holds your light size
+);
 	shadowScale = 1.0 - clamp(1.0 - shadowScale, 0.0f, 1.0f);
+	//shadowScale = 1.0;
 	var lightContribution = CalculateDirLights(FO,
 			View,
 			Normal,
@@ -333,7 +357,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 			Roughness,
 			Metalness);
 
+	//return vec4f(Normal, 1.0);
 	return vec4f(acesFilm(iblContribution + lightContribution), 1.0);
+	//return vec4f(vec3f(1.0, 0.0, 0.0), 1.0);
 }
 
 fn GetShadowMapCoords(
@@ -356,4 +382,164 @@ fn acesFilm(x: vec3<f32>) -> vec3<f32> {
     let d = 0.59;
     let e = 0.14;
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(1.0, 1.0, 1.0));
+}
+
+fn SearchRegionRadiusUV(zWorld: f32) -> f32 {
+    let light_zNear = 0.0;  // 0.01 gives artifacts? maybe because of ortho proj?
+    let lightRadiusUV = 0.05;
+    return lightRadiusUV * (zWorld - light_zNear) / zWorld;
+}
+
+const PoissonDistribution = array<vec2<f32>, 64>(
+    vec2<f32>(-0.94201624, -0.39906216),
+    vec2<f32>(0.94558609, -0.76890725),
+    vec2<f32>(-0.094184101, -0.92938870),
+    vec2<f32>(0.34495938, 0.29387760),
+    vec2<f32>(-0.91588581, 0.45771432),
+    vec2<f32>(-0.81544232, -0.87912464),
+    vec2<f32>(-0.38277543, 0.27676845),
+    vec2<f32>(0.97484398, 0.75648379),
+    vec2<f32>(0.44323325, -0.97511554),
+    vec2<f32>(0.53742981, -0.47373420),
+    vec2<f32>(-0.26496911, -0.41893023),
+    vec2<f32>(0.79197514, 0.19090188),
+    vec2<f32>(-0.24188840, 0.99706507),
+    vec2<f32>(-0.81409955, 0.91437590),
+    vec2<f32>(0.19984126, 0.78641367),
+    vec2<f32>(0.14383161, -0.14100790),
+    vec2<f32>(-0.413923, -0.439757),
+    vec2<f32>(-0.979153, -0.201245),
+    vec2<f32>(-0.865579, -0.288695),
+    vec2<f32>(-0.243704, -0.186378),
+    vec2<f32>(-0.294920, -0.055748),
+    vec2<f32>(-0.604452, -0.544251),
+    vec2<f32>(-0.418056, -0.587679),
+    vec2<f32>(-0.549156, -0.415877),
+    vec2<f32>(-0.238080, -0.611761),
+    vec2<f32>(-0.267004, -0.459702),
+    vec2<f32>(-0.100006, -0.229116),
+    vec2<f32>(-0.101928, -0.380382),
+    vec2<f32>(-0.681467, -0.700773),
+    vec2<f32>(-0.763488, -0.543386),
+    vec2<f32>(-0.549030, -0.750749),
+    vec2<f32>(-0.809045, -0.408738),
+    vec2<f32>(-0.388134, -0.773448),
+    vec2<f32>(-0.429392, -0.894892),
+    vec2<f32>(-0.131597, 0.065058),
+    vec2<f32>(-0.275002, 0.102922),
+    vec2<f32>(-0.106117, -0.068327),
+    vec2<f32>(-0.294586, -0.891515),
+    vec2<f32>(-0.629418, 0.379387),
+    vec2<f32>(-0.407257, 0.339748),
+    vec2<f32>(0.071650, -0.384284),
+    vec2<f32>(0.022018, -0.263793),
+    vec2<f32>(0.003879, -0.136073),
+    vec2<f32>(-0.137533, -0.767844),
+    vec2<f32>(-0.050874, -0.906068),
+    vec2<f32>(0.114133, -0.070053),
+    vec2<f32>(0.163314, -0.217231),
+    vec2<f32>(-0.100262, -0.587992),
+    vec2<f32>(-0.004942, 0.125368),
+    vec2<f32>(0.035302, -0.619310),
+    vec2<f32>(0.195646, -0.459022),
+    vec2<f32>(0.303969, -0.346362),
+    vec2<f32>(-0.678118, 0.685099),
+    vec2<f32>(-0.628418, 0.507978),
+    vec2<f32>(-0.508473, 0.458753),
+    vec2<f32>(0.032134, -0.782030),
+    vec2<f32>(0.122595, 0.280353),
+    vec2<f32>(-0.043643, 0.312119),
+    vec2<f32>(0.132993, 0.085170),
+    vec2<f32>(-0.192106, 0.285848),
+    vec2<f32>(0.183621, -0.713242),
+    vec2<f32>(0.265220, -0.596716),
+    vec2<f32>(-0.009628, -0.483058),
+    vec2<f32>(-0.018516, 0.435703)
+);
+
+const poissonDisk = array<vec2<f32>, 16>(
+    vec2<f32>(-0.94201624, -0.39906216),
+    vec2<f32>(0.94558609, -0.76890725),
+    vec2<f32>(-0.094184101, -0.92938870),
+    vec2<f32>(0.34495938, 0.29387760),
+    vec2<f32>(-0.91588581, 0.45771432),
+    vec2<f32>(-0.81544232, -0.87912464),
+    vec2<f32>(-0.38277543, 0.27676845),
+    vec2<f32>(0.97484398, 0.75648379),
+    vec2<f32>(0.44323325, -0.97511554),
+    vec2<f32>(0.53742981, -0.47373420),
+    vec2<f32>(-0.26496911, -0.41893023),
+    vec2<f32>(0.79197514, 0.19090188),
+    vec2<f32>(-0.24188840, 0.99706507),
+    vec2<f32>(-0.81409955, 0.91437590),
+    vec2<f32>(0.19984126, 0.78641367),
+    vec2<f32>(0.14383161, -0.14100790)
+);
+
+fn SamplePoisson(index: i32) -> vec2<f32> {
+    return PoissonDistribution[index % 64];
+}
+
+
+fn FindBlockerDistance_DirectionalLight(shadowMap: texture_depth_2d_array, cascade: u32, shadowCoords: vec3<f32>, uvLightSize: f32) -> f32 {
+    let bias = 0.03f;
+    let numBlockerSearchSamples = 64;
+    var blockers = 0;
+    var avgBlockerDistance = 0.0;
+    let searchWidth = SearchRegionRadiusUV(shadowCoords.z);
+    let projCoords = shadowCoords.xy * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5);  // Fixed coordinate transform
+    
+    for (var i = 0; i < numBlockerSearchSamples; i++) {
+        let offset = SamplePoisson(i) * searchWidth;
+        let z = textureSampleLevel(
+            shadowMap,
+            u_TextureSampler,
+            projCoords + offset,
+            cascade,
+            0
+        );
+        
+        if (z < (shadowCoords.z - bias)) {
+            blockers += 1;
+            avgBlockerDistance += z;
+        }
+    }
+    if (blockers > 0) {
+        return avgBlockerDistance / f32(blockers);
+    }
+    return -1.0;
+}
+
+fn PCF_DirectionalLight(shadowMap: texture_depth_2d_array, cascade: u32, shadowCoords: vec3<f32>, uvRadius: f32) -> f32 {
+    let bias = 0.03f;
+    let numPCFSamples = 64;
+    var sum = 0.0;
+    let projCoords = shadowCoords.xy * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5);  // Fixed coordinate transform
+    
+    for (var i = 0; i < numPCFSamples; i++) {
+        let offset = SamplePoisson(i) * uvRadius;
+        let z = textureSampleLevel(
+            shadowMap,
+            u_TextureSampler,
+            projCoords + offset,
+            cascade,
+            0
+        );
+        sum += step(shadowCoords.z - bias, z);
+    }
+    
+    return sum / f32(numPCFSamples);
+}
+
+// PCSS function remains the same since it doesn't handle coordinates directly
+fn PCSS_DirectionalLight(shadowMap: texture_depth_2d_array, cascade: u32, shadowCoords: vec3<f32>, uvLightSize: f32) -> f32 {
+    let blockerDistance = FindBlockerDistance_DirectionalLight(shadowMap, cascade, shadowCoords, uvLightSize);
+    if (blockerDistance == -1.0) {  // No occlusion
+        return 1.0;
+    }
+    let penumbraWidth = (shadowCoords.z - blockerDistance) / blockerDistance;
+    let NEAR = 0.01;
+    var uvRadius = penumbraWidth * uvLightSize * NEAR / shadowCoords.z;
+    uvRadius = min(uvRadius, 0.002);
+    return PCF_DirectionalLight(shadowMap, cascade, shadowCoords, uvRadius) * 1.0f;
 }

@@ -24,45 +24,42 @@ struct BasisVectors {
 
 
 @compute @workgroup_size(4, 4, 6)
-fn prefilterCubeMap(@builtin(global_invocation_id) id: vec3u) {
-    let outputDimensions = textureDimensions(outputCubemapTexture).xy;
+	fn prefilterCubeMap(@builtin(global_invocation_id) id: vec3u) {
+		let outputDimensions = textureDimensions(outputCubemapTexture).xy;
 
-	if (id.x >= outputDimensions.x || id.y >= outputDimensions.y) {
-        return;
-    }
-
-    let layer = id.z;
-    var color = vec3f(0.0);
-    var total_weight = 0.0;
-
-    let roughness = lodToAlpha(f32(ud_uniforms.currentMipLevel) / f32(ud_uniforms.mipLevelCount - 1));
-
-    let uv = vec2f(id.xy) / vec2f(outputDimensions - 1u);
-    let N = getCubeMapTexCoord(vec2f(textureDimensions(outputCubemapTexture).xy), id);
-	let Lo = N;
-
-	let basis = computeBasisVectors(N);
-
-    for (var i = 0u ; i < SAMPLE_COUNT ; i++) {
-        let u = hammersley(i, SAMPLE_COUNT);
-		let Lh = tangentToWorld(sampleGGX(u.x, u.y, roughness), N, basis.S, basis.T);
-		let Li = 2.0 * dot(Lo, Lh) * Lh - Lo;
-		let cosLi = dot(N, Li);
-
-		if(cosLi > 0.0) {
-			let cosLh = max(dot(N, Lh), 0.0);
-			let pdf = ndfGGX(cosLh, roughness) * 0.25;
-			let ws = 1.0 / (f32(SAMPLE_COUNT) * pdf);
-
-			//color  += sampleCubeMap(inputCubemapTexture, Li).rgb * cosLi;
-			color = color + textureSampleLevel(inputCubemapTexture, textureSampler, Li, f32(ud_uniforms.currentMipLevel)).rgb * cosLi;
-
-			total_weight += cosLi;
+		if (id.x >= outputDimensions.x || id.y >= outputDimensions.y) {
+			return;
 		}
-    }
-	color /= total_weight;
-    textureStore(outputCubemapTexture, id.xy, layer, vec4f(color, 1.0));
-}
+
+		let layer = id.z;
+		var color = vec3f(0.0);
+		var total_weight = 0.0;
+
+		let roughness = lodToAlpha(f32(ud_uniforms.currentMipLevel) / f32(ud_uniforms.mipLevelCount - 1));
+
+		let uv = vec2f(id.xy) / vec2f(outputDimensions - 1u);
+		let N = getCubeMapTexCoord(vec2f(textureDimensions(outputCubemapTexture).xy), id);
+		let Lo = N;
+
+		let basis = computeBasisVectors(N);
+
+		for (var i = 0u ; i < SAMPLE_COUNT ; i++) {
+			let u = hammersley(i, SAMPLE_COUNT);
+			let Lh = tangentToWorld(sampleGGX(u.x, u.y, roughness), N, basis.S, basis.T);
+			let Li = 2.0 * dot(Lo, Lh) * Lh - Lo;
+			let cosLi = dot(N, Li);
+			if(cosLi > 0.0) {
+				let cosLh = max(dot(N, Lh), 0.0);
+				let pdf = ndfGGX(cosLh, roughness) * 0.25;
+				let ws = 1.0 / (f32(SAMPLE_COUNT) * pdf);
+
+				color = color + textureSampleLevel(inputCubemapTexture, textureSampler, Li, f32(ud_uniforms.currentMipLevel)).rgb * cosLi;
+				total_weight += cosLi;
+			}
+		}
+		color /= total_weight;
+		textureStore(outputCubemapTexture, id.xy, layer, vec4f(color, 1.0));
+	}
 
 fn maxComponent(v: vec3f) -> f32 {
     return max(v.x, max(v.y, v.z));
