@@ -1,4 +1,5 @@
 #include "ShaderManager.h"
+#include "render/RenderUtils.h"
 #include <iostream>
 
 // #include "src/tint/api/tint.h"
@@ -70,10 +71,10 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
   tint::Source::File* file = new tint::Source::File(shader->GetName(), shader->GetSource());
   tint::Program program = tint::wgsl::reader::Parse(file, options);
 
-  if (program.Diagnostics().contains_errors()) {
-    RN_LOG_ERR("Shader Compilation Error: {0}", program.Diagnostics().str());
-    return reflectionInfo;
-  }
+  //if (program.Diagnostics().contains_errors()) {
+  //  RN_LOG_ERR("Shader Compilation Error: {0}", program.Diagnostics().str());
+  //  return reflectionInfo;
+  //}
 
   tint::inspector::Inspector inspector(program);
 
@@ -281,7 +282,7 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
 
     WGPUBindGroupLayoutDescriptor layoutDesc = {};
     layoutDesc.nextInChain = nullptr;
-    layoutDesc.label = label.c_str();
+    layoutDesc.label = RenderUtils::MakeLabel(label);
     layoutDesc.entries = layoutEntries.data();
     layoutDesc.entryCount = layoutEntries.size();
 

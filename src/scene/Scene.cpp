@@ -5,12 +5,12 @@
 #include "SceneRenderer.h"
 #include "debug/Profiler.h"
 #include "glm/gtc/type_ptr.hpp"
-#include "imgui.h"
+//#include "imgui.h"
 #include "io/cursor.h"
 #include "io/keyboard.h"
 #include "render/ResourceManager.h"
 // #include <Tracy.hpp>
-#include "ImGuizmo/ImGuizmo.h"
+//#include "ImGuizmo/ImGuizmo.h"
 
 Scene::Scene(std::string sceneName)
     : m_Name(sceneName) {}
@@ -103,103 +103,103 @@ void Scene::OnUpdate() {
   ScanKeyPress();
 }
 
-glm::mat4 Scene::EditTransform(glm::mat4& matrix) {
-  static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::ROTATE);
-  static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::WORLD);
-
-  // Handle keyboard shortcuts
-  if (ImGui::IsKeyPressed(ImGuiKey_Z)) {
-    mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-  }
-  if (ImGui::IsKeyPressed(ImGuiKey_E)) {
-    mCurrentGizmoOperation = ImGuizmo::ROTATE;
-  }
-  if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-    mCurrentGizmoOperation = ImGuizmo::SCALE;
-  }
-
-  // Prepare matrices for manipulation
-  float modelMatrix[16];
-  std::memcpy(modelMatrix, glm::value_ptr(matrix), sizeof(float) * 16);
-
-  // Snapping controls
-  static bool useSnap(false);
-  if (ImGui::IsKeyPressed(ImGuiKey_S)) {
-    useSnap = !useSnap;
-  }
-  glm::vec3 snap(0.0f);
-
-  // Setup manipulation environment
-  ImGuiIO& io = ImGui::GetIO();
-  ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-  // Get view and projection matrices
-  const glm::mat4& viewMat = m_SceneCamera->GetViewMatrix();
-  static float w = Application::Get()->GetWindowSize().x;
-  static float h = Application::Get()->GetWindowSize().y;
-  static const glm::mat4 projMat = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1400.0f);
-
-  float viewMatrix[16], projectionMatrix[16];
-  std::memcpy(viewMatrix, glm::value_ptr(viewMat), sizeof(float) * 16);
-  std::memcpy(projectionMatrix, glm::value_ptr(projMat), sizeof(float) * 16);
-
-  // Perform manipulation
-  ImGuizmo::Manipulate(
-      viewMatrix,
-      projectionMatrix,
-      mCurrentGizmoOperation,
-      mCurrentGizmoMode,
-      modelMatrix,
-      nullptr,
-      useSnap ? &snap.x : nullptr);
-
-  // Update the matrix with manipulated result
-  matrix = glm::make_mat4(modelMatrix);
-
-	return matrix;
-}
-UUID RenderNode(Entity e, Scene* scene) {
-  auto tag = e.GetComponent<TagComponent>();
-  static UUID selectedNode = -1;
-  UUID currentNode = e.GetComponent<IDComponent>()->ID;
-  int childCount = 0;
-  RelationshipComponent* r = nullptr;
-
-  if (e.HasComponent<RelationshipComponent>()) {
-    r = e.GetComponent<RelationshipComponent>();
-    childCount = r->Children.size();
-  }
-
-  ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow;
-  if (childCount == 0) {
-    flags |= ImGuiTreeNodeFlags_Leaf;
-  }
-  if (selectedNode == currentNode) {
-    flags |= ImGuiTreeNodeFlags_Selected;
-  }
-
-  if (ImGui::TreeNodeEx(tag->Tag.c_str(), flags)) {
-    if (ImGui::IsItemClicked()) {
-      RN_LOG("Name: {} ID: {} C: {}", tag->Tag, (uint64_t)currentNode, (uint64_t)selectedNode);
-      selectedNode = currentNode;
-    }
-
-    if (r != nullptr) {
-      if (r->Children.size() > 0) {
-        ImGui::Indent(0.5f);
-      }
-
-      for (auto child : r->Children) {
-        Entity childEntity = scene->TryGetEntityWithUUID(child);
-        RenderNode(childEntity, scene);
-      }
-    }
-
-    ImGui::TreePop();
-  }
-
-  return selectedNode;
-}
+//glm::mat4 Scene::EditTransform(glm::mat4& matrix) {
+//  static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::ROTATE);
+//  static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::WORLD);
+//
+//  // Handle keyboard shortcuts
+//  if (ImGui::IsKeyPressed(ImGuiKey_Z)) {
+//    mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+//  }
+//  if (ImGui::IsKeyPressed(ImGuiKey_E)) {
+//    mCurrentGizmoOperation = ImGuizmo::ROTATE;
+//  }
+//  if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+//    mCurrentGizmoOperation = ImGuizmo::SCALE;
+//  }
+//
+//  // Prepare matrices for manipulation
+//  float modelMatrix[16];
+//  std::memcpy(modelMatrix, glm::value_ptr(matrix), sizeof(float) * 16);
+//
+//  // Snapping controls
+//  static bool useSnap(false);
+//  if (ImGui::IsKeyPressed(ImGuiKey_S)) {
+//    useSnap = !useSnap;
+//  }
+//  glm::vec3 snap(0.0f);
+//
+//  // Setup manipulation environment
+//  ImGuiIO& io = ImGui::GetIO();
+//  ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+//
+//  // Get view and projection matrices
+//  const glm::mat4& viewMat = m_SceneCamera->GetViewMatrix();
+//  static float w = Application::Get()->GetWindowSize().x;
+//  static float h = Application::Get()->GetWindowSize().y;
+//  static const glm::mat4 projMat = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1400.0f);
+//
+//  float viewMatrix[16], projectionMatrix[16];
+//  std::memcpy(viewMatrix, glm::value_ptr(viewMat), sizeof(float) * 16);
+//  std::memcpy(projectionMatrix, glm::value_ptr(projMat), sizeof(float) * 16);
+//
+//  // Perform manipulation
+//  ImGuizmo::Manipulate(
+//      viewMatrix,
+//      projectionMatrix,
+//      mCurrentGizmoOperation,
+//      mCurrentGizmoMode,
+//      modelMatrix,
+//      nullptr,
+//      useSnap ? &snap.x : nullptr);
+//
+//  // Update the matrix with manipulated result
+//  matrix = glm::make_mat4(modelMatrix);
+//
+//	return matrix;
+//}
+//UUID RenderNode(Entity e, Scene* scene) {
+//  auto tag = e.GetComponent<TagComponent>();
+//  static UUID selectedNode = -1;
+//  UUID currentNode = e.GetComponent<IDComponent>()->ID;
+//  int childCount = 0;
+//  RelationshipComponent* r = nullptr;
+//
+//  if (e.HasComponent<RelationshipComponent>()) {
+//    r = e.GetComponent<RelationshipComponent>();
+//    childCount = r->Children.size();
+//  }
+//
+//  ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow;
+//  if (childCount == 0) {
+//    flags |= ImGuiTreeNodeFlags_Leaf;
+//  }
+//  if (selectedNode == currentNode) {
+//    flags |= ImGuiTreeNodeFlags_Selected;
+//  }
+//
+//  if (ImGui::TreeNodeEx(tag->Tag.c_str(), flags)) {
+//    if (ImGui::IsItemClicked()) {
+//      RN_LOG("Name: {} ID: {} C: {}", tag->Tag, (uint64_t)currentNode, (uint64_t)selectedNode);
+//      selectedNode = currentNode;
+//    }
+//
+//    if (r != nullptr) {
+//      if (r->Children.size() > 0) {
+//        ImGui::Indent(0.5f);
+//      }
+//
+//      for (auto child : r->Children) {
+//        Entity childEntity = scene->TryGetEntityWithUUID(child);
+//        RenderNode(childEntity, scene);
+//      }
+//    }
+//
+//    ImGui::TreePop();
+//  }
+//
+//  return selectedNode;
+//}
 
 void Scene::OnRender(Ref<SceneRenderer> renderer) {
   RN_PROFILE_FUNC;
@@ -228,61 +228,61 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
     SceneLightInfo.LightPos = glm::vec3(0.0f);
   });
 
-  ImGuizmo::BeginFrame();
-  ImGui::Begin("Scene Settings");
+  //ImGuizmo::BeginFrame();
+  //ImGui::Begin("Scene Settings");
 
-  glm::vec3 rotation = glm::vec3(rotX, rotY, rotZ);
-  if (ImGui::InputFloat3("Light Direction", glm::value_ptr(rotation), "%.3f")) {
-    rotX = rotation.x;
-    rotY = rotation.y;
-    rotZ = rotation.z;
+  //glm::vec3 rotation = glm::vec3(rotX, rotY, rotZ);
+  //if (ImGui::InputFloat3("Light Direction", glm::value_ptr(rotation), "%.3f")) {
+  //  rotX = rotation.x;
+  //  rotY = rotation.y;
+  //  rotZ = rotation.z;
 
-    auto ent2 = TryGetEntityWithUUID(entityIdDir);
-    auto transform2 = ent2.GetComponent<TransformComponent>();
-    transform2->SetRotationEuler(glm::radians(rotation));
-  }
+  //  auto ent2 = TryGetEntityWithUUID(entityIdDir);
+  //  auto transform2 = ent2.GetComponent<TransformComponent>();
+  //  transform2->SetRotationEuler(glm::radians(rotation));
+  //}
 
-  static float metallic = 0.0, roughness = 0.0, ao = 0.0;
+  //static float metallic = 0.0, roughness = 0.0, ao = 0.0;
 
-  if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
-    auto mat = cityModel->Materials->GetMaterial(0);
-    mat->Set("Metallic", metallic);
-  }
+  //if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
+  //  auto mat = cityModel->Materials->GetMaterial(0);
+  //  mat->Set("Metallic", metallic);
+  //}
 
-  if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
-    auto mat = cityModel->Materials->GetMaterial(0);
-    mat->Set("Roughness", roughness);
-  }
+  //if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
+  //  auto mat = cityModel->Materials->GetMaterial(0);
+  //  mat->Set("Roughness", roughness);
+  //}
 
-  if (ImGui::SliderFloat("Ao", &ao, 0.0f, 1.0f)) {
-    auto mat = cityModel->Materials->GetMaterial(0);
-    mat->Set("Ao", ao);
-  }
+  //if (ImGui::SliderFloat("Ao", &ao, 0.0f, 1.0f)) {
+  //  auto mat = cityModel->Materials->GetMaterial(0);
+  //  mat->Set("Ao", ao);
+  //}
 
-  ImGui::End();
+  //ImGui::End();
 
-  auto pt = GetWorldSpaceTransformMatrix(map);
+  //auto pt = GetWorldSpaceTransformMatrix(map);
 
-  auto v = m_SceneCamera->GetViewMatrix();
+  //auto v = m_SceneCamera->GetViewMatrix();
 
-  static auto projectionMatrix1 = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1400.0f);
+  //static auto projectionMatrix1 = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1400.0f);
 
-  ImGui::Begin("Hierarchy");
+  //ImGui::Begin("Hierarchy");
 
-  m_World.each([this](flecs::entity e, IDComponent& id, RelationshipComponent& r, TagComponent& t) {
-    Entity entity = TryGetEntityWithUUID(id.ID);
-    if (r.ParentHandle == 0) {
-      auto uuid = RenderNode(entity, this);
+  //m_World.each([this](flecs::entity e, IDComponent& id, RelationshipComponent& r, TagComponent& t) {
+  //  Entity entity = TryGetEntityWithUUID(id.ID);
+  //  if (r.ParentHandle == 0) {
+  //    auto uuid = RenderNode(entity, this);
 
-      if (uuid == id.ID) {
-        auto pt = entity.GetComponent<TransformComponent>()->GetTransform();
-        auto tm = EditTransform(pt);
-				entity.GetComponent<TransformComponent>()->SetTransform(tm);
-      }
-    }
-  });
+  //    if (uuid == id.ID) {
+  //      auto pt = entity.GetComponent<TransformComponent>()->GetTransform();
+  //      auto tm = EditTransform(pt);
+	//			entity.GetComponent<TransformComponent>()->SetTransform(tm);
+  //    }
+  //  }
+  //});
 
-  ImGui::End();
+  //ImGui::End();
 
   renderer->EndScene();
 }

@@ -1,5 +1,6 @@
 #include "Shader.h"
 #include "render/RenderContext.h"
+#include "render/RenderUtils.h"
 #include "io/filesystem.h"
 
 Ref<Shader> Shader::Create(const std::string& name, const std::string& filePath) {
@@ -12,10 +13,10 @@ Ref<Shader> Shader::CreateFromSring(const std::string& name, const std::string& 
 
   WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
   shaderCodeDesc.chain.next = nullptr;
-  shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-  shaderCodeDesc.code = content.c_str();
+  shaderCodeDesc.chain.sType = WGPUSType_ShaderSourceWGSL;
+  shaderCodeDesc.code = RenderUtils::MakeLabel(content);
   WGPUShaderModuleDescriptor shaderDesc;
-	shaderDesc.label = name.c_str();
+	shaderDesc.label = RenderUtils::MakeLabel(name);
   shaderDesc.nextInChain = &shaderCodeDesc.chain;
 
 	shader->m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);
@@ -26,10 +27,10 @@ void Shader::Reload(std::string& content) {
 
   WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
   shaderCodeDesc.chain.next = nullptr;
-  shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-  shaderCodeDesc.code = content.c_str();
+  shaderCodeDesc.chain.sType = WGPUSType_ShaderSourceWGSL;
+  shaderCodeDesc.code = RenderUtils::MakeLabel(content);
   WGPUShaderModuleDescriptor shaderDesc;
-	shaderDesc.label = "PPK";
+	shaderDesc.label = RenderUtils::MakeLabel("PPK");
   shaderDesc.nextInChain = &shaderCodeDesc.chain;
 	m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);
 }

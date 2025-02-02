@@ -3,6 +3,7 @@
 #include "render/RenderContext.h"
 #include "render/RenderUtils.h"
 #include "render/TextureImporter.h"
+#include "render/RenderUtils.h"
 
 #ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
@@ -75,7 +76,7 @@ void Texture2D::Invalidate() {
   ZERO_INIT(textureDesc);
 
   textureDesc.nextInChain = nullptr;
-  textureDesc.label = m_TextureProps.DebugName.c_str();
+  textureDesc.label = RenderUtils::MakeLabel(m_TextureProps.DebugName);
 
   if (m_TextureProps.GenerateMips) {
     textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_StorageBinding | WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst;
@@ -185,7 +186,7 @@ void TextureCube::Invalidate() {
 	WGPUExtent3D cubemapSize = {m_TextureProps.Width, m_TextureProps.Height, 6};
 
   WGPUTextureDescriptor textureDesc;
-  textureDesc.label = "MMB1";
+  textureDesc.label = RenderUtils::MakeLabel("MMB1");
   textureDesc.dimension = WGPUTextureDimension_2D;
   textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
   // textureDesc.format = RenderTypeUtils::ToRenderType(m_TextureProps.Format);
@@ -194,12 +195,14 @@ void TextureCube::Invalidate() {
   textureDesc.sampleCount = 1;
   //textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
   textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_StorageBinding | WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst;
+
+
   textureDesc.viewFormatCount = 0;
   textureDesc.viewFormats = nullptr;
   textureDesc.nextInChain = nullptr;
 
   m_TextureBuffer = wgpuDeviceCreateTexture(RenderContext::GetDevice(), &textureDesc);
-	textureDesc.label = "MMB2";
+	textureDesc.label = RenderUtils::MakeLabel("MMB2");
 	textureDesc.format = WGPUTextureFormat_RGBA32Float;
 	textureDesc.mipLevelCount = 1;
   m_TextureBufferAlt = wgpuDeviceCreateTexture(RenderContext::GetDevice(), &textureDesc);
@@ -215,12 +218,13 @@ void TextureCube::Invalidate() {
   textureDesc.format = WGPUTextureFormat_RGBA8Unorm;
 
   WGPUTextureViewDescriptor textureViewDesc;
-  textureViewDesc.label = "MMB_View";
+  textureViewDesc.label = RenderUtils::MakeLabel("MMB_View");
   textureViewDesc.aspect = WGPUTextureAspect_All;
   textureViewDesc.baseArrayLayer = 0;
   textureViewDesc.arrayLayerCount = 6;
   textureViewDesc.baseMipLevel = 0;
   textureViewDesc.mipLevelCount = textureDesc.mipLevelCount;
+	textureViewDesc.usage = textureDesc.usage;
   textureViewDesc.dimension = WGPUTextureViewDimension_Cube;
   //textureViewDesc.format = textureDesc.format;
 	textureViewDesc.format = WGPUTextureFormat_RGBA8Unorm;

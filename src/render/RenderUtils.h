@@ -140,8 +140,8 @@ struct BufferElement {
 
 class VertexBufferLayout {
  public:
-
-  VertexBufferLayout() : m_Stride(0), m_Elements() {};
+  VertexBufferLayout()
+      : m_Stride(0), m_Elements() {};
 
   VertexBufferLayout(uint32_t stride, std::initializer_list<BufferElement> elements)
       : m_Stride(stride), m_Elements(elements) {
@@ -265,17 +265,20 @@ class LayoutUtils {
 };
 
 class RenderTypeUtils {
-	public:
-		static TextureFormat FromRenderType(WGPUTextureFormat format);
-		static TextureWrappingFormat FromRenderType(WGPUAddressMode format);
-		static FilterMode FromRenderType(WGPUFilterMode format);
+ public:
+  static TextureFormat FromRenderType(WGPUTextureFormat format);
+  static TextureWrappingFormat FromRenderType(WGPUAddressMode format);
+  static FilterMode FromRenderType(WGPUFilterMode format);
 
-		static WGPUTextureFormat  ToRenderType(TextureFormat format);
-		static WGPUAddressMode ToRenderType(TextureWrappingFormat format);
-		static WGPUFilterMode ToRenderType(FilterMode format);
+  static WGPUTextureFormat ToRenderType(TextureFormat format);
+  static WGPUAddressMode ToRenderType(TextureWrappingFormat format);
+  static WGPUFilterMode ToRenderType(FilterMode format);
 };
 
 class RenderUtils {
-	public:
-		static uint32_t CalculateMipCount(uint32_t width, uint32_t height);
+ public:
+  static uint32_t CalculateMipCount(uint32_t width, uint32_t height);
+
+  static WGPUStringView MakeLabel(const char* str);
+  static WGPUStringView MakeLabel(const std::string& str);
 };

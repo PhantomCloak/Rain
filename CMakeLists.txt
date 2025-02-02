@@ -19,7 +19,7 @@ file(GLOB IMGUI_SOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_wgpu.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/vendor/ImGuizmo/*.cpp")
 
-list(APPEND SOURCES ${IMGUI_SOURCES})
+#list(APPEND SOURCES ${IMGUI_SOURCES})
 
 if(APPLE)
   list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/osx/macos_window.mm")
@@ -34,7 +34,8 @@ set_target_properties(ReEngine PROPERTIES
   EXPORT_COMPILE_COMMANDS ON
 )
 
-target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui" "vendor/ImGuizmo")
+#target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui" "vendor/ImGuizmo")
+target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb)
 target_compile_definitions(ReEngine PRIVATE RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources")
 
 #if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")

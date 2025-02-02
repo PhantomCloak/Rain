@@ -33,7 +33,7 @@ WGPUVertexFormat ConvertWGPUVertexFormat(ShaderDataType type) {
       break;
   }
   RN_CORE_ASSERT("Undefined Vertex Format");
-  return WGPUVertexFormat_Undefined;
+  return WGPUVertexFormat_Float32;
 }
 
 RenderPipeline::RenderPipeline(const RenderPipelineSpec& props)
@@ -48,7 +48,7 @@ void RenderPipeline::Invalidate() {
   //}
 
   WGPURenderPipelineDescriptor* pipelineDesc = (WGPURenderPipelineDescriptor*)malloc(sizeof(WGPURenderPipelineDescriptor));
-  pipelineDesc->label = m_PipelineSpec.DebugName.c_str();
+  pipelineDesc->label = RenderUtils::MakeLabel(m_PipelineSpec.DebugName);
 
   std::vector<WGPUVertexAttribute> vertexAttributes;
   std::vector<WGPUVertexAttribute> instanceAttributes;
@@ -91,18 +91,19 @@ void RenderPipeline::Invalidate() {
   pipelineDesc->vertex.bufferCount = vertexLayouts.size();
   pipelineDesc->vertex.buffers = vertexLayouts.data();
   pipelineDesc->vertex.module = m_PipelineSpec.Shader->GetNativeShaderModule();
-  pipelineDesc->vertex.entryPoint = "vs_main";  // let be constant for now
+  pipelineDesc->vertex.entryPoint = RenderUtils::MakeLabel("vs_main");  // let be constant for now
   pipelineDesc->vertex.nextInChain = nullptr;
   pipelineDesc->primitive.topology = WGPUPrimitiveTopology_TriangleList;
   pipelineDesc->primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
   pipelineDesc->primitive.frontFace = WGPUFrontFace_CCW;
   pipelineDesc->primitive.nextInChain = nullptr;
+	pipelineDesc->primitive.unclippedDepth = true;
 
   std::vector<WGPUConstantEntry>* constants = new std::vector<WGPUConstantEntry>();
 
   for (const auto& [key, value] : m_PipelineSpec.Overrides) {
     WGPUConstantEntry constant;
-    constant.key = key.c_str();
+    constant.key = RenderUtils::MakeLabel(key);
     constant.value = static_cast<double>(value);
     constant.nextInChain = nullptr;
     constants->push_back(constant);
@@ -121,15 +122,15 @@ void RenderPipeline::Invalidate() {
 
   pipelineDesc->primitive.cullMode = mode;
 
-  WGPUFragmentState* fragmentState = (WGPUFragmentState*)malloc(sizeof(WGPUFragmentState));
+  WGPUFragmentState* fragmentState = ZERO_ALLOC(WGPUFragmentState);
   fragmentState->module = m_PipelineSpec.Shader->GetNativeShaderModule();
-  fragmentState->entryPoint = "fs_main";
+  fragmentState->entryPoint = RenderUtils::MakeLabel("fs_main");
   fragmentState->constantCount = 0;
   fragmentState->constants = NULL;
   fragmentState->nextInChain = nullptr;
 
   if (m_PipelineSpec.TargetFramebuffer->HasColorAttachment()) {
-    WGPUBlendState* blendState = (WGPUBlendState*)malloc(sizeof(WGPUBlendState));
+    WGPUBlendState* blendState = ZERO_ALLOC(WGPUBlendState);
     blendState->color.srcFactor = WGPUBlendFactor_SrcAlpha;
     blendState->color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
     blendState->color.operation = WGPUBlendOperation_Add;
@@ -137,7 +138,7 @@ void RenderPipeline::Invalidate() {
     blendState->alpha.dstFactor = WGPUBlendFactor_One;
     blendState->alpha.operation = WGPUBlendOperation_Add;
 
-    WGPUColorTargetState* colorTarget = (WGPUColorTargetState*)malloc(sizeof(WGPUColorTargetState));
+    WGPUColorTargetState* colorTarget = ZERO_ALLOC(WGPUColorTargetState);
     colorTarget->format = RenderTypeUtils::ToRenderType(m_PipelineSpec.TargetFramebuffer->m_FrameBufferSpec.ColorFormat);
     colorTarget->blend = blendState;
     colorTarget->writeMask = WGPUColorWriteMask_All;
@@ -149,7 +150,7 @@ void RenderPipeline::Invalidate() {
   fragmentState->targetCount = m_PipelineSpec.TargetFramebuffer->HasColorAttachment() ? 1 : 0;
 
   if (m_PipelineSpec.TargetFramebuffer->HasDepthAttachment()) {
-    WGPUDepthStencilState* depthStencilState = (WGPUDepthStencilState*)malloc(sizeof(WGPUDepthStencilState));
+    WGPUDepthStencilState* depthStencilState = ZERO_ALLOC(WGPUDepthStencilState);
     depthStencilState->format = WGPUTextureFormat_Depth24Plus;
     depthStencilState->stencilReadMask = 0xFFFFFFFF;
     depthStencilState->stencilWriteMask = 0xFFFFFFFF;
@@ -169,7 +170,7 @@ void RenderPipeline::Invalidate() {
     depthStencilState->stencilBack.passOp = WGPUStencilOperation_Keep;
 
     depthStencilState->depthCompare = WGPUCompareFunction_Less;
-    depthStencilState->depthWriteEnabled = true;
+    depthStencilState->depthWriteEnabled = WGPUOptionalBool_True;
 
     depthStencilState->stencilReadMask = 0xFFFFFFFF;
     depthStencilState->stencilWriteMask = 0xFFFFFFFF;
@@ -188,6 +189,7 @@ void RenderPipeline::Invalidate() {
 
   if (m_PipelineSpec.DebugName == "RP_Composite" || m_PipelineSpec.DebugName == "RP_Skybox") {
     pipelineDesc->multisample.count = 4;
+		pipelineDesc->primitive.unclippedDepth = true;
   }
 
   auto device = RenderContext::GetDevice();
@@ -196,10 +198,12 @@ void RenderPipeline::Invalidate() {
   for (const auto& [_, layout] : m_PipelineSpec.Shader->GetReflectionInfo().LayoutDescriptors) {
     bindGroupLayouts.push_back(layout);
   }
-  WGPUPipelineLayoutDescriptor* layoutDesc = (WGPUPipelineLayoutDescriptor*)malloc(sizeof(WGPUPipelineLayoutDescriptor));
+  WGPUPipelineLayoutDescriptor* layoutDesc = ZERO_ALLOC(WGPUPipelineLayoutDescriptor);
   layoutDesc->bindGroupLayoutCount = bindGroupLayouts.size();
   layoutDesc->bindGroupLayouts = bindGroupLayouts.data();
   layoutDesc->nextInChain = nullptr;
+  layoutDesc->immediateDataRangeByteSize = 0;
+	layoutDesc->label = RenderUtils::MakeLabel(m_PipelineSpec.DebugName);
 
   WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, layoutDesc);
   pipelineDesc->layout = pipelineLayout;

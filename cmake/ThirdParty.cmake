@@ -58,7 +58,7 @@ if(EMSCRIPTEN)
 	#string(APPEND CMAKE_CXX_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
 	#string(APPEND CMAKE_EXE_LINKER_FLAGS " ${EMSCRIPTEN_PTHREADS_LINKER_FLAGS}")
 else()
-	add_subdirectory(vendor/PhysX/physx/compiler/public)
+	#add_subdirectory(vendor/PhysX/physx/compiler/public)
 	add_library(TracyClient STATIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/TracyClient.cpp)
 	target_include_directories(TracyClient PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/tracy)
 	target_compile_definitions(TracyClient PUBLIC TRACY_ENABLE=1)
@@ -102,7 +102,6 @@ else()
   dawn_headers
   dawn_native
   dawn_platform
-  dawn_utils
   dawn_wire
   dawncpp
   dawncpp_headers
@@ -112,11 +111,11 @@ else()
 	flecs
 	TracyClient
 	glfw
-	assimp
-	PhysX
-	PhysXCooking 
-	PhysXCommon
-	PhysXExtensions)
+	assimp)
+	##PhysX
+	##PhysXCooking 
+	##PhysXCommon
+	##PhysXExtensions)
 endif()
 
 

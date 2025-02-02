@@ -5,7 +5,6 @@
 
 class RenderContext {
  public:
-  static WGPUSwapChain& GetSwapChain() { return *Instance().m_SwapChain; }
   static WGPUSurface& GetSurface() { return *Instance().m_Surface; }
   static WGPUAdapter& GetAdapter() { return *Instance().m_Adapter; }
   static WGPUDevice& GetDevice() { return *Instance().m_Device; }
@@ -26,7 +25,6 @@ class RenderContext {
   Ref<WGPUQueue> m_Queue;
   Ref<WGPUSurface> m_Surface;
   Ref<WGPUAdapter> m_Adapter;
-  Ref<WGPUSwapChain> m_SwapChain;
 
   friend class Render;
 };

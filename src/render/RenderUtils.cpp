@@ -15,6 +15,15 @@ void LayoutUtils::SetVisibility(WGPUBindGroupLayoutEntry& entry,
   }
 }
 
+WGPUStringView RenderUtils::MakeLabel(const char* str) {
+  return {str, strlen(str)};
+}
+
+// For std::string if needed
+WGPUStringView RenderUtils::MakeLabel(const std::string& str) {
+  return {str.c_str(), str.size()};
+}
+
 void LayoutUtils::SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type) {
   switch (type) {
     case GroupLayoutType::Uniform:
@@ -75,7 +84,7 @@ WGPUBindGroupLayout LayoutUtils::CreateBindGroup(std::string label, WGPUDevice d
   // TODO(memory): We need to introduce custom allocator in the future
   // or alternatively use callbacks to handle release
   WGPUBindGroupLayoutDescriptor* descriptor = new WGPUBindGroupLayoutDescriptor{};
-  descriptor->label = label.c_str();
+  descriptor->label = RenderUtils::MakeLabel(label);
   descriptor->entries = entries.data();
   descriptor->entryCount = entries.size();
 

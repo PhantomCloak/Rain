@@ -12,11 +12,12 @@ class Render {
   static Render* Instance;
   bool Init(void* window);
 
-  WGPUSwapChain BuildSwapChain(WGPUSwapChainDescriptor descriptor, WGPUDevice device, WGPUSurface surface);
   Ref<RenderContext> GetRenderContext() { return m_RenderContext; }
 
   static Ref<Texture2D> GetWhiteTexture();
   static Ref<Sampler> GetDefaultSampler();
+
+	void ConfigureSurface(uint32_t width, uint32_t height);
 
   static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
   // static WGPUComputePassEncoder BeginComputePass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
@@ -57,6 +58,8 @@ class Render {
   WGPUAdapter RequestAdapter(WGPUInstance instance, WGPURequestAdapterOptions const* options);
   WGPUDevice RequestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor);
 
+	WGPUTextureView GetCurrentTextureView();
+
  public:
   Ref<RenderContext> m_RenderContext;
   Ref<RenderPass> m_CurrentRenderPass;
@@ -69,11 +72,8 @@ class Render {
   WGPUTextureView m_SwapTexture;
 	WGPULimits m_Limits;
 
-  WGPUSwapChain m_swapChain = nullptr;
   WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_Undefined;
   WGPUTextureFormat m_depthTextureFormat = WGPUTextureFormat_Depth24Plus;
-
-  WGPUSwapChainDescriptor m_swapChainDesc;
 
   friend class RenderContext;
 };
