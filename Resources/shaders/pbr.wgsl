@@ -327,18 +327,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 			);
 
 //#ifdef DEBUG_CASCADES
-//	return vec4f(cascadeColors[layer], 1.0);
+	//return vec4f(cascadeColors[layer], 1.0);
 //#endif
 
 	// Final Color
-	//var shadowScale = sampleShadow(in, layer, bias);
+	var shadowScale = sampleShadow(in, layer, bias);
 
-var shadowScale = PCSS_DirectionalLight(
-    u_ShadowMap, 
-    layer, 
-    GetShadowMapCoords(in, layer),
-    10.0f  // Or whatever uniform holds your light size
-);
+//var shadowScale = PCSS_DirectionalLight(
+//    u_ShadowMap, 
+//    layer, 
+//    GetShadowMapCoords(in, layer),
+//    10.0f  // Or whatever uniform holds your light size
+//);
 	shadowScale = 1.0 - clamp(1.0 - shadowScale, 0.0f, 1.0f);
 	//shadowScale = 1.0;
 	var lightContribution = CalculateDirLights(FO,
