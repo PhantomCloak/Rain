@@ -3,7 +3,6 @@
 
 // #include "src/tint/api/tint.h"
 #include "core/Log.h"
-#include "src/tint/lang/core/type/reference.h"
 #include "src/tint/lang/core/type/storage_texture.h"
 #include "src/tint/lang/wgsl/inspector/inspector.h"
 #include "src/tint/lang/wgsl/reader/reader.h"

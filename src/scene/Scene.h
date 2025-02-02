@@ -13,8 +13,8 @@ class Entity;
 class SceneRenderer;
 
 struct LightInfo {
-	glm::vec3 LightDirection;
-	glm::vec3 LightPos;
+  glm::vec3 LightDirection;
+  glm::vec3 LightPos;
 };
 
 class Scene {
@@ -32,13 +32,14 @@ class Scene {
   void BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh);
   Entity TryGetEntityWithUUID(UUID id) const;
   glm::mat4 GetWorldSpaceTransformMatrix(Entity entity);
+  glm::mat4 EditTransform(glm::mat4& matrix);
 
+  void OnMouseMove(double xPos, double yPos);
+  void ScanKeyPress();
 
-	void OnMouseMove(double xPos, double yPos);
-	void ScanKeyPress();
-
-	LightInfo SceneLightInfo;
+  LightInfo SceneLightInfo;
   std::unique_ptr<PlayerCamera> m_SceneCamera;
+
  private:
   std::unordered_map<UUID, Entity> m_EntityMap;
   flecs::world m_World;

@@ -1,6 +1,5 @@
 #include "BindingManager.h"
 #include "debug/Profiler.h"
-#include "render/Render.h"
 
 RenderPassResourceType GetRenderPassTypeFromShaderDecl(BindingType type) {
   switch (type) {

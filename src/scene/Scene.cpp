@@ -10,6 +10,7 @@
 #include "io/keyboard.h"
 #include "render/ResourceManager.h"
 // #include <Tracy.hpp>
+#include "ImGuizmo/ImGuizmo.h"
 
 Scene::Scene(std::string sceneName)
     : m_Name(sceneName) {}
@@ -25,40 +26,42 @@ float rotZ = 25.0;
 UUID entityIdDir = 0.0;
 Entity entityCamera;
 Ref<MeshSource> cityModel;
+Entity map;
 
 void Scene::Init() {
   m_SceneCamera = std::make_unique<PlayerCamera>();
-  m_SceneCamera->Position.x = -105.414;
-  m_SceneCamera->Position.y = 72.52;
-	m_SceneCamera->Position.z = -139.405;
-	m_SceneCamera->Yaw = 128.699;
-	m_SceneCamera->Pitch = -24.00;
-
-
+  //m_SceneCamera->Position.x = -105.414;
+  //m_SceneCamera->Position.y = 72.52;
+  //m_SceneCamera->Position.z = -139.405;
+  //m_SceneCamera->Yaw = 128.699;
+  //m_SceneCamera->Pitch = -24.00;
 
   //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/cityz.gltf");
   cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/Helment/untitled.gltf");
-	//cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/glTF/DamagedHelmet.gltf");
-  //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/weapon.gltf");
-  //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/sponza/SponzaExp5.gltf");
-	//cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test.gltf");
-  //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
-  //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/pbr_spheres/scene.gltf");
-  Entity map = CreateEntity("Box");
-  //map.GetComponent<TransformComponent>()->Translation = glm::vec3(0.0, 0.0, 0);
-  //map.GetComponent<TransformComponent>()->Scale = glm::vec3(300.0f);
-  //map.GetComponent<TransformComponent>()->Scale = glm::vec3(0.10f);
-  //map.GetComponent<TransformComponent>()->Scale = glm::vec3(25.0f);
-	//map.GetComponent<TransformComponent>()->Scale = glm::vec3(350.0f);
-	map.GetComponent<TransformComponent>()->Scale = glm::vec3(15.0f);
-	//map.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(90.0), glm::radians(0.0), glm::radians(180.0)));
+	auto cityModel2 = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
+  //  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/glTF/DamagedHelmet.gltf");
+  //  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/weapon.gltf");
+  //  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/sponza/SponzaExp5.gltf");
+  //  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test.gltf");
+  //  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
+  //  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/pbr_spheres/scene.gltf");
+  map = CreateEntity("Box");
+  auto map2 = CreateEntity("Box2");
+  // map.GetComponent<TransformComponent>()->Translation = glm::vec3(0.0, 0.0, 0);
+  // map.GetComponent<TransformComponent>()->Scale = glm::vec3(300.0f);
+  // map.GetComponent<TransformComponent>()->Scale = glm::vec3(0.10f);
+  // map.GetComponent<TransformComponent>()->Scale = glm::vec3(25.0f);
+  // map.GetComponent<TransformComponent>()->Scale = glm::vec3(350.0f);
+   map.GetComponent<TransformComponent>()->Scale = glm::vec3(1.0f);
+   map2.GetComponent<TransformComponent>()->Scale = glm::vec3(1.0f);
+  // map.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(90.0), glm::radians(0.0), glm::radians(180.0)));
   //map.GetComponent<TransformComponent>()->Scale = glm::vec3(0.10f);
   BuildMeshEntityHierarchy(map, cityModel);
+  BuildMeshEntityHierarchy(map2, cityModel2);
 
-
-	//auto mat = cityModel->Materials->GetMaterial(0);
-	//mat->Set("Metallic", 0.1);
-	//mat->Set("Roughness", 1.0);
+  // auto mat = cityModel->Materials->GetMaterial(0);
+  // mat->Set("Metallic", 0.1);
+  // mat->Set("Roughness", 1.0);
 
   Entity light = CreateEntity("DirectionalLight");
   light.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
@@ -100,6 +103,104 @@ void Scene::OnUpdate() {
   ScanKeyPress();
 }
 
+glm::mat4 Scene::EditTransform(glm::mat4& matrix) {
+  static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::ROTATE);
+  static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::WORLD);
+
+  // Handle keyboard shortcuts
+  if (ImGui::IsKeyPressed(ImGuiKey_Z)) {
+    mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+  }
+  if (ImGui::IsKeyPressed(ImGuiKey_E)) {
+    mCurrentGizmoOperation = ImGuizmo::ROTATE;
+  }
+  if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+    mCurrentGizmoOperation = ImGuizmo::SCALE;
+  }
+
+  // Prepare matrices for manipulation
+  float modelMatrix[16];
+  std::memcpy(modelMatrix, glm::value_ptr(matrix), sizeof(float) * 16);
+
+  // Snapping controls
+  static bool useSnap(false);
+  if (ImGui::IsKeyPressed(ImGuiKey_S)) {
+    useSnap = !useSnap;
+  }
+  glm::vec3 snap(0.0f);
+
+  // Setup manipulation environment
+  ImGuiIO& io = ImGui::GetIO();
+  ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
+  // Get view and projection matrices
+  const glm::mat4& viewMat = m_SceneCamera->GetViewMatrix();
+  static float w = Application::Get()->GetWindowSize().x;
+  static float h = Application::Get()->GetWindowSize().y;
+  static const glm::mat4 projMat = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1400.0f);
+
+  float viewMatrix[16], projectionMatrix[16];
+  std::memcpy(viewMatrix, glm::value_ptr(viewMat), sizeof(float) * 16);
+  std::memcpy(projectionMatrix, glm::value_ptr(projMat), sizeof(float) * 16);
+
+  // Perform manipulation
+  ImGuizmo::Manipulate(
+      viewMatrix,
+      projectionMatrix,
+      mCurrentGizmoOperation,
+      mCurrentGizmoMode,
+      modelMatrix,
+      nullptr,
+      useSnap ? &snap.x : nullptr);
+
+  // Update the matrix with manipulated result
+  matrix = glm::make_mat4(modelMatrix);
+
+	return matrix;
+}
+UUID RenderNode(Entity e, Scene* scene) {
+  auto tag = e.GetComponent<TagComponent>();
+  static UUID selectedNode = -1;
+  UUID currentNode = e.GetComponent<IDComponent>()->ID;
+  int childCount = 0;
+  RelationshipComponent* r = nullptr;
+
+  if (e.HasComponent<RelationshipComponent>()) {
+    r = e.GetComponent<RelationshipComponent>();
+    childCount = r->Children.size();
+  }
+
+  ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow;
+  if (childCount == 0) {
+    flags |= ImGuiTreeNodeFlags_Leaf;
+  }
+  if (selectedNode == currentNode) {
+    flags |= ImGuiTreeNodeFlags_Selected;
+  }
+
+  if (ImGui::TreeNodeEx(tag->Tag.c_str(), flags)) {
+    if (ImGui::IsItemClicked()) {
+      RN_LOG("Name: {} ID: {} C: {}", tag->Tag, (uint64_t)currentNode, (uint64_t)selectedNode);
+      selectedNode = currentNode;
+    }
+
+    if (r != nullptr) {
+      if (r->Children.size() > 0) {
+        ImGui::Indent(0.5f);
+      }
+
+      for (auto child : r->Children) {
+        Entity childEntity = scene->TryGetEntityWithUUID(child);
+        RenderNode(childEntity, scene);
+      }
+    }
+
+    ImGui::TreePop();
+  }
+
+  return selectedNode;
+}
+
 void Scene::OnRender(Ref<SceneRenderer> renderer) {
   RN_PROFILE_FUNC;
   renderer->SetScene(this);
@@ -107,9 +208,9 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
   static float w = Application::Get()->GetWindowSize().x;
   static float h = Application::Get()->GetWindowSize().y;
 
-  static auto projectionMatrix = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 2400.0f);
+  static auto projectionMatrix = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1400.0f);
 
-  renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 0.10, 2400.0f});
+  renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 0.10, 1400.0f});
 
   static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
   drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent) {
@@ -127,6 +228,7 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
     SceneLightInfo.LightPos = glm::vec3(0.0f);
   });
 
+  ImGuizmo::BeginFrame();
   ImGui::Begin("Scene Settings");
 
   glm::vec3 rotation = glm::vec3(rotX, rotY, rotZ);
@@ -159,8 +261,32 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
 
   ImGui::End();
 
+  auto pt = GetWorldSpaceTransformMatrix(map);
+
+  auto v = m_SceneCamera->GetViewMatrix();
+
+  static auto projectionMatrix1 = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1400.0f);
+
+  ImGui::Begin("Hierarchy");
+
+  m_World.each([this](flecs::entity e, IDComponent& id, RelationshipComponent& r, TagComponent& t) {
+    Entity entity = TryGetEntityWithUUID(id.ID);
+    if (r.ParentHandle == 0) {
+      auto uuid = RenderNode(entity, this);
+
+      if (uuid == id.ID) {
+        auto pt = entity.GetComponent<TransformComponent>()->GetTransform();
+        auto tm = EditTransform(pt);
+				entity.GetComponent<TransformComponent>()->SetTransform(tm);
+      }
+    }
+  });
+
+  ImGui::End();
+
   renderer->EndScene();
 }
+
 void Scene::BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh) {
   const std::vector<Ref<MeshNode>> nodes = mesh->GetNodes();
 
@@ -190,7 +316,7 @@ glm::mat4 Scene::GetWorldSpaceTransformMatrix(Entity entity) {
 }
 
 void Scene::ScanKeyPress() {
-  float speed = 1.55f;
+  float speed = 0.55f;
 
   if (Keyboard::IsKeyPressing(Rain::Key::W)) {
     m_SceneCamera->ProcessKeyboard(FORWARD, speed);

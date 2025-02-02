@@ -45,9 +45,9 @@ void CalculateCascades(CascadeData* cascades, const SceneCamera& sceneCamera, gl
   float CascadeSplitLambda = 0.92f;
   // float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
    //float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -320.0f;
-  // float CascadeFarPlaneOffset = 250.0f, CascadeNearPlaneOffset = -250.0f;
+   float CascadeFarPlaneOffset = 250.0f, CascadeNearPlaneOffset = -250.0f;
 	//float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
-	float CascadeFarPlaneOffset = 50.0f, CascadeNearPlaneOffset = -50.0f;
+	//float CascadeFarPlaneOffset = 50.0f, CascadeNearPlaneOffset = -50.0f;
 	//float CascadeFarPlaneOffset = 50.0f, CascadeNearPlaneOffset = -50.0f;
   // float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -100.0f;
 
@@ -416,6 +416,9 @@ void SceneRenderer::Init() {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   auto& io = ImGui::GetIO();
+	ImGuiStyle& style = ImGui::GetStyle();
+	style.ScaleAllSizes(2.0f);  // Scale everything by 2x
+	io.FontGlobalScale = 2.0f;
   ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
 
   ImGui_ImplWGPU_InitInfo initInfo;

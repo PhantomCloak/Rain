@@ -25,3 +25,6 @@
 [submodule "vendor/astc-encoder"]
 	path = vendor/astc-encoder
 	url = git@github.com:ARM-software/astc-encoder.git
+[submodule "vendor/ImGuizmo"]
+	path = vendor/ImGuizmo
+	url = https://github.com/CedricGuillemet/ImGuizmo.git
