@@ -36,38 +36,41 @@ static WGPURendererData* s_Data = nullptr;
 // extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
 
 #include "glfw3webgpu.h"
-WGPUInstance Render::CreateGPUInstance() {
-  WGPUInstanceDescriptor* instanceDesc = ZERO_ALLOC(WGPUInstanceDescriptor);
-  instanceDesc->nextInChain = nullptr;
 
-#if !__EMSCRIPTEN__
-  static std::vector<const char*> enabledToggles = {
-      "chromium_disable_uniformity_analysis",
-      "allow_unsafe_apis"};
+struct UserData {
+  WGPUAdapter adapter = nullptr;
+  bool requestEnded = false;
+};
 
-  WGPUDawnTogglesDescriptor dawnToggleDesc = {};
-  dawnToggleDesc.chain.next = nullptr;
-  dawnToggleDesc.chain.sType = WGPUSType_DawnTogglesDescriptor;
+struct AdapterRequestData {
+  WGPUAdapter adapter = nullptr;
+  bool requestEnded = false;
+};
 
-  dawnToggleDesc.enabledToggles = enabledToggles.data();
-  dawnToggleDesc.enabledToggleCount = enabledToggles.size();
-  dawnToggleDesc.disabledToggleCount = 0;
+struct DeviceRequestData {
+  WGPUDevice device = nullptr;
+  bool requestEnded = false;
+};
 
-  instanceDesc->nextInChain = &dawnToggleDesc.chain;
+struct ComputeDispatchInfo {
+  uint32_t workgroupsX;
+  uint32_t workgroupsY;
+  uint32_t workgroupsZ;
+  uint32_t workgroupSize;
+};
 
-  instanceDesc->features.timedWaitAnyEnable = 0;
-  instanceDesc->features.timedWaitAnyMaxCount = 64;
-#endif
+inline ComputeDispatchInfo CalculateDispatchInfo(
+    uint32_t width,
+    uint32_t height,
+    uint32_t depth = 1,
+    uint32_t workgroupSize = 32) {
+  ComputeDispatchInfo info;
+  info.workgroupSize = workgroupSize;
+  info.workgroupsX = (width + workgroupSize - 1) / workgroupSize;
+  info.workgroupsY = (height + workgroupSize - 1) / workgroupSize;
+  info.workgroupsZ = depth;
 
-#if !__EMSCRIPTEN__
-  m_Instance = wgpuCreateInstance(instanceDesc);
-#else
-  m_Instance = wgpuCreateInstance(nullptr);
-#endif
-
-  RN_CORE_ASSERT(m_Instance, "An error occured while acquiring the WebGPU instance.");
-
-  return m_Instance;
+  return info;
 }
 
 inline WGPUStringView MakeLabel(const char* str) {
@@ -79,182 +82,197 @@ inline WGPUStringView MakeLabel(const std::string& str) {
   return {str.c_str(), str.size()};
 }
 
+void onAdapterRequestEnded(
+    WGPURequestAdapterStatus status,
+    WGPUAdapter adapter,
+    WGPUStringView message,  // Changed back to WGPUStringView
+    void* userdata1,
+    void* userdata2) {
+  auto* requestData = static_cast<AdapterRequestData*>(userdata1);
+  if (status == WGPURequestAdapterStatus_Success) {
+    requestData->adapter = adapter;
+  } else {
+    std::string errorMessage(message.data, message.length);
+    std::cerr << "Failed to request adapter: " << errorMessage << std::endl;
+  }
+  requestData->requestEnded = true;
+}
+
 bool Render::Init(void* window) {
-    Instance = this;
-    
-    // Instance creation
-    RN_LOG("Creating GPU Instance");
-    CreateGPUInstance();
-    RN_LOG("GPU Instance: {}", m_Instance == nullptr);
-    
-    // Window and surface setup
-    m_window = static_cast<GLFWwindow*>(window);
-    RN_LOG("Window: {}", m_window == nullptr);
-    
-#if EMSCRIPTEN
-    m_surface = htmlGetCanvasSurface(m_Instance, "canvas");
-#else
-    m_surface = glfwGetWGPUSurface(m_Instance, m_window);
-#endif
-    RN_LOG("GPU Surface {}", m_surface == nullptr);
+  Instance = this;
 
-    // Adapter request
-    WGPURequestAdapterOptions adapterOpts = {};
-    adapterOpts.compatibleSurface = m_surface;
-    adapterOpts.powerPreference = WGPUPowerPreference_HighPerformance;
-    adapterOpts.nextInChain = nullptr;
-    m_adapter = RequestAdapter(m_Instance, &adapterOpts);
-    RN_LOG("GPU Adapter {}", m_adapter == nullptr);
+  WGPUDeviceLostCallback deviceLostCb = [](WGPUDevice const* device,
+                                           WGPUDeviceLostReason reason,
+                                           WGPUStringView message,
+                                           void* userdata1,
+                                           void* userdata2) {
+    fprintf(stderr, "GPU device lost: %.*s\n", (int)message.length, message.data);
+  };
 
-    // Device setup
-    WGPURequiredLimits* requiredLimits = GetRequiredLimits(m_adapter);
-    WGPUDeviceDescriptor deviceDesc = {};
-    deviceDesc.label = MakeLabel("MyDevice");
-
-	
-   WGPUDeviceLostCallback deviceLostCb = [](WGPUDevice const* device,
-                                            WGPUDeviceLostReason reason,
-                                            WGPUStringView message,
-                                            void* userdata1,
-                                            void* userdata2) {
-        fprintf(stderr, "GPU device lost: %.*s\n", (int)message.length, message.data);
-    };
-
-    WGPUDeviceLostCallbackInfo deviceLostInfo = {};
-    deviceLostInfo.nextInChain = nullptr;
-    deviceLostInfo.mode = WGPUCallbackMode_AllowProcessEvents;
-    deviceLostInfo.callback = deviceLostCb;
-    deviceLostInfo.userdata1 = nullptr;
-    deviceLostInfo.userdata2 = nullptr;
-
-
-
-WGPUUncapturedErrorCallback errorCallback = [](WGPUDevice const* device, 
-                                             WGPUErrorType type, 
-                                             WGPUStringView message,
-                                             void* userdata1,
-                                             void* userdata2) {
+  WGPUUncapturedErrorCallback errorCallback = [](WGPUDevice const* device,
+                                                 WGPUErrorType type,
+                                                 WGPUStringView message,
+                                                 void* userdata1,
+                                                 void* userdata2) {
     const char* errorTypeName = "";
     switch (type) {
-        case WGPUErrorType_Validation:
-            errorTypeName = "Validation";
-            break;
-        case WGPUErrorType_OutOfMemory:
-            errorTypeName = "Out of Memory";
-            break;
-            break;
-        case WGPUErrorType_Internal:
-            errorTypeName = "Internal";
-            break;
-        default:
-            errorTypeName = "Unknown";
-            break;
+      case WGPUErrorType_Validation:
+        errorTypeName = "Validation";
+        break;
+      case WGPUErrorType_OutOfMemory:
+        errorTypeName = "Out of Memory";
+        break;
+        break;
+      case WGPUErrorType_Internal:
+        errorTypeName = "Internal";
+        break;
+      default:
+        errorTypeName = "Unknown";
+        break;
     }
-    fprintf(stderr, "Dawn uncaptured error (%s): %.*s\n", 
-            errorTypeName, 
-            (int)message.length, 
+    fprintf(stderr, "Dawn uncaptured error (%s): %.*s\n",
+            errorTypeName,
+            (int)message.length,
             message.data);
-	exit(0);
-};
+    exit(0);
+  };
 
-// Set up the uncaptured error callback info
-WGPUUncapturedErrorCallbackInfo uncapturedErrorInfo = {};
-uncapturedErrorInfo.nextInChain = nullptr;
-uncapturedErrorInfo.callback = errorCallback;
-uncapturedErrorInfo.userdata1 = nullptr;
-uncapturedErrorInfo.userdata2 = nullptr;
+  WGPULoggingCallback callback = [](WGPULoggingType type, WGPUStringView message, void* userdata1, void* userdata2) {
+    switch (type) {
+      case WGPULoggingType_Error:
+        fprintf(stderr, "Dawn error: %.*s\n", static_cast<int>(message.length), message.data);
+        exit(0);
+        break;
+      case WGPULoggingType_Warning:
+        fprintf(stderr, "Dawn warning: %.*s\n", static_cast<int>(message.length), message.data);
+        break;
+      case WGPULoggingType_Info:
+        fprintf(stdout, "Dawn info: %.*s\n", static_cast<int>(message.length), message.data);
+        break;
+      default:
+        fprintf(stdout, "Dawn log: %.*s\n", static_cast<int>(message.length), message.data);
+        break;
+    }
+  };
 
-    
-#if EMSCRIPTEN
-    deviceDesc.requiredFeatureCount = 0;
-    deviceDesc.requiredFeatures = nullptr;
-#else
-    static WGPUFeatureName requiredFeatures[] = {
-        WGPUFeatureName_TimestampQuery,
-        WGPUFeatureName_TextureCompressionBC,
-        WGPUFeatureName_DepthClipControl
-    };
-    deviceDesc.requiredFeatures = requiredFeatures;
-    deviceDesc.requiredFeatureCount = 3;
-#endif
+  WGPUDawnTogglesDescriptor dawnToggles;
+  ZERO_INIT(dawnToggles);
+  dawnToggles.chain.sType = WGPUSType_DawnTogglesDescriptor;
+  dawnToggles.enabledToggles = (const char*[]){
+      "chromium_disable_uniformity_analysis",
+      "allow_unsafe_apis"};
+  dawnToggles.enabledToggleCount = 2;
+  dawnToggles.disabledToggleCount = 0;
 
-    deviceDesc.requiredLimits = requiredLimits;
-    deviceDesc.defaultQueue.label = MakeLabel("defq");
-    deviceDesc.nextInChain = nullptr;
-	deviceDesc.deviceLostCallbackInfo = deviceLostInfo;  // Add the device lost callback
-	deviceDesc.uncapturedErrorCallbackInfo = uncapturedErrorInfo;  // Add the device lost callback
-    
-    m_device = RequestDevice(m_adapter, &deviceDesc);
-    m_queue = wgpuDeviceGetQueue(m_device);
-    RN_CORE_ASSERT(m_queue, "An error occurred while acquiring the queue. This might indicate unsupported browser/device.");
+  WGPUInstanceDescriptor* instanceDesc = ZERO_ALLOC(WGPUInstanceDescriptor);
+  instanceDesc->nextInChain = nullptr;
+  instanceDesc->nextInChain = &dawnToggles.chain;
+  instanceDesc->features.timedWaitAnyEnable = 0;
+  instanceDesc->features.timedWaitAnyMaxCount = 64;
 
-    // Render context setup
-    m_RenderContext = CreateRef<RenderContext>(m_adapter, m_surface, m_device, m_queue);
+  static const WGPUInstance gpuInstance = wgpuCreateInstance(instanceDesc);
 
-    // Surface configuration
-    int width, height;
-    glfwGetFramebufferSize(m_window, &width, &height);
+  m_window = static_cast<GLFWwindow*>(window);
+  m_surface = glfwGetWGPUSurface(gpuInstance, m_window);
 
-    // Get surface capabilities
-    WGPUSurfaceCapabilities capabilities;
-    wgpuSurfaceGetCapabilities(m_surface, m_adapter, &capabilities);
+  AdapterRequestData requestData{};
+  ZERO_INIT(requestData);
 
-    // Select format
-    WGPUTextureFormat swapChainFormat;
-#if EMSCRIPTEN
-    RN_ASSERT(capabilities.formatCount > 0, "No supported formats for surface");
-    swapChainFormat = capabilities.formats[0];
-#else
-    swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
-#endif
-    m_swapChainFormat = swapChainFormat;
+  WGPURequestAdapterCallbackInfo callbackInfo;
+  ZERO_INIT(callbackInfo);
+  callbackInfo.mode = WGPUCallbackMode_AllowProcessEvents,
+  callbackInfo.callback = onAdapterRequestEnded,
+  callbackInfo.userdata1 = &requestData;
 
-    // Configure surface instead of creating swapchain
-    WGPUSurfaceConfiguration surfaceConfig = {};
-    surfaceConfig.nextInChain = nullptr;
-    surfaceConfig.device = m_device;
-    surfaceConfig.format = swapChainFormat;
-    surfaceConfig.usage = WGPUTextureUsage_RenderAttachment;
-    surfaceConfig.alphaMode = WGPUCompositeAlphaMode_Auto;
-    surfaceConfig.width = width;
-    surfaceConfig.height = height;
-    surfaceConfig.presentMode = WGPUPresentMode_Fifo;
-    surfaceConfig.viewFormatCount = 1;
-    surfaceConfig.viewFormats = &swapChainFormat;
+  WGPURequestAdapterOptions adapterOpts;
+  ZERO_INIT(adapterOpts);
+  adapterOpts.compatibleSurface = m_surface;
+  adapterOpts.powerPreference = WGPUPowerPreference_HighPerformance;
 
-    // Configure the surface
-    wgpuSurfaceConfigure(m_surface, &surfaceConfig);
+  wgpuInstanceRequestAdapter(gpuInstance, &adapterOpts, callbackInfo);
 
-    // Setup logging callback
-    WGPULoggingCallback callback = [](WGPULoggingType type, WGPUStringView message, void* userdata1, void* userdata2) {
-        switch (type) {
-            case WGPULoggingType_Error:
-                fprintf(stderr, "Dawn error: %.*s\n", static_cast<int>(message.length), message.data);
-                exit(0);
-                break;
-            case WGPULoggingType_Warning:
-                fprintf(stderr, "Dawn warning: %.*s\n", static_cast<int>(message.length), message.data);
-                break;
-            case WGPULoggingType_Info:
-                fprintf(stdout, "Dawn info: %.*s\n", static_cast<int>(message.length), message.data);
-                break;
-            default:
-                fprintf(stdout, "Dawn log: %.*s\n", static_cast<int>(message.length), message.data);
-                break;
-        }
-    };
+  while (!requestData.requestEnded) {
+    wgpuInstanceProcessEvents(gpuInstance);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
 
+  WGPUAdapter adapter = requestData.adapter;
 
-    WGPULoggingCallbackInfo callbackInfo = {};
-    callbackInfo.nextInChain = nullptr;
-    callbackInfo.callback = callback;
-    callbackInfo.userdata1 = nullptr;
-    callbackInfo.userdata2 = nullptr;
+  WGPURequiredLimits* requiredLimits = GetRequiredLimits(adapter);
 
-    wgpuDeviceSetLoggingCallback(m_device, callbackInfo);
-    
-    RendererPostInit();
-    return true;
+  WGPUUncapturedErrorCallbackInfo uncapturedErrorInfo;
+  ZERO_INIT(uncapturedErrorInfo);
+  uncapturedErrorInfo.callback = errorCallback;
+
+  WGPUDeviceLostCallbackInfo deviceLostInfo;
+  ZERO_INIT(deviceLostInfo);
+  deviceLostInfo.mode = WGPUCallbackMode_AllowProcessEvents;
+  deviceLostInfo.callback = deviceLostCb;
+
+  auto onDeviceRequestEnded = [](WGPURequestDeviceStatus status,
+                                 WGPUDevice device,
+                                 WGPUStringView message,
+                                 void* userdata1,
+                                 void* userdata2) {
+    auto* userData = static_cast<DeviceRequestData*>(userdata1);
+    RN_CORE_ASSERT(status == WGPURequestDeviceStatus_Success,
+                   "An error occurred while acquiring WebGPU device");
+    userData->device = device;
+    userData->requestEnded = true;
+  };
+
+  DeviceRequestData deviceRequestData{};
+  WGPURequestDeviceCallbackInfo deviceCallbackInfo;
+  ZERO_INIT(deviceCallbackInfo);
+  deviceCallbackInfo.mode = WGPUCallbackMode_AllowProcessEvents;
+  deviceCallbackInfo.callback = onDeviceRequestEnded;
+  deviceCallbackInfo.userdata1 = &deviceRequestData;
+
+  WGPUDeviceDescriptor gpuDeviceDescriptor;
+  ZERO_INIT(gpuDeviceDescriptor);
+  gpuDeviceDescriptor.label = MakeLabel("MyDevice");
+  gpuDeviceDescriptor.requiredFeatures = (WGPUFeatureName[]){
+      WGPUFeatureName_TimestampQuery,
+      WGPUFeatureName_TextureCompressionBC,
+      WGPUFeatureName_Float32Filterable,
+      WGPUFeatureName_DepthClipControl};
+  gpuDeviceDescriptor.requiredFeatureCount = 4;
+  gpuDeviceDescriptor.requiredLimits = requiredLimits;
+  gpuDeviceDescriptor.defaultQueue.label = MakeLabel("defq");
+  gpuDeviceDescriptor.deviceLostCallbackInfo = deviceLostInfo;
+  gpuDeviceDescriptor.uncapturedErrorCallbackInfo = uncapturedErrorInfo;
+
+  wgpuAdapterRequestDevice(adapter, &gpuDeviceDescriptor, deviceCallbackInfo);
+
+  while (!deviceRequestData.requestEnded) {
+    wgpuInstanceProcessEvents(gpuInstance);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+
+  m_device = deviceRequestData.device;
+
+  m_queue = wgpuDeviceGetQueue(m_device);
+  RN_CORE_ASSERT(m_queue, "An error occurred while acquiring the queue. This might indicate unsupported browser/device.");
+
+  m_RenderContext = CreateRef<RenderContext>(adapter, m_surface, m_device, m_queue);
+
+  WGPUSurfaceCapabilities capabilities;
+  wgpuSurfaceGetCapabilities(m_surface, adapter, &capabilities);
+
+  m_swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
+
+  int width, height;
+  glfwGetFramebufferSize(m_window, &width, &height);
+  ConfigureSurface(width, height);
+
+  // WGPULoggingCallbackInfo callbackInfo = {};
+  // ZERO_INIT(callbackInfo);
+  // callbackInfo.callback = callback;
+
+  // wgpuDeviceSetLoggingCallback(m_device, callbackInfo);
+
+  RendererPostInit();
+  return true;
 }
 
 void Render::RendererPostInit() {
@@ -339,101 +357,6 @@ const char* getBackendTypeString(WGPUBackendType backendType) {
   }
 }
 
-struct UserData {
-  WGPUAdapter adapter = nullptr;
-  bool requestEnded = false;
-};
-
-struct AdapterRequestData {
-  WGPUAdapter adapter = nullptr;
-  bool requestEnded = false;
-};
-
-void onAdapterRequestEnded(
-    WGPURequestAdapterStatus status,
-    WGPUAdapter adapter,
-    WGPUStringView message,  // Changed back to WGPUStringView
-    void* userdata1,
-    void* userdata2) {
-    auto* requestData = static_cast<AdapterRequestData*>(userdata1);
-    if (status == WGPURequestAdapterStatus_Success) {
-        requestData->adapter = adapter;
-    } else {
-        // Convert WGPUStringView to string for logging
-			std::string errorMessage(message.data, message.length);
-        std::cerr << "Failed to request adapter: " << errorMessage << std::endl;
-    }
-    requestData->requestEnded = true;
-}
-
-WGPUAdapter Render::RequestAdapter(WGPUInstance instance, const WGPURequestAdapterOptions* options) {
-    AdapterRequestData requestData{};
-    
-    WGPURequestAdapterCallbackInfo callbackInfo{
-        .nextInChain = nullptr,
-        .mode = WGPUCallbackMode_AllowProcessEvents,
-        .callback = onAdapterRequestEnded,
-        .userdata1 = &requestData,
-        .userdata2 = nullptr
-    };
-
-    WGPUFuture future = wgpuInstanceRequestAdapter(instance, options, callbackInfo);
-    
-    while (!requestData.requestEnded) {
-		wgpuInstanceProcessEvents(instance);
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    
-    assert(requestData.adapter != nullptr && "Failed to acquire WebGPU adapter");
-    return requestData.adapter;
-}
-
-WGPUDevice Render::RequestDevice(WGPUAdapter adapter, WGPUDeviceDescriptor const* descriptor) {
-    struct UserData {
-        WGPUDevice device = nullptr;
-        bool requestEnded = false;
-    };
-    UserData userData{};
-
-    auto onDeviceRequestEnded = [](WGPURequestDeviceStatus status,
-                                  WGPUDevice device,
-                                  WGPUStringView message,
-                                  void* userdata1,
-                                  void* userdata2) {
-        RN_LOG("Device callback received");
-        auto* userData = static_cast<UserData*>(userdata1);
-        RN_CORE_ASSERT(status == WGPURequestDeviceStatus_Success, 
-                      "An error occurred while acquiring WebGPU device");
-        userData->device = device;
-        userData->requestEnded = true;
-    };
-
-    WGPURequestDeviceCallbackInfo callbackInfo{
-        .nextInChain = nullptr,
-        .mode = WGPUCallbackMode_AllowProcessEvents,
-        .callback = onDeviceRequestEnded,
-        .userdata1 = &userData,
-        .userdata2 = nullptr
-    };
-
-    WGPUFuture future = wgpuAdapterRequestDevice(adapter, descriptor, callbackInfo);
-
-    // Wait for the callback
-#if EMSCRIPTEN
-    while (!userData.requestEnded) {
-        emscripten_sleep(1000);
-    }
-#else
-    while (!userData.requestEnded) {
-		wgpuInstanceProcessEvents(m_Instance);
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-#endif
-
-    assert(userData.requestEnded);
-    return userData.device;
-}
-
 WGPURequiredLimits* Render::GetRequiredLimits(WGPUAdapter adapter) {
   static WGPUSupportedLimits supportedLimits = {};
   supportedLimits.nextInChain = nullptr;
@@ -468,57 +391,57 @@ WGPURequiredLimits* Render::GetRequiredLimits(WGPUAdapter adapter) {
 }
 
 void Render::ConfigureSurface(uint32_t width, uint32_t height) {
-    WGPUSurfaceConfiguration config = {};
-    config.device = m_device;
-    config.format = m_swapChainFormat;
-    config.usage = WGPUTextureUsage_RenderAttachment;
-    config.alphaMode = WGPUCompositeAlphaMode_Auto;
-    config.width = width;
-    config.height = height;
-    config.presentMode = WGPUPresentMode_Fifo;
-    config.viewFormatCount = 1;
-    config.viewFormats = &m_swapChainFormat;
-    
-    wgpuSurfaceConfigure(m_surface, &config);
+  WGPUSurfaceConfiguration config = {};
+  config.device = m_device;
+  config.format = m_swapChainFormat;
+  config.usage = WGPUTextureUsage_RenderAttachment;
+  config.alphaMode = WGPUCompositeAlphaMode_Auto;
+  config.width = width;
+  config.height = height;
+  config.presentMode = WGPUPresentMode_Fifo;
+  config.viewFormatCount = 1;
+  config.viewFormats = &m_swapChainFormat;
+
+  wgpuSurfaceConfigure(m_surface, &config);
 }
 
 WGPUTextureView Render::GetCurrentTextureView() {
-    WGPUSurfaceTexture surfaceTexture = {};
-    wgpuSurfaceGetCurrentTexture(m_surface, &surfaceTexture);
-    
-    if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_Success) {
-        switch (surfaceTexture.status) {
-            case WGPUSurfaceGetCurrentTextureStatus_Lost:
-                // Reconfigure surface here
-                //ConfigureSurface(m_swapChainDesc.width, m_swapChainDesc.height);
-                wgpuSurfaceGetCurrentTexture(m_surface, &surfaceTexture);
-                break;
-            case WGPUSurfaceGetCurrentTextureStatus_OutOfMemory:
-                RN_CORE_ASSERT(false, "Out of memory when acquiring next swapchain texture");
-                return nullptr;
-            case WGPUSurfaceGetCurrentTextureStatus_DeviceLost:
-                RN_CORE_ASSERT(false, "Device lost when acquiring next swapchain texture");
-                return nullptr;
-            default:
-                RN_CORE_ASSERT(false, "Unknown error when acquiring next swapchain texture");
-                return nullptr;
-        }
-    }
+  WGPUSurfaceTexture surfaceTexture = {};
+  wgpuSurfaceGetCurrentTexture(m_surface, &surfaceTexture);
 
-    WGPUTextureViewDescriptor viewDesc = {};
-    viewDesc.format = m_swapChainFormat;
-    viewDesc.dimension = WGPUTextureViewDimension_2D;
-    viewDesc.mipLevelCount = 1;
-    viewDesc.arrayLayerCount = 1;
-    viewDesc.aspect = WGPUTextureAspect_All;
-    
-    return wgpuTextureCreateView(surfaceTexture.texture, &viewDesc);
-    // Don't call wgpuSurfacePresent here, do it after rendering is complete
+  if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_Success) {
+    switch (surfaceTexture.status) {
+      case WGPUSurfaceGetCurrentTextureStatus_Lost:
+        // Reconfigure surface here
+        // ConfigureSurface(m_swapChainDesc.width, m_swapChainDesc.height);
+        wgpuSurfaceGetCurrentTexture(m_surface, &surfaceTexture);
+        break;
+      case WGPUSurfaceGetCurrentTextureStatus_OutOfMemory:
+        RN_CORE_ASSERT(false, "Out of memory when acquiring next swapchain texture");
+        return nullptr;
+      case WGPUSurfaceGetCurrentTextureStatus_DeviceLost:
+        RN_CORE_ASSERT(false, "Device lost when acquiring next swapchain texture");
+        return nullptr;
+      default:
+        RN_CORE_ASSERT(false, "Unknown error when acquiring next swapchain texture");
+        return nullptr;
+    }
+  }
+
+  WGPUTextureViewDescriptor viewDesc = {};
+  viewDesc.format = m_swapChainFormat;
+  viewDesc.dimension = WGPUTextureViewDimension_2D;
+  viewDesc.mipLevelCount = 1;
+  viewDesc.arrayLayerCount = 1;
+  viewDesc.aspect = WGPUTextureAspect_All;
+
+  return wgpuTextureCreateView(surfaceTexture.texture, &viewDesc);
+  // Don't call wgpuSurfacePresent here, do it after rendering is complete
 }
 
 Ref<Texture2D> Render::GetWhiteTexture() {
   static auto whiteTexture = Rain::ResourceManager::GetTexture("T_Default");
-  RN_ASSERT(whiteTexture->GetNativeView() != 0, "Material: Default texture couldn't found.");
+  RN_ASSERT(whiteTexture->GetReadableView() != 0, "Material: Default texture couldn't found.");
   return whiteTexture;
 }
 
@@ -554,7 +477,6 @@ void Render::ComputeMip(Texture2D* input) {
   WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(device, &computePipelineDesc);
 
   int mipCount = RenderUtils::CalculateMipCount(input->GetSpec().Width, input->GetSpec().Height);
-  const uint32_t workgroupSizePerDim = 8;
 
   for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
     auto encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
@@ -563,35 +485,9 @@ void Render::ComputeMip(Texture2D* input) {
     WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder, &computePassDesc);
     wgpuComputePassEncoderSetPipeline(computePass, pipeline);
 
-    auto textureWidth = std::max(input->GetSpec().Width >> mipLevel, (uint32_t)1);
-    auto textureHeight = std::max(input->GetSpec().Height >> mipLevel, (uint32_t)1);
-    uint32_t workgroupCountX = (textureWidth + workgroupSizePerDim - 1) / workgroupSizePerDim;
-    uint32_t workgroupCountY = (textureHeight + workgroupSizePerDim - 1) / workgroupSizePerDim;
-
-    // Create texture views for input and output mip levels
-    WGPUTextureViewDescriptor inputViewDesc = {
-        .format = WGPUTextureFormat_RGBA8Unorm,
-        .dimension = WGPUTextureViewDimension_2D,
-        .baseMipLevel = mipLevel - 1,
-        .mipLevelCount = 1,
-        .baseArrayLayer = 0,
-        .arrayLayerCount = 1};
-    WGPUTextureView inputTextureView = wgpuTextureCreateView(input->TextureBuffer, &inputViewDesc);
-
-    WGPUTextureViewDescriptor outputViewDesc = {
-        .format = WGPUTextureFormat_RGBA8Unorm,
-        .dimension = WGPUTextureViewDimension_2D,
-        .baseMipLevel = mipLevel,
-        .mipLevelCount = 1,
-        .baseArrayLayer = 0,
-        .arrayLayerCount = 1};
-
-    WGPUTextureView outputTextureView = wgpuTextureCreateView(input->TextureBuffer, &outputViewDesc);
-
-    // Create and set bind group
     WGPUBindGroupEntry bindGroupEntries[2] = {
-        {.binding = 0, .textureView = inputTextureView},
-        {.binding = 1, .textureView = outputTextureView}};
+        {.binding = 0, .textureView = input->GetReadableView(mipLevel - 1)},
+        {.binding = 1, .textureView = input->GetWriteableView(mipLevel)}};
 
     WGPUBindGroupDescriptor bindGroupDesc = {};
     bindGroupDesc.layout = bindGroupLayouts[0];
@@ -599,8 +495,12 @@ void Render::ComputeMip(Texture2D* input) {
     bindGroupDesc.entries = bindGroupEntries;
     WGPUBindGroup bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
 
+    const uint32_t workgroupSize = 32;
+    const uint32_t workgroupsX = (std::max(input->GetSpec().Width >> mipLevel, (uint32_t)1) + workgroupSize - 1) / workgroupSize;
+    const uint32_t workgroupsY = (std::max(input->GetSpec().Height >> mipLevel, (uint32_t)1) + workgroupSize - 1) / workgroupSize;
+
     wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, nullptr);
-    wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupCountX, workgroupCountY, 1);
+    wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupsX, workgroupsY, 1);
     wgpuComputePassEncoderEnd(computePass);
 
     WGPUCommandBufferDescriptor cmdBufferDesc = {};
@@ -608,8 +508,6 @@ void Render::ComputeMip(Texture2D* input) {
     wgpuQueueSubmit(*RenderContext::GetQueue(), 1, &commandBuffer);
 
     wgpuBindGroupRelease(bindGroup);
-    wgpuTextureViewRelease(inputTextureView);
-    wgpuTextureViewRelease(outputTextureView);
     wgpuCommandEncoderRelease(encoder);
     wgpuCommandBufferRelease(commandBuffer);
   }
@@ -619,73 +517,58 @@ void Render::ComputeMip(Texture2D* input) {
 }
 
 void Render::ComputeMipCube(TextureCube* input) {
-  auto device = RenderContext::GetDevice();
-  auto computeShader = ShaderManager::LoadShader(
-      "SH_ComputeCube",
-      RESOURCE_DIR "/shaders/ComputeMipCube.wgsl");
+  auto computeShader = ShaderManager::LoadShader("SH_ComputeCube", RESOURCE_DIR "/shaders/ComputeMipCube.wgsl");
 
-  // Create pipeline layout
+  auto device = RenderContext::GetDevice();
+
   auto bindGroupLayout = computeShader->GetReflectionInfo().LayoutDescriptors.begin()->second;
   WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
   pipelineLayoutDesc.bindGroupLayoutCount = 1;
   pipelineLayoutDesc.bindGroupLayouts = &bindGroupLayout;
-  auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
+  const auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
 
-  // Create compute pipeline
   WGPUComputePipelineDescriptor pipelineDesc = {};
   pipelineDesc.layout = pipelineLayout;
   pipelineDesc.compute.entryPoint = MakeLabel("computeMipMap");
   pipelineDesc.compute.module = computeShader->GetNativeShaderModule();
-  auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
+  const auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
 
-  // Common view descriptor template
-  WGPUTextureViewDescriptor viewDesc = {
-      .format = WGPUTextureFormat_RGBA8Unorm,
-      .dimension = WGPUTextureViewDimension_2DArray,
-      .mipLevelCount = 1,
-      .baseArrayLayer = 0,
-      .arrayLayerCount = 6  // All faces
-  };
-
-  // Process mip chain
   const uint32_t mipCount = RenderUtils::CalculateMipCount(
       input->GetSpec().Width,
       input->GetSpec().Height);
-  const uint32_t workgroupSize = 8;
 
   for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
-    // Calculate dimensions for current mip level
-    const uint32_t width = std::max(input->GetSpec().Width >> mipLevel, 1u);
-    const uint32_t height = std::max(input->GetSpec().Height >> mipLevel, 1u);
-    const uint32_t workgroupsX = (width + workgroupSize - 1) / workgroupSize;
-    const uint32_t workgroupsY = (height + workgroupSize - 1) / workgroupSize;
+    WGPUTextureViewDescriptor* viewDesc = ZERO_ALLOC(WGPUTextureViewDescriptor);
+    viewDesc->nextInChain = nullptr;
+    viewDesc->format = RenderTypeUtils::ToRenderType(input->GetFormat());
+    viewDesc->dimension = WGPUTextureViewDimension_2DArray;
+    viewDesc->baseMipLevel = mipLevel - 1;
+    viewDesc->mipLevelCount = 1;
+    viewDesc->baseArrayLayer = 0;
+    viewDesc->arrayLayerCount = 6;
 
-    // Create input view (previous mip level)
-    viewDesc.baseMipLevel = mipLevel - 1;
-    auto inputView = wgpuTextureCreateView(input->m_TextureBuffer, &viewDesc);
+    auto inputView = wgpuTextureCreateView(input->m_TextureBuffer, viewDesc);
 
-    // Create output view (current mip level)
-    viewDesc.baseMipLevel = mipLevel;
-    auto outputView = wgpuTextureCreateView(input->m_TextureBuffer, &viewDesc);
-
-    // Create bind group
     WGPUBindGroupEntry bindGroupEntries[2] = {
         {.binding = 0, .textureView = inputView},
-        {.binding = 1, .textureView = outputView}};
+        {.binding = 1, .textureView = input->GetWriteableView(mipLevel)}};
 
     WGPUBindGroupDescriptor bindGroupDesc = {};
+    ZERO_INIT(bindGroupDesc);
     bindGroupDesc.layout = bindGroupLayout;
     bindGroupDesc.entryCount = 2;
     bindGroupDesc.entries = bindGroupEntries;
     auto bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
 
-    // Record and submit commands
+    const uint32_t workgroupSize = 32;
+    const uint32_t workgroupsX = (std::max(input->GetSpec().Width >> mipLevel, 1u) + workgroupSize - 1) / workgroupSize;
+    const uint32_t workgroupsY = (std::max(input->GetSpec().Height >> mipLevel, 1u) + workgroupSize - 1) / workgroupSize;
+
     auto encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
     {
       auto computePass = wgpuCommandEncoderBeginComputePass(encoder, nullptr);
       wgpuComputePassEncoderSetPipeline(computePass, pipeline);
       wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, nullptr);
-      // Dispatch across all faces (6 in Z dimension)
       wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupsX, workgroupsY, 6);
       wgpuComputePassEncoderEnd(computePass);
     }
@@ -693,15 +576,11 @@ void Render::ComputeMipCube(TextureCube* input) {
     auto commandBuffer = wgpuCommandEncoderFinish(encoder, nullptr);
     wgpuQueueSubmit(*RenderContext::GetQueue(), 1, &commandBuffer);
 
-    // Cleanup per-mip resources
     wgpuBindGroupRelease(bindGroup);
-    wgpuTextureViewRelease(inputView);
-    wgpuTextureViewRelease(outputView);
     wgpuCommandEncoderRelease(encoder);
     wgpuCommandBufferRelease(commandBuffer);
   }
 
-  // Cleanup shared resources
   wgpuPipelineLayoutRelease(pipelineLayout);
   wgpuComputePipelineRelease(pipeline);
 }
@@ -712,192 +591,155 @@ struct PrefilterUniform {
   uint32_t _pad[2];
 };
 
-void Render::PreFilter(TextureCube* input) {
-  auto device = RenderContext::GetDevice();
-  auto computeShader = ShaderManager::LoadShader(
-      "SH_ComputeCube2",
-      RESOURCE_DIR "/shaders/CubePreFilter.wgsl");
+std::pair<Ref<TextureCube>, Ref<TextureCube>> Render::CreateEnvironmentMap(const std::string& filepath) {
+  const uint32_t cubemapSize = 2048;
+  const uint32_t irradianceMapSize = 32;
 
-  // Calculate mip parameters
+  TextureProps cubeProps = {};
+  cubeProps.Width = cubemapSize;
+  cubeProps.Height = cubemapSize;
+  cubeProps.GenerateMips = true;
+  cubeProps.Format = TextureFormat::RGBA16F;
+
+  Ref<TextureCube> envUnfiltered = TextureCube::Create(cubeProps);
+  Ref<TextureCube> envFiltered = TextureCube::Create(cubeProps);
+
+  cubeProps.Width = irradianceMapSize;
+  cubeProps.Height = irradianceMapSize;
+  cubeProps.Format = TextureFormat::RGBA32F;
+  cubeProps.GenerateMips = false;
+  Ref<TextureCube> irradianceMap = TextureCube::Create(cubeProps);
+
+  Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), filepath);
+
+  Render::ComputeEquirectToCubemap(envEquirect.get(), envUnfiltered.get());
+  Render::ComputeMipCube(envUnfiltered.get());
+
+  Render::ComputeEquirectToCubemap(envEquirect.get(), envFiltered.get());
+
+  Render::PreFilter(envUnfiltered.get(), envFiltered.get());
+  Render::ComputeEnvironmentIrradiance(envFiltered.get(), irradianceMap.get());
+
+  return std::make_pair(envFiltered, irradianceMap);
+}
+
+void Render::PreFilter(TextureCube* input, TextureCube* output) {
+  auto computeShader = ShaderManager::LoadShader("SH_ComputeCube2", RESOURCE_DIR "/shaders/environment_prefilter.wgsl");
+
   const uint32_t mipCount = RenderUtils::CalculateMipCount(input->GetSpec().Width, input->GetSpec().Height);
-  const uint32_t uniformStride = std::max(
-      (uint32_t)sizeof(PrefilterUniform),
-      (uint32_t)Instance->m_Limits.minUniformBufferOffsetAlignment);
+  const uint32_t uniformStride = std::max((uint32_t)sizeof(PrefilterUniform), (uint32_t)Instance->m_Limits.minUniformBufferOffsetAlignment);
+  auto uniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, uniformStride * mipCount);
 
-  // Create uniform buffer for all mip levels
-  auto uniformBuffer = GPUAllocator::GAlloc(
-      WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
-      uniformStride * mipCount);
-
-  // Initialize uniforms for all mip levels
-  for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
+  for (uint32_t mipLevel = 0; mipLevel < mipCount; ++mipLevel) {
     PrefilterUniform uniform = {
         .currentMipLevel = mipLevel,
         .mipLevelCount = mipCount};
     uniformBuffer->SetData(&uniform, mipLevel * uniformStride, sizeof(uniform));
   }
 
-  // Create sampler
   auto sampler = Sampler::Create({.Name = "S_Skybox",
                                   .WrapFormat = TextureWrappingFormat::ClampToEdges,
                                   .MagFilterFormat = FilterMode::Linear,
                                   .MinFilterFormat = FilterMode::Linear,
                                   .MipFilterFormat = FilterMode::Linear});
 
-  // Create pipeline layout
-  auto bindGroupLayout = computeShader->GetReflectionInfo().LayoutDescriptors.begin()->second;
+  auto device = RenderContext::GetDevice();
+  const auto bindGroupLayout = computeShader->GetReflectionInfo().LayoutDescriptors.begin()->second;
   WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
   pipelineLayoutDesc.bindGroupLayoutCount = 1;
   pipelineLayoutDesc.bindGroupLayouts = &bindGroupLayout;
-  auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
+  const auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
 
-  // Create compute pipeline
   WGPUComputePipelineDescriptor pipelineDesc = {};
   pipelineDesc.layout = pipelineLayout;
   pipelineDesc.compute.entryPoint = MakeLabel("prefilterCubeMap");
   pipelineDesc.compute.module = computeShader->GetNativeShaderModule();
-  auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
+  const auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
 
-  // Common view descriptor template
-  WGPUTextureViewDescriptor viewDesc = {
-      .format = WGPUTextureFormat_RGBA8Unorm,
-      .dimension = WGPUTextureViewDimension_Cube,  // Will be overridden for output
-      .mipLevelCount = 1,
-      .baseArrayLayer = 0,
-      .arrayLayerCount = 6};
-
-  // Process each mip level
-  uint32_t width = input->GetSpec().Width;
-  uint32_t height = input->GetSpec().Height;
-  const uint32_t workgroupSize = 4;
-
-  for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
-    // Update dimensions for current mip level
-    width /= 2;
-    height /= 2;
-    const uint32_t workgroupsX = (width + workgroupSize - 1) / workgroupSize;
-    const uint32_t workgroupsY = (height + workgroupSize - 1) / workgroupSize;
-
-    // Create input view (previous mip level)
-    viewDesc.dimension = WGPUTextureViewDimension_Cube;
-    viewDesc.baseMipLevel = mipLevel - 1;
-    auto inputView = wgpuTextureCreateView(input->m_TextureBuffer, &viewDesc);
-
-    // Create output view (current mip level)
-    viewDesc.dimension = WGPUTextureViewDimension_2DArray;
-    viewDesc.baseMipLevel = mipLevel;
-    auto outputView = wgpuTextureCreateView(input->m_TextureBuffer, &viewDesc);
-
-    // Create bind group
+  for (uint32_t mipLevel = 0; mipLevel < mipCount; ++mipLevel) {
     WGPUBindGroupEntry bindGroupEntries[4] = {
-        {.binding = 0, .textureView = inputView},
-        {.binding = 1, .textureView = outputView},
+        {.binding = 0, .textureView = input->GetReadableView(0)},  // Always sample from mip 0
+        {.binding = 1, .textureView = output->GetWriteableView(mipLevel)},
         {.binding = 2, .sampler = *sampler->GetNativeSampler()},
-        {.binding = 3, .buffer = uniformBuffer->Buffer, .size = sizeof(PrefilterUniform)}};
+        {.binding = 3, .buffer = uniformBuffer->Buffer, .offset = 0, .size = sizeof(PrefilterUniform)}};
 
     WGPUBindGroupDescriptor bindGroupDesc = {};
     bindGroupDesc.layout = bindGroupLayout;
     bindGroupDesc.entryCount = 4;
     bindGroupDesc.entries = bindGroupEntries;
-    auto bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
+    const auto bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
 
-    // Record and submit commands
+    const uint32_t workgroupSize = 32;
+    const uint32_t workgroupsX = (std::max(input->GetSpec().Width >> mipLevel, 1u) + workgroupSize - 1) / workgroupSize;
+    const uint32_t workgroupsY = (std::max(input->GetSpec().Height >> mipLevel, 1u) + workgroupSize - 1) / workgroupSize;
+
     auto encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
     {
       auto computePass = wgpuCommandEncoderBeginComputePass(encoder, nullptr);
-      wgpuComputePassEncoderSetPipeline(computePass, pipeline);
-
       uint32_t dynamicOffset = mipLevel * uniformStride;
+
+      wgpuComputePassEncoderSetPipeline(computePass, pipeline);
       wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 1, &dynamicOffset);
-      wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupsX, workgroupsY, 1);
+      wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupsX, workgroupsY, 6);
       wgpuComputePassEncoderEnd(computePass);
     }
 
-    auto commandBuffer = wgpuCommandEncoderFinish(encoder, nullptr);
+    const auto commandBuffer = wgpuCommandEncoderFinish(encoder, nullptr);
     wgpuQueueSubmit(*RenderContext::GetQueue(), 1, &commandBuffer);
 
-    // Cleanup per-mip resources
     wgpuBindGroupRelease(bindGroup);
-    wgpuTextureViewRelease(inputView);
-    wgpuTextureViewRelease(outputView);
     wgpuCommandEncoderRelease(encoder);
     wgpuCommandBufferRelease(commandBuffer);
   }
 
-  // Cleanup shared resources
   wgpuPipelineLayoutRelease(pipelineLayout);
   wgpuComputePipelineRelease(pipeline);
 }
 
-void Render::PreFilterAlt(TextureCube* input) {
-  auto device = RenderContext::GetDevice();
-  auto computeShader = ShaderManager::LoadShader(
-      "SH_ComputeCube3",
-      RESOURCE_DIR "/shaders/CubePreFilter2.wgsl");
+void Render::ComputeEnvironmentIrradiance(TextureCube* input, TextureCube* output) {
+  auto computeShader = ShaderManager::LoadShader("SH_EnvironmentIrradiance", RESOURCE_DIR "/shaders/environment_irradiance.wgsl");
 
-  // Create common texture view descriptor for both input and output
-  WGPUTextureViewDescriptor viewDesc = {
-      .dimension = WGPUTextureViewDimension_Cube,  // Will be overridden for output
-      .baseMipLevel = 0,
-      .mipLevelCount = 1,
-      .baseArrayLayer = 0,
-      .arrayLayerCount = 6};
-
-  // Create input and output views
-  viewDesc.format = WGPUTextureFormat_RGBA8Unorm;
-  auto inputView = wgpuTextureCreateView(input->m_TextureBuffer, &viewDesc);
-
-  viewDesc.format = WGPUTextureFormat_RGBA32Float;
-  viewDesc.dimension = WGPUTextureViewDimension_2DArray;
-  auto outputView = wgpuTextureCreateView(input->m_TextureBufferAlt, &viewDesc);
-
-  // Create sampler
   auto sampler = Sampler::Create({.Name = "S_Skybox",
                                   .WrapFormat = TextureWrappingFormat::ClampToEdges,
                                   .MagFilterFormat = FilterMode::Linear,
                                   .MinFilterFormat = FilterMode::Linear,
                                   .MipFilterFormat = FilterMode::Linear});
 
-  // Create pipeline layout
-  auto bindGroupLayout = computeShader->GetReflectionInfo().LayoutDescriptors.begin()->second;
+  const auto device = RenderContext::GetDevice();
+  const auto bindGroupLayout = computeShader->GetReflectionInfo().LayoutDescriptors.begin()->second;
+
   WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
   pipelineLayoutDesc.bindGroupLayoutCount = 1;
   pipelineLayoutDesc.bindGroupLayouts = &bindGroupLayout;
-  auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
+  const auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
 
-  // Create bind group
   WGPUBindGroupEntry bindGroupEntries[3] = {
-      {.binding = 0, .textureView = outputView},
-      {.binding = 1, .textureView = inputView},
+      {.binding = 0, .textureView = output->GetWriteableView(0)},
+      {.binding = 1, .textureView = input->GetReadableView(0)},
       {.binding = 2, .sampler = *sampler->GetNativeSampler()}};
 
   WGPUBindGroupDescriptor bindGroupDesc = {};
   bindGroupDesc.layout = bindGroupLayout;
   bindGroupDesc.entryCount = 3;
   bindGroupDesc.entries = bindGroupEntries;
-  auto bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
+  const auto bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
 
-  // Create compute pipeline
   WGPUComputePipelineDescriptor pipelineDesc = {};
   pipelineDesc.layout = pipelineLayout;
   pipelineDesc.compute.module = computeShader->GetNativeShaderModule();
   pipelineDesc.compute.entryPoint = MakeLabel("prefilterCubeMap");
-  auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
+  const auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
 
-  // Set up compute parameters
-  const uint32_t workgroupSize = 4;
-  const uint32_t width = input->GetSpec().Width;
-  const uint32_t height = input->GetSpec().Height;
-  const uint32_t workgroupsX = (width + workgroupSize - 1) / workgroupSize;
-  const uint32_t workgroupsY = (height + workgroupSize - 1) / workgroupSize;
+  const uint32_t workgroupSize = 32;
+  const uint32_t workgroupsX = (input->GetSpec().Width + workgroupSize - 1) / workgroupSize;
+  const uint32_t workgroupsY = (input->GetSpec().Height + workgroupSize - 1) / workgroupSize;
 
-  // Record and submit commands
   auto encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
   {
     auto computePass = wgpuCommandEncoderBeginComputePass(encoder, nullptr);
     wgpuComputePassEncoderSetPipeline(computePass, pipeline);
     wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, nullptr);
-    wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupsX, workgroupsY, 1);
+    wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupsX, workgroupsY, 6);
     wgpuComputePassEncoderEnd(computePass);
   }
 
@@ -906,46 +748,11 @@ void Render::PreFilterAlt(TextureCube* input) {
 
   // Cleanup WebGPU resources
   wgpuBindGroupRelease(bindGroup);
-  wgpuTextureViewRelease(inputView);
-  wgpuTextureViewRelease(outputView);
   wgpuPipelineLayoutRelease(pipelineLayout);
   wgpuComputePipelineRelease(pipeline);
   wgpuCommandEncoderRelease(encoder);
   wgpuCommandBufferRelease(commandBuffer);
 }
-
-// WGPUComputePassEncoder BeginComputePass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder) {
-//   WGPUComputePassDescriptor computePassDesc = {};
-//   WGPUComputePassEncoder computePass = wgpuCommandEncoderBeginComputePass(encoder, &computePassDesc);
-//
-//   return computePass;
-// }
-
-// Queue queue = m_device.getQueue();
-//
-//	// Initialize a command encoder
-//	CommandEncoderDescriptor encoderDesc = Default;
-//	CommandEncoder encoder = m_device.createCommandEncoder(encoderDesc);
-//
-//	// Create compute pass
-//	ComputePassDescriptor computePassDesc;
-//	computePassDesc.timestampWriteCount = 0;
-//	computePassDesc.timestampWrites = nullptr;
-//	ComputePassEncoder computePass = encoder.beginComputePass(computePassDesc);
-//
-//	computePass.setPipeline(m_pipeline);
-//
-//	for (uint32_t nextLevel = 1; nextLevel < m_textureMipSizes.size(); ++nextLevel) {
-//		initBindGroup(nextLevel);
-//		computePass.setBindGroup(0, m_bindGroup, 0, nullptr);
-//
-//		uint32_t invocationCountX = m_textureMipSizes[nextLevel].width;
-//		uint32_t invocationCountY = m_textureMipSizes[nextLevel].height;
-//		uint32_t workgroupSizePerDim = 8;
-//		// This ceils invocationCountX / workgroupSizePerDim
-//		uint32_t workgroupCountX = (invocationCountX + workgroupSizePerDim - 1) / workgroupSizePerDim;
-//		uint32_t workgroupCountY = (invocationCountY + workgroupSizePerDim - 1) / workgroupSizePerDim;
-//		computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY, 1);
 
 WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder) {
   RN_PROFILE_FUNC;
@@ -969,18 +776,18 @@ WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandE
   colorAttachment.clearValue = WGPUColor{0, 0, 0, 1};
   colorAttachment.resolveTarget = nullptr;
 
-//#if __EMSCRIPTEN__
+  // #if __EMSCRIPTEN__
   colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
-//#endif
+  // #endif
 
   if (renderFrameBuffer->HasColorAttachment()) {
     if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget) {
       Instance->m_SwapTexture = Render::Instance->GetCurrentSwapChainTexture();
       colorAttachment.resolveTarget = Instance->m_SwapTexture;
-      //colorAttachment.view = Instance->m_SwapTexture;
+      // colorAttachment.view = Instance->m_SwapTexture;
     }
 
-    colorAttachment.view = renderFrameBuffer->GetAttachment(0)->GetNativeView();
+    colorAttachment.view = renderFrameBuffer->GetAttachment(0)->GetReadableView();
     passDesc.colorAttachmentCount = 1;
     passDesc.colorAttachments = &colorAttachment;
   }
@@ -990,11 +797,11 @@ WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandE
     ZERO_INIT(depthAttachment);
 
     auto depth = renderFrameBuffer->GetDepthAttachment();
-    if (depth->m_Views.size() > 1) {
+    if (depth->m_ReadViews.size() > 1) {
       int layerNum = renderFrameBuffer->m_FrameBufferSpec.ExistingImageLayers[0];
-      depthAttachment.view = renderFrameBuffer->GetDepthAttachment()->m_Views[layerNum + 1];
+      depthAttachment.view = renderFrameBuffer->GetDepthAttachment()->m_ReadViews[layerNum + 1];
     } else {
-      depthAttachment.view = renderFrameBuffer->GetDepthAttachment()->GetNativeView();
+      depthAttachment.view = renderFrameBuffer->GetDepthAttachment()->GetReadableView();
     }
 
     depthAttachment.depthClearValue = 1.0f;
@@ -1082,6 +889,63 @@ void Render::SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WG
                                       0,
                                       s_Data->QuadIndexBuffer->Size);
   wgpuRenderPassEncoderDrawIndexed(renderCommandBuffer, 6, 1, 0, 0, 0);
+}
+
+void Render::ComputeEquirectToCubemap(Texture2D* equirectTexture, TextureCube* outputCubemap) {
+  auto computeShader = ShaderManager::LoadShader("SH_EquirectToCubemap", RESOURCE_DIR "/shaders/equirectangular_to_cubemap.wgsl");
+
+  auto sampler = Sampler::Create({.Name = "S_EquirectSampler",
+                                  .WrapFormat = TextureWrappingFormat::ClampToEdges,
+                                  .MagFilterFormat = FilterMode::Linear,
+                                  .MinFilterFormat = FilterMode::Linear,
+                                  .MipFilterFormat = FilterMode::Linear});
+
+  auto device = RenderContext::GetDevice();
+
+  // Create pipeline layout
+  auto bindGroupLayout = computeShader->GetReflectionInfo().LayoutDescriptors.begin()->second;
+  WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
+  pipelineLayoutDesc.bindGroupLayoutCount = 1;
+  pipelineLayoutDesc.bindGroupLayouts = &bindGroupLayout;
+  auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
+
+  WGPUBindGroupEntry bindGroupEntries[3] = {
+      {.binding = 0, .textureView = outputCubemap->GetWriteableView(0)},
+      {.binding = 1, .textureView = equirectTexture->GetReadableView(0)},
+      {.binding = 2, .sampler = *sampler->GetNativeSampler()}};
+  WGPUBindGroupDescriptor bindGroupDesc = {};
+  bindGroupDesc.layout = bindGroupLayout;
+  bindGroupDesc.entryCount = 3;
+  bindGroupDesc.entries = bindGroupEntries;
+  auto bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
+
+  WGPUComputePipelineDescriptor pipelineDesc = {};
+  pipelineDesc.layout = pipelineLayout;
+  pipelineDesc.compute.module = computeShader->GetNativeShaderModule();
+  pipelineDesc.compute.entryPoint = MakeLabel("main");
+  auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
+
+  const uint32_t workgroupSize = 32;
+  const uint32_t workgroupsX = (outputCubemap->GetSpec().Width + workgroupSize - 1) / workgroupSize;
+  const uint32_t workgroupsY = (outputCubemap->GetSpec().Height + workgroupSize - 1) / workgroupSize;
+
+  auto encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
+  {
+    auto computePass = wgpuCommandEncoderBeginComputePass(encoder, nullptr);
+    wgpuComputePassEncoderSetPipeline(computePass, pipeline);
+    wgpuComputePassEncoderSetBindGroup(computePass, 0, bindGroup, 0, nullptr);
+    wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupsX, workgroupsY, 6);
+    wgpuComputePassEncoderEnd(computePass);
+  }
+  auto commandBuffer = wgpuCommandEncoderFinish(encoder, nullptr);
+  wgpuQueueSubmit(*RenderContext::GetQueue(), 1, &commandBuffer);
+
+  // Cleanup WebGPU resources
+  wgpuBindGroupRelease(bindGroup);
+  wgpuPipelineLayoutRelease(pipelineLayout);
+  wgpuComputePipelineRelease(pipeline);
+  wgpuCommandEncoderRelease(encoder);
+  wgpuCommandBufferRelease(commandBuffer);
 }
 
 void Render::RegisterShaderDependency(Ref<Shader> shader, Material* material) {

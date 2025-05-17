@@ -16,17 +16,17 @@ Buffer TextureImporter::ImportFileToBuffer(const std::filesystem::path& path, Te
   Buffer imageBuffer;
   std::string pathStr = path.string();
 
-  if (stbi_is_hdr(pathStr.c_str())) {
-    RN_LOG_ERR("Failed to import texture from file: {} - HDR Is not supported", pathStr);
-  }
-
   int width, height, channels;
-  imageBuffer.Data = stbi_load(pathStr.c_str(), &width, &height, &channels, 4 /* force RGBA */);
-	//unsigned char* pixelData = stbi_load(pathStr.c_str(), &width, &height, &channels, 4 /* force RGBA */);
-	//imageBuffer.Data = pixelData;
-  imageBuffer.Size = width * height * 4;
 
-	outFormat = TextureFormat::RGBA8;
+  if (stbi_is_hdr(pathStr.c_str())) {
+    imageBuffer.Data = (byte*)stbi_loadf(pathStr.c_str(), &width, &height, &channels, 4);
+    imageBuffer.Size = width * height * 4 * sizeof(float);
+    outFormat = TextureFormat::RGBA32F;
+  } else {
+    imageBuffer.Data = stbi_load(pathStr.c_str(), &width, &height, &channels, 4 /* force RGBA */);
+    imageBuffer.Size = width * height * 4;
+    outFormat = TextureFormat::RGBA8;
+  }
 
   outWidth = width;
   outHeight = height;

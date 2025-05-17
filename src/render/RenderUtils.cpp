@@ -116,12 +116,17 @@ WGPUTextureFormat RenderTypeUtils::ToRenderType(TextureFormat format) {
       return WGPUTextureFormat_BGRA8Unorm;
     case Depth24Plus:
       return WGPUTextureFormat_Depth24Plus;
+    case RGBA16F:
+      return WGPUTextureFormat_RGBA16Float;
+    case RGBA32F:
+      return WGPUTextureFormat_RGBA32Float;
     case Undefined:
       return WGPUTextureFormat_Undefined;
     default:
       RN_ASSERT(false, "Format conversion for TextureFormat not exist.")
   };
 }
+
 WGPUAddressMode RenderTypeUtils::ToRenderType(TextureWrappingFormat format) {
   switch (format) {
     case ClampToEdges:
@@ -146,4 +151,19 @@ WGPUFilterMode RenderTypeUtils::ToRenderType(FilterMode format) {
 
 uint32_t RenderUtils::CalculateMipCount(uint32_t width, uint32_t height) {
   return (uint32_t)(floor((float)(log2(glm::max(width, height))))) + 1;
+}
+
+uint32_t TextureUtils::GetBytesPerPixel(TextureFormat format) {
+  switch (format) {
+    case TextureFormat::RGBA8:
+      return 4;
+    case TextureFormat::RGBA16F:
+      return 8;
+
+    case TextureFormat::RGBA32F:
+      return 16;
+    default:
+      RN_LOG_ERR("GetBytesPerPixel: Unsupported format {}", (int)format);
+      return 0;
+  }
 }

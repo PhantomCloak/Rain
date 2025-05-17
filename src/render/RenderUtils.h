@@ -282,3 +282,8 @@ class RenderUtils {
   static WGPUStringView MakeLabel(const char* str);
   static WGPUStringView MakeLabel(const std::string& str);
 };
+
+class TextureUtils {
+ public:
+  static uint32_t GetBytesPerPixel(TextureFormat format);
+};

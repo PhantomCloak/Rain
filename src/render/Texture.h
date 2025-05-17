@@ -10,6 +10,8 @@
 enum TextureFormat {
   RGBA8,
   BRGBA8,
+  RGBA16F,
+  RGBA32F,
   Depth24Plus,
   Undefined
 };
@@ -45,10 +47,11 @@ class Texture {
 
   virtual glm::uvec2 GetSize() const = 0;
 
-	public:
+ public:
   virtual bool Hack() const = 0;
-	virtual WGPUTextureView GetNativeView(int layer = 0) = 0;
-	virtual WGPUTextureView GetNativeViewAlt(int layer = 0) = 0;
+  virtual WGPUTextureView GetView() = 0;
+  virtual WGPUTextureView GetReadableView(int layer = 0) = 0;
+  virtual WGPUTextureView GetWriteableView(int layer = 0) = 0;
 };
 
 class Texture2D : public Texture {
@@ -69,9 +72,10 @@ class Texture2D : public Texture {
   Texture2D(const TextureProps& props);
   Texture2D(const TextureProps& props, const std::filesystem::path& path);
 
-  const int GetViewCount() { return m_Views.size(); }
-  WGPUTextureView GetNativeView(int layer = 0) override { return m_Views[layer]; }
-  WGPUTextureView GetNativeViewAlt(int layer = 0) override { return m_Views[layer]; }
+  const int GetViewCount() { return m_ReadViews.size(); }
+  WGPUTextureView GetView() override { return m_View; }
+  WGPUTextureView GetReadableView(int layer = 0) override { return m_ReadViews[layer]; }
+  WGPUTextureView GetWriteableView(int layer = 0) override { return m_ReadViews[layer]; }
 
   glm::uvec2 GetSize() const override { return glm::uvec2(m_TextureProps.Width, m_TextureProps.Height); }
 
@@ -85,7 +89,10 @@ class Texture2D : public Texture {
 
   const TextureProps& GetSpec() { return m_TextureProps; }
 
-  std::vector<WGPUTextureView> m_Views;
+  WGPUTextureView m_View;;
+  std::vector<WGPUTextureView> m_ReadViews;
+  std::vector<WGPUTextureView> m_WriteViews;
+
   WGPUTextureView m_ArrayView;
 
  private:
@@ -98,8 +105,10 @@ class Texture2D : public Texture {
 
 class TextureCube : public Texture {
  public:
+  static Ref<TextureCube> Create(const TextureProps& props);
   static Ref<TextureCube> Create(const TextureProps& props, const std::filesystem::path (&paths)[6]);
   TextureCube(const TextureProps& props, const std::filesystem::path (&paths)[6]);
+  TextureCube(const TextureProps& props);
   TextureCube() {};
 
   glm::uvec2 GetSize() const override { return glm::uvec2(m_TextureProps.Width, m_TextureProps.Height); }
@@ -114,13 +123,16 @@ class TextureCube : public Texture {
   const TextureProps& GetSpec() { return m_TextureProps; }
   bool Hack() const override { return true; }
 
-  WGPUTextureView GetNativeView(int layer = 0) override { return m_Views[layer]; }
-  WGPUTextureView GetNativeViewAlt(int layer = 0) override { return m_ViewsAlt[layer]; }
+  WGPUTextureView GetView() override { return m_View; }
+  WGPUTextureView GetReadableView(int layer = 0) override { return m_ReadViews[layer]; }
+  WGPUTextureView GetWriteableView(int layer = 0) override { return m_WriteViews[layer]; }
 
   WGPUTexture m_TextureBuffer = NULL;
-  WGPUTexture m_TextureBufferAlt = NULL;
-  std::vector<WGPUTextureView> m_Views;
-  std::vector<WGPUTextureView> m_ViewsAlt;
+
+  WGPUTextureView m_View;;
+  std::vector<WGPUTextureView> m_ReadViews;
+  std::vector<WGPUTextureView> m_WriteViews;
+
  private:
   TextureProps m_TextureProps;
   Buffer m_ImageData[6];

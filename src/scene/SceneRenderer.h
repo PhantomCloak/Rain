@@ -114,7 +114,6 @@ class SceneRenderer {
   Ref<GPUBuffer> m_TransformBuffer;
   Ref<GPUBuffer> m_SceneUniformBuffer;
   Ref<GPUBuffer> m_ShadowUniformBuffer;
-  ;
 
   SceneUniform m_SceneUniform;
   ShadowUniform m_ShadowUniform;
@@ -142,6 +141,9 @@ class SceneRenderer {
   Ref<RenderPipeline> m_DebugPipeline;
   Ref<RenderPipeline> m_PpfxPipeline;
   Ref<RenderPipeline> m_SkyboxPipeline;
+
+	Ref<TextureCube> m_RadianceMap;
+	Ref<TextureCube> m_IrradianceMap;
 
   bool m_NeedResize = false;
   uint32_t m_NumOfCascades = 4;

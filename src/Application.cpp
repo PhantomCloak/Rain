@@ -1,4 +1,5 @@
 //#include "imgui.h"
+#include "imgui.h"
 #include "scene/Entity.h"
 #include "scene/Scene.h"
 #define RN_DEBUG
@@ -73,10 +74,10 @@ void Application::OnUpdate() {
 }
 
 void Application::OnMouseClick(Rain::MouseCode button) {
-  //ImGuiIO& io = ImGui::GetIO();
-  //if (io.WantCaptureMouse) {
-  //  return;
-  //}
+  ImGuiIO& io = ImGui::GetIO();
+  if (io.WantCaptureMouse) {
+    return;
+  }
   Cursor::CaptureMouse(true);
 }
 

@@ -5,7 +5,7 @@
 #include "SceneRenderer.h"
 #include "debug/Profiler.h"
 #include "glm/gtc/type_ptr.hpp"
-//#include "imgui.h"
+#include "imgui.h"
 #include "io/cursor.h"
 #include "io/keyboard.h"
 #include "render/ResourceManager.h"
@@ -37,14 +37,15 @@ void Scene::Init() {
   //m_SceneCamera->Pitch = -24.00;
 
   //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/models/cityz.gltf");
-  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/Helment/untitled.gltf");
+  //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/Helment/untitled.gltf");
 	auto cityModel2 = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
+	//cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/humanoid_female_ai_robot_sci-fi/scene.gltf");
   //  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/glTF/DamagedHelmet.gltf");
   //  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/weapon.gltf");
   //  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/sponza/SponzaExp5.gltf");
   //  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test.gltf");
-  //  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
-  //  cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/pbr_spheres/scene.gltf");
+	//cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
+    cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/pbr_spheres/scene.gltf");
   map = CreateEntity("Box");
   auto map2 = CreateEntity("Box2");
   // map.GetComponent<TransformComponent>()->Translation = glm::vec3(0.0, 0.0, 0);
@@ -52,9 +53,9 @@ void Scene::Init() {
   // map.GetComponent<TransformComponent>()->Scale = glm::vec3(0.10f);
   // map.GetComponent<TransformComponent>()->Scale = glm::vec3(25.0f);
   // map.GetComponent<TransformComponent>()->Scale = glm::vec3(350.0f);
-   map.GetComponent<TransformComponent>()->Scale = glm::vec3(1.0f);
+   map.GetComponent<TransformComponent>()->Scale = glm::vec3(6.0f);
    map2.GetComponent<TransformComponent>()->Scale = glm::vec3(1.0f);
-  // map.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(90.0), glm::radians(0.0), glm::radians(180.0)));
+	// map.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(90.0), glm::radians(0.0), glm::radians(180.0)));
   //map.GetComponent<TransformComponent>()->Scale = glm::vec3(0.10f);
   BuildMeshEntityHierarchy(map, cityModel);
   BuildMeshEntityHierarchy(map2, cityModel2);
@@ -229,37 +230,37 @@ void Scene::OnRender(Ref<SceneRenderer> renderer) {
   });
 
   //ImGuizmo::BeginFrame();
-  //ImGui::Begin("Scene Settings");
+  ImGui::Begin("Scene Settings");
 
-  //glm::vec3 rotation = glm::vec3(rotX, rotY, rotZ);
-  //if (ImGui::InputFloat3("Light Direction", glm::value_ptr(rotation), "%.3f")) {
-  //  rotX = rotation.x;
-  //  rotY = rotation.y;
-  //  rotZ = rotation.z;
+  glm::vec3 rotation = glm::vec3(rotX, rotY, rotZ);
+  if (ImGui::InputFloat3("Light Direction", glm::value_ptr(rotation), "%.3f")) {
+    rotX = rotation.x;
+    rotY = rotation.y;
+    rotZ = rotation.z;
 
-  //  auto ent2 = TryGetEntityWithUUID(entityIdDir);
-  //  auto transform2 = ent2.GetComponent<TransformComponent>();
-  //  transform2->SetRotationEuler(glm::radians(rotation));
-  //}
+    auto ent2 = TryGetEntityWithUUID(entityIdDir);
+    auto transform2 = ent2.GetComponent<TransformComponent>();
+    transform2->SetRotationEuler(glm::radians(rotation));
+  }
 
-  //static float metallic = 0.0, roughness = 0.0, ao = 0.0;
+  static float metallic = 0.0, roughness = 0.0, ao = 0.0;
 
-  //if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
-  //  auto mat = cityModel->Materials->GetMaterial(0);
-  //  mat->Set("Metallic", metallic);
-  //}
+  if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
+    auto mat = cityModel->Materials->GetMaterial(0);
+    mat->Set("Metallic", metallic);
+  }
 
-  //if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
-  //  auto mat = cityModel->Materials->GetMaterial(0);
-  //  mat->Set("Roughness", roughness);
-  //}
+  if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
+    auto mat = cityModel->Materials->GetMaterial(0);
+    mat->Set("Roughness", roughness);
+  }
 
-  //if (ImGui::SliderFloat("Ao", &ao, 0.0f, 1.0f)) {
-  //  auto mat = cityModel->Materials->GetMaterial(0);
-  //  mat->Set("Ao", ao);
-  //}
+  if (ImGui::SliderFloat("Ao", &ao, 0.0f, 1.0f)) {
+    auto mat = cityModel->Materials->GetMaterial(0);
+    mat->Set("Ao", ao);
+  }
 
-  //ImGui::End();
+  ImGui::End();
 
   //auto pt = GetWorldSpaceTransformMatrix(map);
 

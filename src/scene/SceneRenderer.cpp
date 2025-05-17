@@ -1,10 +1,10 @@
 #include "SceneRenderer.h"
 #include "Application.h"
-//#include "backends/imgui_impl_glfw.h"
-//#include "backends/imgui_impl_wgpu.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_wgpu.h"
 #include "debug/Profiler.h"
 #include "glm/gtx/rotate_vector.hpp"
-//#include "imgui.h"
+#include "imgui.h"
 #include "io/filesystem.h"
 #include "io/keyboard.h"
 #include "render/Framebuffer.h"
@@ -44,11 +44,11 @@ void CalculateCascades(CascadeData* cascades, const SceneCamera& sceneCamera, gl
 
   float CascadeSplitLambda = 0.92f;
   // float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
-   //float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -320.0f;
-   float CascadeFarPlaneOffset = 250.0f, CascadeNearPlaneOffset = -250.0f;
-	//float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
-	//float CascadeFarPlaneOffset = 50.0f, CascadeNearPlaneOffset = -50.0f;
-	//float CascadeFarPlaneOffset = 50.0f, CascadeNearPlaneOffset = -50.0f;
+  // float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -320.0f;
+  float CascadeFarPlaneOffset = 250.0f, CascadeNearPlaneOffset = -250.0f;
+  // float CascadeFarPlaneOffset = 350.0f, CascadeNearPlaneOffset = -350.0f;
+  // float CascadeFarPlaneOffset = 50.0f, CascadeNearPlaneOffset = -50.0f;
+  // float CascadeFarPlaneOffset = 50.0f, CascadeNearPlaneOffset = -50.0f;
   // float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -100.0f;
 
   // Calculate split depths based on view camera frustum
@@ -202,13 +202,24 @@ void SceneRenderer::Init() {
   auto skyboxShader = ShaderManager::LoadShader("SH_Skybox", RESOURCE_DIR "/shaders/skybox.wgsl");
   auto ppfxShader = ShaderManager::LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
 
-  // Add Watchers
+  TextureProps cubeProps = {};
+  cubeProps.Width = 2048;
+  cubeProps.Height = 2048;
+  cubeProps.GenerateMips = true;
+  cubeProps.Format = TextureFormat::RGBA16F;
+
+  Ref<TextureCube> envUnfiltered = TextureCube::Create(cubeProps);
+  Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), RESOURCE_DIR "/textures/evening_road_01_puresky_4k.hdr");
+
+  Render::ComputeEquirectToCubemap(envEquirect.get(), envUnfiltered.get());
+
+  auto [envFiltered, envIrradiance] = Render::CreateEnvironmentMap(RESOURCE_DIR "/textures/evening_road_01_puresky_4k.hdr");
 
   FileSys::WatchFile(RESOURCE_DIR "/shaders/pbr.wgsl", [pbrShader](std::string filePath) {
-			std::string b = FileSys::ReadFile(filePath);
-			pbrShader->Reload(b);
-			Render::ReloadShader(pbrShader);
-			//callbacks()
+    std::string b = FileSys::ReadFile(filePath);
+    pbrShader->Reload(b);
+    Render::ReloadShader(pbrShader);
+    // callbacks()
   });
 
   glm::vec2 screenSize = Application::Get()->GetWindowSize();
@@ -267,20 +278,14 @@ void SceneRenderer::Init() {
                                         .LodMinClamp = 0.0f,
                                         .LodMaxClamp = 12.0f});
   auto skyboxSampler2 = Sampler::Create({.Name = "S_Skybox2",
-                                        .WrapFormat = TextureWrappingFormat::ClampToEdges,
-                                        .MagFilterFormat = FilterMode::Linear,
-                                        .MinFilterFormat = FilterMode::Linear,
-                                        .MipFilterFormat = FilterMode::Linear,
-                                        .Compare = CompareMode::CompareUndefined,
-                                        .LodMinClamp = 0.0f,
-                                        .LodMaxClamp = 1.0f});
-  auto skybox = Rain::ResourceManager::LoadCubeTexture("T3D_Skybox",
-                                                       {RESOURCE_DIR "/textures/right.jpg",
-                                                        RESOURCE_DIR "/textures/left.jpg",
-                                                        RESOURCE_DIR "/textures/top.jpg",
-                                                        RESOURCE_DIR "/textures/bottom.jpg",
-                                                        RESOURCE_DIR "/textures/front.jpg",
-                                                        RESOURCE_DIR "/textures/back.jpg"});
+                                         .WrapFormat = TextureWrappingFormat::ClampToEdges,
+                                         .MagFilterFormat = FilterMode::Linear,
+                                         .MinFilterFormat = FilterMode::Linear,
+                                         .MipFilterFormat = FilterMode::Linear,
+                                         .Compare = CompareMode::CompareUndefined,
+                                         .LodMinClamp = 0.0f,
+                                         .LodMaxClamp = 1.0f});
+
   auto bdrfLut = Rain::ResourceManager::LoadTexture("BDRF", RESOURCE_DIR "/textures/BRDF_LUT.png");
 
   RenderPassSpec propSkyboxPass = {
@@ -288,7 +293,7 @@ void SceneRenderer::Init() {
       .DebugName = "SykboxPass"};
 
   m_SkyboxPass = RenderPass::Create(propSkyboxPass);
-  m_SkyboxPass->Set("cubemapTexture", skybox);
+  m_SkyboxPass->Set("u_Texture", envUnfiltered);
   m_SkyboxPass->Set("textureSampler", skyboxSampler);
   m_SkyboxPass->Set("u_Camera", m_CameraUniformBuffer);
   m_SkyboxPass->Bake();
@@ -360,8 +365,8 @@ void SceneRenderer::Init() {
   m_LitPass->Set("u_ShadowMap", m_ShadowPass[0]->GetDepthOutput());
   m_LitPass->Set("u_ShadowSampler", m_ShadowSampler);
   m_LitPass->Set("u_ShadowData", m_ShadowUniformBuffer);
-  m_LitPass->Set("u_radianceMap", skybox);
-  m_LitPass->Set("u_irradianceMap", skybox);
+  m_LitPass->Set("u_radianceMap", envFiltered);
+  m_LitPass->Set("u_irradianceMap", envIrradiance);
   m_LitPass->Set("u_radianceMapSampler", skyboxSampler);
   m_LitPass->Set("u_irradianceMapSampler", skyboxSampler2);
   m_LitPass->Set("u_BDRFLut", bdrfLut);
@@ -413,25 +418,25 @@ void SceneRenderer::Init() {
   // Render::ComputeMip(texture);
   // Render::saveTexture(RESOURCE_DIR "matrix2.png", RenderContext::GetDevice(), texture, 3);
 
-  //IMGUI_CHECKVERSION();
-  //ImGui::CreateContext();
-  //auto& io = ImGui::GetIO();
-	//ImGuiStyle& style = ImGui::GetStyle();
-	//style.ScaleAllSizes(2.0f);  // Scale everything by 2x
-	//io.FontGlobalScale = 2.0f;
-  //ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  auto& io = ImGui::GetIO();
+  ImGuiStyle& style = ImGui::GetStyle();
+  style.ScaleAllSizes(2.0f);  // Scale everything by 2x
+  io.FontGlobalScale = 2.0f;
+  ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
 
-  //ImGui_ImplWGPU_InitInfo initInfo;
-  //initInfo.Device = RenderContext::GetDevice();
-  //// initInfo.RenderTargetFormat = render->m_swapChainFormat;
-  //initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
-  //initInfo.PipelineMultisampleState = {
-  //    .nextInChain = nullptr,
-  //    .count = 4,
-  //    .mask = ~0u,
-  //    .alphaToCoverageEnabled = false};
-  //initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
-  //ImGui_ImplWGPU_Init(&initInfo);
+  ImGui_ImplWGPU_InitInfo initInfo;
+  initInfo.Device = RenderContext::GetDevice();
+  // initInfo.RenderTargetFormat = render->m_swapChainFormat;
+  initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
+  initInfo.PipelineMultisampleState = {
+      .nextInChain = nullptr,
+      .count = 4,
+      .mask = ~0u,
+      .alphaToCoverageEnabled = false};
+  initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
+  ImGui_ImplWGPU_Init(&initInfo);
 }
 
 void SceneRenderer::PreRender() {
@@ -498,9 +503,9 @@ void SceneRenderer::BeginScene(const SceneCamera& camera) {
     m_NeedResize = false;
   }
 
-  //ImGui_ImplWGPU_NewFrame();
-  //ImGui_ImplGlfw_NewFrame();
-  //ImGui::NewFrame();
+  ImGui_ImplWGPU_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
 }
 
 void SceneRenderer::FlushDrawList() {
@@ -539,7 +544,7 @@ void SceneRenderer::FlushDrawList() {
     for (auto& [mk, dc] : m_DrawList) {
       Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
     }
-    //ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
+    ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
     Render::EndRenderPass(m_LitPass, litPassEncoder);
   }
 
@@ -560,10 +565,10 @@ void SceneRenderer::FlushDrawList() {
     wgpuCommandBufferRelease(commandBuffer);
     wgpuCommandEncoderRelease(commandEncoder);
 
-		wgpuSurfacePresent(Render::Instance->m_surface);
+    wgpuSurfacePresent(Render::Instance->m_surface);
 
 #ifndef __EMSCRIPTEN__
-    //wgpuSwapChainPresent(Render::Instance->m_swapChain);
+    // wgpuSwapChainPresent(Render::Instance->m_swapChain);
     wgpuDeviceTick(renderContext->GetDevice());
 #endif
   }
@@ -573,8 +578,8 @@ void SceneRenderer::FlushDrawList() {
 }
 
 void SceneRenderer::EndScene() {
-  //ImGui::EndFrame();
-  //ImGui::Render();
+  ImGui::EndFrame();
+  ImGui::Render();
   PreRender();
   FlushDrawList();
 }

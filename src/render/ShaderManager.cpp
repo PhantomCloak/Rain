@@ -1,6 +1,6 @@
 #include "ShaderManager.h"
-#include "render/RenderUtils.h"
 #include <iostream>
+#include "render/RenderUtils.h"
 
 // #include "src/tint/api/tint.h"
 #include "core/Log.h"
@@ -51,15 +51,15 @@ WGPUTextureViewDimension GetDimensionType(tint::inspector::ResourceBinding::Text
   }
 }
 
- WGPUTextureFormat GetImageFormat(tint::inspector::ResourceBinding::TexelFormat type) {
+WGPUTextureFormat GetImageFormat(tint::inspector::ResourceBinding::TexelFormat type) {
   switch (type) {
     case tint::inspector::ResourceBinding::TexelFormat::kRgba8Unorm:
       return WGPUTextureFormat_RGBA8Unorm;
     case tint::inspector::ResourceBinding::TexelFormat::kRgba32Float:
       return WGPUTextureFormat_RGBA32Float;
+    case tint::inspector::ResourceBinding::TexelFormat::kRgba16Float:
+      return WGPUTextureFormat_RGBA16Float;
       break;
-			default:
-			 exit(1);
   }
 }
 
@@ -71,10 +71,10 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
   tint::Source::File* file = new tint::Source::File(shader->GetName(), shader->GetSource());
   tint::Program program = tint::wgsl::reader::Parse(file, options);
 
-  //if (program.Diagnostics().contains_errors()) {
-  //  RN_LOG_ERR("Shader Compilation Error: {0}", program.Diagnostics().str());
-  //  return reflectionInfo;
-  //}
+  if (program.Diagnostics().ContainsErrors()) {
+    RN_LOG_ERR("Shader Compilation Error: {0}", program.Diagnostics().Str());
+    return reflectionInfo;
+  }
 
   tint::inspector::Inspector inspector(program);
 
@@ -263,13 +263,13 @@ ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
           groupEntry.visibility = WGPUShaderStage_Fragment;
           break;
         case StorageBindingType:
-					auto v = inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].image_format;
+          auto v = inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].image_format;
           groupEntry.storageTexture.access = WGPUStorageTextureAccess_WriteOnly;
           groupEntry.storageTexture.format = GetImageFormat(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].image_format);
           groupEntry.storageTexture.viewDimension = GetDimensionType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].dim);
 
-          //groupEntry.storageTexture.format = WGPUTextureFormat_RGBA8Unorm;
-          // groupEntry.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
+          // groupEntry.storageTexture.format = WGPUTextureFormat_RGBA8Unorm;
+          //  groupEntry.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
 
           groupEntry.visibility = WGPUShaderStage_Compute;
           break;

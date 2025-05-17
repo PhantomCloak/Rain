@@ -26,7 +26,7 @@ bool IsInputValid(const RenderPassInput& input) {
     case PT_Uniform:
       return input.UniformIntput != NULL && input.UniformIntput->Buffer != NULL;
     case PT_Texture:
-      return input.TextureInput != NULL && input.TextureInput->GetNativeView() != NULL;
+      return input.TextureInput != NULL && input.TextureInput->GetReadableView() != NULL;
     case PT_Sampler:
       return input.SamplerInput != NULL && input.SamplerInput->GetNativeSampler() != NULL;
     default:
@@ -165,11 +165,11 @@ void BindingManager::InvalidateAndUpdate() {
           break;
         case PT_Texture:
 
-					if (input.TextureInput->Hack() && storedEntry.textureView != input.TextureInput->GetNativeView()) {
+					if (input.TextureInput->Hack() && storedEntry.textureView != input.TextureInput->GetReadableView()) {
             m_InvalidatedInputs[index][location] = input;
           }
 
-          if (storedEntry.textureView != input.TextureInput->GetNativeView()) {
+          if (storedEntry.textureView != input.TextureInput->GetReadableView()) {
             m_InvalidatedInputs[index][location] = input;
           }
           break;
@@ -196,7 +196,7 @@ void BindingManager::InvalidateAndUpdate() {
           storedEntry.size = input.UniformIntput->Size;
           break;
         case PT_Texture:
-          storedEntry.textureView = input.TextureInput->GetNativeView();
+          storedEntry.textureView = input.TextureInput->GetReadableView();
           break;
         case PT_Sampler:
           storedEntry.sampler = *input.SamplerInput->GetNativeSampler();
