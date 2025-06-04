@@ -10,15 +10,16 @@ static std::uniform_int_distribution<uint64_t> s_UniformDistribution;
 static std::mt19937 eng32(s_RandomDevice());
 static std::uniform_int_distribution<uint32_t> s_UniformDistribution32;
 
-UUID::UUID()
-    : m_UUID(s_UniformDistribution(eng)) {
-}
+namespace Rain {
+  UUID::UUID()
+      : m_UUID(s_UniformDistribution(eng)) {
+  }
 
-UUID::UUID(uint64_t uuid)
-    : m_UUID(uuid) {
-}
+  UUID::UUID(uint64_t uuid)
+      : m_UUID(uuid) {
+  }
 
-UUID::UUID(const UUID& other)
-    : m_UUID(other.m_UUID) {
-}
-  // namespace std
+  UUID::UUID(const UUID& other)
+      : m_UUID(other.m_UUID) {
+  }
+}  // namespace Rain

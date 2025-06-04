@@ -45,7 +45,17 @@ else()
   add_subdirectory(vendor/dawn)
 endif()
 
-# PhysX
+
+# Add Jolt Physics
+set(JOLT_PHYSICS_BUILD_SHARED_LIBRARY OFF CACHE BOOL "Build Jolt as a shared library" FORCE)
+set(JOLT_PHYSICS_BUILD_UNIT_TESTS OFF CACHE BOOL "Build unit tests" FORCE)
+set(JOLT_PHYSICS_BUILD_PERFORMANCE_TESTS OFF CACHE BOOL "Build performance tests" FORCE)
+set(JOLT_PHYSICS_BUILD_SAMPLES OFF CACHE BOOL "Build samples" FORCE)
+add_subdirectory(vendor/JoltPhysics/Build)
+target_include_directories(ReEngine PRIVATE 
+    vendor/JoltPhysics
+    vendor/JoltPhysics/Jolt  # Add this line - this is where the actual headers are
+)
 
 if(EMSCRIPTEN)
 	#message(FATAL "OH NOOOO!!!")
@@ -58,7 +68,6 @@ if(EMSCRIPTEN)
 	#string(APPEND CMAKE_CXX_FLAGS " ${EMSCRIPTEN_PTHREADS_COMPILER_FLAGS}")
 	#string(APPEND CMAKE_EXE_LINKER_FLAGS " ${EMSCRIPTEN_PTHREADS_LINKER_FLAGS}")
 else()
-	#add_subdirectory(vendor/PhysX/physx/compiler/public)
 	add_library(TracyClient STATIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/TracyClient.cpp)
 	target_include_directories(TracyClient PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/tracy)
 	target_compile_definitions(TracyClient PUBLIC TRACY_ENABLE=1)
@@ -111,11 +120,8 @@ else()
 	flecs
 	TracyClient
 	glfw
+	Jolt
 	assimp)
-	##PhysX
-	##PhysXCooking 
-	##PhysXCommon
-	##PhysXExtensions)
 endif()
 
 

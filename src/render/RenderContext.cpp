@@ -1,3 +1,5 @@
 #include "RenderContext.h"
 
-RenderContext* RenderContext::m_Instance;
+namespace Rain {
+  RenderContext* RenderContext::m_Instance;
+}

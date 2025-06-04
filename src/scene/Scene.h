@@ -1,49 +1,55 @@
 #pragma once
 
 #include <flecs/flecs.h>
+#include <memory>
 #include <string>
-#include <unordered_map>
 #include "Cam.h"
 #include "core/UUID.h"
+#include "physics/PhysicsScene.h"
 #include "render/Mesh.h"
 #include "scene/Entity.h"
 
-class Entity;
+namespace Rain {
 
-class SceneRenderer;
+  class SceneRenderer;
 
-struct LightInfo {
-  glm::vec3 LightDirection;
-  glm::vec3 LightPos;
-};
+  struct LightInfo {
+    glm::vec3 LightDirection;
+    glm::vec3 LightPos;
+  };
 
-class Scene {
- public:
-  Scene(std::string sceneName = "Untitled Scene");
+  class Scene {
+   public:
+    Scene(std::string sceneName = "Untitled Scene");
 
-  Entity CreateEntity(std::string name);
-  Entity CreateChildEntity(Entity parent, std::string name);
+    Entity CreateEntity(std::string name);
+    Entity CreateChildEntity(Entity parent, std::string name);
 
-  void Init();
+    void Init();
 
-  void OnUpdate();
-  void OnRender(Ref<SceneRenderer> renderer);
+    void OnUpdate();
+    void OnRender(Ref<SceneRenderer> renderer);
 
-  void BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh);
-  Entity TryGetEntityWithUUID(UUID id) const;
-  glm::mat4 GetWorldSpaceTransformMatrix(Entity entity);
-  glm::mat4 EditTransform(glm::mat4& matrix);
+    void BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh);
+    Entity TryGetEntityWithUUID(UUID id) const;
+    glm::mat4 GetWorldSpaceTransformMatrix(Entity entity);
+    TransformComponent GetWorldSpaceTransform(Entity entity);
+    glm::mat4 EditTransform(glm::mat4& matrix);
+    void ConvertToLocalSpace(Entity entity);
 
-  void OnMouseMove(double xPos, double yPos);
-  void ScanKeyPress();
+    std::pair<glm::vec3, glm::vec3> CastRay(const PlayerCamera& camera, float mx, float my);
+    void OnMouseMove(double xPos, double yPos);
+    void ScanKeyPress();
 
-  LightInfo SceneLightInfo;
-  std::unique_ptr<PlayerCamera> m_SceneCamera;
+    LightInfo SceneLightInfo;
+    std::unique_ptr<PlayerCamera> m_SceneCamera;
+    static Scene* Instance;
 
- private:
-  std::unordered_map<UUID, Entity> m_EntityMap;
-  flecs::world m_World;
-  std::string m_Name;
-
-  friend class Entity;
-};
+   private:
+    std::unordered_map<UUID, Entity> m_EntityMap;
+    flecs::world m_World;
+    std::string m_Name;
+    Ref<PhysicsScene> m_PhysicsScene;
+    friend class Entity;
+  };
+}  // namespace Rain

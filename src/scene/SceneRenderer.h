@@ -6,148 +6,150 @@
 #include "render/RenderPass.h"
 #include "render/ShaderManager.h"
 
-struct MeshKey {
-  UUID MeshHandle;
-  UUID MaterialHandle;
-  uint32_t SubmeshIndex;
+namespace Rain {
+  struct MeshKey {
+    UUID MeshHandle;
+    UUID MaterialHandle;
+    uint32_t SubmeshIndex;
 
-  MeshKey(UUID meshHandle, UUID materialHandle, uint32_t submeshIndex)
-      : MeshHandle(meshHandle), MaterialHandle(materialHandle), SubmeshIndex(submeshIndex) {
-  }
-
-  bool operator<(const MeshKey& other) const {
-    if (MeshHandle < other.MeshHandle) {
-      return true;
+    MeshKey(UUID meshHandle, UUID materialHandle, uint32_t submeshIndex)
+        : MeshHandle(meshHandle), MaterialHandle(materialHandle), SubmeshIndex(submeshIndex) {
     }
 
-    if (MeshHandle > other.MeshHandle) {
+    bool operator<(const MeshKey& other) const {
+      if (MeshHandle < other.MeshHandle) {
+        return true;
+      }
+
+      if (MeshHandle > other.MeshHandle) {
+        return false;
+      }
+
+      if (SubmeshIndex < other.SubmeshIndex) {
+        return true;
+      }
+
+      if (SubmeshIndex > other.SubmeshIndex) {
+        return false;
+      }
+
+      if (MaterialHandle < other.MaterialHandle) {
+        return true;
+      }
+
+      if (MaterialHandle > other.MaterialHandle) {
+        return false;
+      }
+
       return false;
     }
+  };
 
-    if (SubmeshIndex < other.SubmeshIndex) {
-      return true;
-    }
+  struct DrawCommand {
+    Ref<MeshSource> Mesh;
+    uint32_t SubmeshIndex;
+    Ref<MaterialTable> Materials;
 
-    if (SubmeshIndex > other.SubmeshIndex) {
-      return false;
-    }
+    uint32_t InstanceCount = 0;
+    uint32_t InstanceOffset = 0;
+    bool IsRigged = false;
+  };
 
-    if (MaterialHandle < other.MaterialHandle) {
-      return true;
-    }
+  struct TransformVertexData {
+    glm::vec4 MRow[3];
+  };
 
-    if (MaterialHandle > other.MaterialHandle) {
-      return false;
-    }
+  struct TransformMapData {
+    std::vector<TransformVertexData> Transforms;
+    uint32_t TransformOffset = 0;
+  };
 
-    return false;
-  }
-};
+  struct SceneCamera {
+    glm::mat4 ViewMatrix;
+    glm::mat4 Projection;
+    float Near;
+    float Far;
+  };
 
-struct DrawCommand {
-  Ref<MeshSource> Mesh;
-  uint32_t SubmeshIndex;
-  Ref<MaterialTable> Materials;
+  struct CameraData {
+    glm::mat4 InverseViewProjectionMatrix;
+  };
 
-  uint32_t InstanceCount = 0;
-  uint32_t InstanceOffset = 0;
-  bool IsRigged = false;
-};
+  struct SceneUniform {
+    glm::mat4x4 ViewProjection;
+    glm::mat4x4 View;
+    glm::vec3 CameraPosition;
+    float _pad0;
+    glm::vec3 LightDir;
+    float _pad1;
+  };
 
-struct TransformVertexData {
-  glm::vec4 MRow[3];
-};
+  struct ShadowUniform {
+    glm::mat4 ShadowViews[4];
+    glm::vec4 CascadeDistances;
+  };
 
-struct TransformMapData {
-  std::vector<TransformVertexData> Transforms;
-  uint32_t TransformOffset = 0;
-};
+  class SceneRenderer {
+   public:
+    SceneRenderer() { instance = this; };
 
-struct SceneCamera {
-  glm::mat4 ViewMatrix;
-  glm::mat4 Projection;
-  float Near;
-  float Far;
-};
+    void Init();
+    void SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform);
+    void BeginScene(const SceneCamera& camera);
+    void EndScene();
+    void SetScene(Scene* scene);
+    void SetViewportSize(int height, int width);
 
-struct CameraData {
-  glm::mat4 InverseViewProjectionMatrix;
-};
+    static SceneRenderer* instance;
 
-struct SceneUniform {
-  glm::mat4x4 ViewProjection;
-  glm::mat4x4 View;
-  glm::vec3 CameraPosition;
-  float _pad0;
-  glm::vec3 LightDir;
-  float _pad1;
-};
+   private:
+    void PreRender();
+    void FlushDrawList();
 
-struct ShadowUniform {
-  glm::mat4 ShadowViews[4];
-  glm::vec4 CascadeDistances;
-};
+   private:
+    Scene* m_Scene;
 
-class SceneRenderer {
- public:
-  SceneRenderer() { instance = this; };
+    CameraData m_CameraData;
+    Ref<GPUBuffer> m_CameraUniformBuffer;
 
-  void Init();
-  void SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform);
-  void BeginScene(const SceneCamera& camera);
-  void EndScene();
-  void SetScene(Scene* scene);
-  void SetViewportSize(int height, int width);
+    Ref<GPUBuffer> m_TransformBuffer;
+    Ref<GPUBuffer> m_SceneUniformBuffer;
+    Ref<GPUBuffer> m_ShadowUniformBuffer;
 
-  static SceneRenderer* instance;
+    SceneUniform m_SceneUniform;
+    ShadowUniform m_ShadowUniform;
 
- private:
-  void PreRender();
-  void FlushDrawList();
+    std::map<MeshKey, DrawCommand> m_DrawList;
+    std::map<MeshKey, TransformMapData> m_MeshTransformMap;
 
- private:
-  Scene* m_Scene;
+    Ref<Texture2D> m_ShadowDepthTexture;
+    Ref<Texture2D> m_LitDepthTexture;
+    Ref<Texture2D> m_LitPassTexture;
+    SceneCamera Cam;
 
-  CameraData m_CameraData;
-  Ref<GPUBuffer> m_CameraUniformBuffer;
+    Ref<Sampler> m_ShadowSampler;
 
-  Ref<GPUBuffer> m_TransformBuffer;
-  Ref<GPUBuffer> m_SceneUniformBuffer;
-  Ref<GPUBuffer> m_ShadowUniformBuffer;
+    Ref<Framebuffer> m_CompositeFramebuffer;
 
-  SceneUniform m_SceneUniform;
-  ShadowUniform m_ShadowUniform;
+    Ref<RenderPass> m_ShadowPass[4];
+    Ref<RenderPass> m_LitPass;
+    Ref<RenderPass> m_PpfxPass;
+    Ref<RenderPass> m_SkyboxPass;
 
-  std::map<MeshKey, DrawCommand> m_DrawList;
-  std::map<MeshKey, TransformMapData> m_MeshTransformMap;
+    // Ref<RenderPipeline> m_ShadowPipeline;
+    Ref<RenderPipeline> m_ShadowPipeline[4];
+    Ref<RenderPipeline> m_LitPipeline;
+    Ref<RenderPipeline> m_DebugPipeline;
+    Ref<RenderPipeline> m_PpfxPipeline;
+    Ref<RenderPipeline> m_SkyboxPipeline;
 
-  Ref<Texture2D> m_ShadowDepthTexture;
-  Ref<Texture2D> m_LitDepthTexture;
-  Ref<Texture2D> m_LitPassTexture;
-  SceneCamera Cam;
+    Ref<TextureCube> m_RadianceMap;
+    Ref<TextureCube> m_IrradianceMap;
 
-  Ref<Sampler> m_ShadowSampler;
+    bool m_NeedResize = false;
+    uint32_t m_NumOfCascades = 4;
 
-  Ref<Framebuffer> m_CompositeFramebuffer;
-
-  Ref<RenderPass> m_ShadowPass[4];
-  Ref<RenderPass> m_LitPass;
-  Ref<RenderPass> m_PpfxPass;
-  Ref<RenderPass> m_SkyboxPass;
-
-  // Ref<RenderPipeline> m_ShadowPipeline;
-  Ref<RenderPipeline> m_ShadowPipeline[4];
-  Ref<RenderPipeline> m_LitPipeline;
-  Ref<RenderPipeline> m_DebugPipeline;
-  Ref<RenderPipeline> m_PpfxPipeline;
-  Ref<RenderPipeline> m_SkyboxPipeline;
-
-	Ref<TextureCube> m_RadianceMap;
-	Ref<TextureCube> m_IrradianceMap;
-
-  bool m_NeedResize = false;
-  uint32_t m_NumOfCascades = 4;
-
-  uint32_t m_ViewportWidth;
-  uint32_t m_ViewportHeight;
-};
+    uint32_t m_ViewportWidth;
+    uint32_t m_ViewportHeight;
+  };
+}  // namespace Rain

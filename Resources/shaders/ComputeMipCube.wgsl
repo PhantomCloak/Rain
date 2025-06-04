@@ -1,7 +1,7 @@
 @group(0) @binding(0) var previousMipLevel: texture_2d_array<f32>;
-@group(0) @binding(1) var nextMipLevel: texture_storage_2d_array<rgba8unorm, write>;
+@group(0) @binding(1) var nextMipLevel: texture_storage_2d_array<rgba16float, write>;
 
-@compute @workgroup_size(8, 8, 1)
+@compute @workgroup_size(32, 32, 1)
 fn computeMipMap(@builtin(global_invocation_id) id: vec3<u32>) {
     let faceIndex: i32 = i32(id.z); 
     let texCoord: vec2<i32> = vec2<i32>(id.xy); 

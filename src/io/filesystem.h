@@ -1,10 +1,11 @@
 #pragma once
+#include <functional>
 #include <string>
 #include <vector>
-#include <functional>
 
-class FileSys {
-    public:
+namespace Rain {
+  class FileSys {
+   public:
     static std::vector<std::string> GetFilesInDirectory(std::string path);
     static std::vector<std::string> GetFoldersInDirectory(std::string path);
     static std::string GetParentDirectory(std::string path);
@@ -15,6 +16,7 @@ class FileSys {
     static void OpenFilePickerDialog(std::function<void(std::string filePath)> callback);
     static void OpenFileSaveDialog(std::string defaultName, std::string defaultPath, std::function<void(std::string filePath)>&& callback);
     static void OpenFileOSDefaults(std::string path);
-		static bool IsFileExist(std::string path);
-		static void WatchFile(const std::string& path, std::function<void(std::string fileName)> callback);
-};
+    static bool IsFileExist(std::string path);
+    static void WatchFile(const std::string& path, std::function<void(std::string fileName)> callback);
+  };
+}  // namespace Rain

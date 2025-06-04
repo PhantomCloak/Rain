@@ -1,24 +1,26 @@
-#include <GLFW/glfw3.h>
 #include "keyboard.h"
+#include <GLFW/glfw3.h>
 #include <unordered_map>
 
-void* NativeWndPtr;
+namespace Rain {
+  void* NativeWndPtr;
 
-void Keyboard::Setup(void* nativeWndPtr) {
-	NativeWndPtr = nativeWndPtr;
-}
+  void Keyboard::Setup(void* nativeWndPtr) {
+    NativeWndPtr = nativeWndPtr;
+  }
 
-bool Keyboard::IsKeyPressed(int keyCode) {
-  return glfwGetKey((GLFWwindow*)NativeWndPtr, keyCode);
-}
+  bool Keyboard::IsKeyPressed(int keyCode) {
+    return glfwGetKey((GLFWwindow*)NativeWndPtr, keyCode);
+  }
 
-void Keyboard::Poll() {
-  glfwPollEvents();
-}
+  void Keyboard::Poll() {
+    glfwPollEvents();
+  }
 
-bool Keyboard::IsKeyPressing(int keyCode) {
-  return glfwGetKey((GLFWwindow*)NativeWndPtr, keyCode);
-}
+  bool Keyboard::IsKeyPressing(int keyCode) {
+    return glfwGetKey((GLFWwindow*)NativeWndPtr, keyCode);
+  }
 
-void Keyboard::FlushPressedKeys() {
-}
+  void Keyboard::FlushPressedKeys() {
+  }
+}  // namespace Rain

@@ -1,15 +1,17 @@
 #pragma once
-#include "render/Shader.h"
 #include <webgpu/webgpu.h>
-#include <string>
 #include <map>
+#include <string>
+#include "render/Shader.h"
 
-class ShaderManager {
- public:
-  static Ref<Shader> LoadShader(const std::string& shaderId, const std::string& shaderPath);
-  static Ref<Shader> GetShader(const std::string& shaderId);
+namespace Rain {
+  class ShaderManager {
+   public:
+    static Ref<Shader> LoadShader(const std::string& shaderId, const std::string& shaderPath);
+    static Ref<Shader> GetShader(const std::string& shaderId);
 
-	// TODO: Make better API
- private:
-  static std::map<std::string, Ref<Shader>> m_Shaders;
-};
+    // TODO: Make better API
+   private:
+    static std::map<std::string, Ref<Shader>> m_Shaders;
+  };
+}  // namespace Rain

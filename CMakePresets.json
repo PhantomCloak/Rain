@@ -33,6 +33,7 @@
                 "DAWN_ENABLE_DESKTOP_GL": "OFF",
                 "TINT_BUILD_TINT": "OFF",
                 "DEV_MODE": "ON",
+								"IMGUI_IMPL_WEBGPU_BACKEND_DAWN": "ON",
                 "PHYSX_ROOT_DIR": "${sourceDir}/vendor/PhysX/physx",
                 "PX_OUTPUT_LIB_DIR": "${sourceDir}/build/${presetName}/physx",
                 "PX_OUTPUT_BIN_DIR": "${sourceDir}/buld/${presetName}/physx"

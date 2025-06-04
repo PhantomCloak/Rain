@@ -3,18 +3,18 @@
 #ifndef NDEBUG
 #define NDEBUG
 #endif
-
-#include <PxPhysicsAPI.h>
+#include <Jolt.h>
 #include <glm/glm.hpp>
-#include <vector>
+#include <glm/gtx/quaternion.hpp>
 
-using namespace physx;
+namespace Rain {
+  class PhysicsUtils {
+   public:
+    static JPH::Vec3 ToJoltVector(const glm::vec3& vector);
+    static JPH::Quat ToJoltQuat(const glm::quat& quat);
 
-class PhysicUtils {
- public:
-  static PxConvexMesh* createConvexMesh(const std::vector<glm::vec3>& vertices, unsigned int stride, PxPhysics* physics, PxCookingParams* cooking);
-  static PxBoxGeometry* createBoxMesh(int hx, int hy, int z);
-	static PxTransform ConvertPxTransform(glm::vec3 position, float rotation, glm::vec3 direction = glm::vec3(0, 1, 0));
-	static PxTransform ConvertPxTransform(glm::vec3 position, glm::vec3 rotation);
-};
+    static glm::vec3 FromJoltVector(const JPH::Vec3& vector);
+    static glm::quat FromJoltQuat(const JPH::Quat& quat);
+  };
+}  // namespace Rain
 #endif

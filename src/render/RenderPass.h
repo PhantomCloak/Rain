@@ -5,35 +5,37 @@
 #include "render/Sampler.h"
 #include "render/Texture.h"
 
-struct RenderPassSpec {
-  Ref<RenderPipeline> Pipeline;
-  std::string DebugName;
-  glm::vec4 MarkerColor;
-};
+namespace Rain {
+  struct RenderPassSpec {
+    Ref<RenderPipeline> Pipeline;
+    std::string DebugName;
+    glm::vec4 MarkerColor;
+  };
 
-// There is an interesting case in WebGPU which it doesn't have any explicit barriers and
-// all synchronization goes implicitly within API, due to that all PASSES that are using the same resources
-// Ran sequental instead of parallel, careness needed
+  // There is an interesting case in WebGPU which it doesn't have any explicit barriers and
+  // all synchronization goes implicitly within API, due to that all PASSES that are using the same resources
+  // Ran sequental instead of parallel, careness needed
 
-class RenderPass {
- public:
-  RenderPass(const RenderPassSpec& props);
+  class RenderPass {
+   public:
+    RenderPass(const RenderPassSpec& props);
 
-  void Set(const std::string& name, Ref<Texture> texture);
-  void Set(const std::string& name, Ref<GPUBuffer> uniform);
-  void Set(const std::string& name, Ref<Sampler> sampler);
-  void Bake();
+    void Set(const std::string& name, Ref<Texture> texture);
+    void Set(const std::string& name, Ref<GPUBuffer> uniform);
+    void Set(const std::string& name, Ref<Sampler> sampler);
+    void Bake();
 
-  const Ref<Texture2D> GetOutput(int index) { return GetTargetFrameBuffer()->GetAttachment(index); }
-  const Ref<Texture2D> GetDepthOutput() { return GetTargetFrameBuffer()->GetDepthAttachment(); }
-  const RenderPassSpec& GetProps() { return m_PassSpec; }
-  const Ref<BindingManager> GetBindManager() { return m_PassBinds; }
-	const Ref<Framebuffer> GetTargetFrameBuffer() { return m_PassSpec.Pipeline->GetPipelineSpec().TargetFramebuffer; }
+    const Ref<Texture2D> GetOutput(int index) { return GetTargetFrameBuffer()->GetAttachment(index); }
+    const Ref<Texture2D> GetDepthOutput() { return GetTargetFrameBuffer()->GetDepthAttachment(); }
+    const RenderPassSpec& GetProps() { return m_PassSpec; }
+    const Ref<BindingManager> GetBindManager() { return m_PassBinds; }
+    const Ref<Framebuffer> GetTargetFrameBuffer() { return m_PassSpec.Pipeline->GetPipelineSpec().TargetFramebuffer; }
 
-  static Ref<RenderPass> Create(const RenderPassSpec& spec);
+    static Ref<RenderPass> Create(const RenderPassSpec& spec);
 
-	void Prepare();
+    void Prepare();
 
-  Ref<BindingManager> m_PassBinds;
-  RenderPassSpec m_PassSpec;
-};
+    Ref<BindingManager> m_PassBinds;
+    RenderPassSpec m_PassSpec;
+  };
+}  // namespace Rain

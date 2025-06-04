@@ -25,6 +25,7 @@ struct VertexOutput {
   @location(10) ShadowCoord1: vec3f,
   @location(11) ShadowCoord2: vec3f,
   @location(12) ShadowCoord3: vec3f,
+	@location(13) Barycentric: vec3f,
 };
 
 struct SceneData {
@@ -99,7 +100,7 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
     out.ShadowCoord2 = shadowCoords2.xyz / shadowCoords2.w;
     out.ShadowCoord3 = shadowCoords3.xyz / shadowCoords3.w;
 
-	out.FragPos = (u_Scene.cameraViewMatrix * vec4f(out.WorldPosition, 1.0)).xyz;
+		out.FragPos = (u_Scene.cameraViewMatrix * vec4f(out.WorldPosition, 1.0)).xyz;
 
     return out;
 }

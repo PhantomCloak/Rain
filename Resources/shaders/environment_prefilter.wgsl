@@ -1,5 +1,5 @@
 @group(0) @binding(0) var inputCubemapTexture: texture_cube<f32>;
-@group(0) @binding(1) var outputCubemapTexture: texture_storage_2d_array<rgba8unorm, write>;
+@group(0) @binding(1) var outputCubemapTexture: texture_storage_2d_array<rgba16float, write>;
 @group(0) @binding(2) var textureSampler: sampler;
 @group(0) @binding(3) var<uniform> ud_uniforms: Uniforms;
 
@@ -23,7 +23,7 @@ struct BasisVectors {
 }
 
 
-@compute @workgroup_size(4, 4, 6)
+@compute @workgroup_size(32, 32, 1)
 	fn prefilterCubeMap(@builtin(global_invocation_id) id: vec3u) {
 		let outputDimensions = textureDimensions(outputCubemapTexture).xy;
 
@@ -53,7 +53,7 @@ struct BasisVectors {
 				let pdf = ndfGGX(cosLh, roughness) * 0.25;
 				let ws = 1.0 / (f32(SAMPLE_COUNT) * pdf);
 
-				color = color + textureSampleLevel(inputCubemapTexture, textureSampler, Li, f32(ud_uniforms.currentMipLevel)).rgb * cosLi;
+				color = color + textureSampleLevel(inputCubemapTexture, textureSampler, Li, 0.0).rgb * cosLi;
 				total_weight += cosLi;
 			}
 		}
@@ -243,7 +243,7 @@ fn hammersley(i: u32, numSamples: u32) -> vec2f {
 fn computeBasisVectors(N: vec3f) -> BasisVectors {
     // Branchless select non-degenerate T.
     var T = cross(N, vec3f(0.0, 1.0, 0.0));
-	const Epsilon: f32 = 1e-5;
+		const Epsilon: f32 = 1e-5;
     T = mix(cross(N, vec3f(1.0, 0.0, 0.0)), T, step(Epsilon, dot(T, T)));
 
     T = normalize(T);

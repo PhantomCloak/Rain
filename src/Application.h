@@ -9,7 +9,6 @@
 #include "scene/SceneRenderer.h"
 
 struct GLFWwindow;
-
 #if __APPLE__
 #include "platform/osx/OSXWindow.h"
 typedef Rain::OSXWindow AppWindow;
@@ -21,36 +20,38 @@ typedef Rain::LinuxWindow AppWindow;
 typedef Rain::WebWindow AppWindow;
 #endif
 
-class Application : public AppWindow {
- protected:
-  void OnKeyPressed(KeyCode key, KeyAction action) override;
-  void OnMouseMove(double xPos, double yPos) override;
-  void OnMouseClick(Rain::MouseCode button) override;
-  void OnResize(int height, int width) override;
+namespace Rain {
+  class Application : public AppWindow {
+   protected:
+    void OnKeyPressed(KeyCode key, KeyAction action) override;
+    void OnMouseMove(double xPos, double yPos) override;
+    void OnMouseClick(Rain::MouseCode button) override;
+    void OnResize(int height, int width) override;
 
- public:
-  Application(const Rain::WindowProps& props)
-      : AppWindow(props) {
-    m_Instance = this;
-  }
+   public:
+    Application(const Rain::WindowProps& props)
+        : AppWindow(props) {
+      m_Instance = this;
+    }
 
-  bool isRunning();
+    bool isRunning();
 
-  void OnUpdate() override;
-  void OnStart() override;
-  void fetchTimestamps();
-  TinyTimer::PerformanceCounter m_perf;
-  static Application* Get();
+    void OnUpdate() override;
+    void OnStart() override;
+    void fetchTimestamps();
+    TinyTimer::PerformanceCounter m_perf;
+    static Application* Get();
 
-  glm::vec2 GetWindowSize();
+    glm::vec2 GetWindowSize();
 
- private:
-  Ref<SceneRenderer> m_Renderer;
-  Scene* m_Scene;
-  static Application* m_Instance;
+   private:
+    Ref<SceneRenderer> m_Renderer;
+    Scene* m_Scene;
+    static Application* m_Instance;
 
- private:
-  void updateDragInertia();
+   private:
+    void updateDragInertia();
 
-  void drawImgui(WGPURenderPassEncoder renderPass);
-};
+    void drawImgui(WGPURenderPassEncoder renderPass);
+  };
+}  // namespace Rain

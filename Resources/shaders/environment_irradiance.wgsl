@@ -2,7 +2,7 @@
 @group(0) @binding(1) var radianceMap: texture_cube<f32>;
 @group(0) @binding(2) var radianceMapSampler: sampler;
 
-@compute @workgroup_size(4, 4, 6)
+@compute @workgroup_size(32, 32, 1)
 fn prefilterCubeMap(@builtin(global_invocation_id) id: vec3u) {
     let outputDimensions = textureDimensions(outputIrradianceMap).xy;
     if (id.x >= outputDimensions.x || id.y >= outputDimensions.y) {
@@ -11,7 +11,7 @@ fn prefilterCubeMap(@builtin(global_invocation_id) id: vec3u) {
     
     let N = getCubeMapTexCoord(vec2f(outputDimensions), id);
     let basis = computeBasisVectors(N);
-    let totalSamples = 64u * 512;
+    let totalSamples = 2048u;
     
     // Monte Carlo integration of hemispherical irradiance
     var irradiance = vec3f(0.0);
