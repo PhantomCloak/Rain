@@ -104,6 +104,32 @@ namespace Rain {
     Static
   };
 
+  struct BoxColliderComponent {
+    glm::vec3 Offset = {0.0f, 0.0f, 0.0f};
+    glm::vec3 Size = {0.5f, 0.5f, 0.5f};
+
+    BoxColliderComponent() = default;
+    BoxColliderComponent(const BoxColliderComponent& other) = default;
+  };
+
+  struct CylinderCollider {
+    glm::vec2 Size = {0.5f, 0.5f};
+
+    CylinderCollider() = default;
+    CylinderCollider(const CylinderCollider& other) = default;
+  };
+
+  struct WheelColliderComponent {
+    glm::vec3 LocalPosition;
+    float Radius;
+    float Width;
+    float SuspensionMaxLen;
+    float SuspensionMinLen;
+
+    WheelColliderComponent() = default;
+    WheelColliderComponent(const WheelColliderComponent& other) = default;
+  };
+
   struct RigidBodyComponent {
     float Mass = 1.0f;
     float LinearDrag = 0.01f;
@@ -120,6 +146,18 @@ namespace Rain {
 
     RigidBodyComponent() = default;
     RigidBodyComponent(const RigidBodyComponent& other) = default;
+  };
+
+  struct TrackedVehicleComponent {
+    glm::vec3 CenterOfMassOffset = glm::vec3(0.0f);
+    float VehicleWidth = 3.4f;
+    float FehicleLenght = 6.4f;
+    float WheelRadius = 0.3f;
+    float SuspensionMinLen = 0.3f;
+    float SuspensionMaxLen = 0.5f;
+    float WheelWidth = 1.7f;
+    float MaxPitchRollAngle = 60.0f;
+    float Mass = 4000.0f;
   };
 
   struct RelationshipComponent {

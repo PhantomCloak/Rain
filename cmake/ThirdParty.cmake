@@ -51,6 +51,8 @@ set(JOLT_PHYSICS_BUILD_SHARED_LIBRARY OFF CACHE BOOL "Build Jolt as a shared lib
 set(JOLT_PHYSICS_BUILD_UNIT_TESTS OFF CACHE BOOL "Build unit tests" FORCE)
 set(JOLT_PHYSICS_BUILD_PERFORMANCE_TESTS OFF CACHE BOOL "Build performance tests" FORCE)
 set(JOLT_PHYSICS_BUILD_SAMPLES OFF CACHE BOOL "Build samples" FORCE)
+set(JPH_DEBUG_RENDERER ON CACHE BOOL "Enable debug renderer" FORCE)
+set(CPP_RTTI_ENABLED ON CACHE BOOL "Enable RTTI for Jolt" FORCE)
 add_subdirectory(vendor/JoltPhysics/Build)
 target_include_directories(ReEngine PRIVATE 
     vendor/JoltPhysics

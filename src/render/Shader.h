@@ -2,6 +2,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "core/Assert.h"
 #include "core/Ref.h"
 #include "webgpu/webgpu.h"
 
@@ -58,24 +59,31 @@ namespace Rain {
 
     void Reload(std::string& content);
 
-    static Ref<Shader> Create(const std::string& name, const std::string& filePath);
-    static Ref<Shader> CreateFromSring(const std::string& name, const std::string& content);
-    static WGPUBindGroupLayout GetLayout(uint32_t index);
+    const WGPUBindGroupLayout& GetLayout(uint32_t index) {
+      RN_ASSERT(index < m_ReflectionInfo.LayoutDescriptors.size(), "Index out of bounds");
+      return m_ReflectionInfo.LayoutDescriptors.at(index);
+    }
 
     // Ref<T> cannot instantiate this class unless it's public
     Shader(const std::string& name, const std::string& content)
         : m_Name(name), m_Content(content) {}
 
-    void SetReflectionInfo(const ShaderReflectionInfo& info) { m_ReflectionInfo = info; }
     ShaderReflectionInfo& GetReflectionInfo() { return m_ReflectionInfo; }
 
     const WGPUShaderModule GetNativeShaderModule() { return m_ShaderModule; }
 
    private:
+    static Ref<Shader> Create(const std::string& name, const std::string& filePath);
+    static Ref<Shader> CreateFromSring(const std::string& name, const std::string& content);
+
+    void SetReflectionInfo(const ShaderReflectionInfo& info) { m_ReflectionInfo = info; }
+
     ShaderReflectionInfo m_ReflectionInfo;
     std::string m_Name;
     std::string m_Content;
     std::string m_Path;
     WGPUShaderModule m_ShaderModule;
+
+    friend class ShaderManager;
   };
 }  // namespace Rain

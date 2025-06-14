@@ -3,8 +3,8 @@
 #include "Scene.h"
 #include "render/Pipeline.h"
 #include "render/PipelineCompute.h"
+#include "render/Render2D.h"
 #include "render/RenderPass.h"
-#include "render/ShaderManager.h"
 
 namespace Rain {
   struct MeshKey {

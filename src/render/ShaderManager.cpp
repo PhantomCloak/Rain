@@ -305,6 +305,17 @@ namespace Rain {
     return shader;
   };
 
+  Ref<Shader> ShaderManager::LoadShaderFromString(const std::string& shaderId,
+                                                  const std::string& shaderStr) {
+    Ref<Shader> shader = Shader::CreateFromSring(shaderId, shaderStr);
+    auto reflectionInfo = ReflectShader(shader);
+
+    shader->SetReflectionInfo(reflectionInfo);
+    m_Shaders[shaderId] = shader;
+
+    return shader;
+  };
+
   Ref<Shader> ShaderManager::GetShader(const std::string& shaderId) {
     if (m_Shaders.find(shaderId) == m_Shaders.end()) {
       std::cout << "cannot find the shader";

@@ -50,8 +50,8 @@ namespace Rain {
     m_Scene = new Scene("Test Scene");
     m_Scene->Init();
 
-    Cursor::Setup(render->m_window);
-    Keyboard::Setup(render->m_window);
+    Cursor::Setup(render->m_Window);
+    Keyboard::Setup(render->m_Window);
     Cursor::CaptureMouse(true);
   }
 
@@ -91,7 +91,7 @@ namespace Rain {
   }
 
   bool Application::isRunning() {
-    return !glfwWindowShouldClose(render->m_window);
+    return !glfwWindowShouldClose(render->m_Window);
   }
 
   Application* Application::Get() {

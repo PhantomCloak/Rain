@@ -129,10 +129,14 @@ namespace Rain {
       requestData->requestEnded = true;
     };
 
+    static const char* enabledTogglesArray[] = {
+        "chromium_disable_uniformity_analysis",
+        "allow_unsafe_apis"};
+
     WGPUDawnTogglesDescriptor dawnToggles;
     ZERO_INIT(dawnToggles);
     dawnToggles.chain.sType = WGPUSType_DawnTogglesDescriptor;
-    dawnToggles.enabledToggles = (const char*[]){"chromium_disable_uniformity_analysis", "allow_unsafe_apis"};
+    dawnToggles.enabledToggles = enabledTogglesArray;
     dawnToggles.enabledToggleCount = 2;
     dawnToggles.disabledToggleCount = 0;
 
@@ -144,8 +148,8 @@ namespace Rain {
 
     static const WGPUInstance gpuInstance = wgpuCreateInstance(instanceDesc);
 
-    m_window = static_cast<GLFWwindow*>(window);
-    m_surface = glfwGetWGPUSurface(gpuInstance, m_window);
+    m_Window = static_cast<GLFWwindow*>(window);
+    m_Surface = glfwGetWGPUSurface(gpuInstance, m_Window);
 
     AdapterRequestData requestData{};
     ZERO_INIT(requestData);
@@ -158,7 +162,7 @@ namespace Rain {
 
     WGPURequestAdapterOptions adapterOpts;
     ZERO_INIT(adapterOpts);
-    adapterOpts.compatibleSurface = m_surface;
+    adapterOpts.compatibleSurface = m_Surface;
     adapterOpts.powerPreference = WGPUPowerPreference_HighPerformance;
 
     wgpuInstanceRequestAdapter(gpuInstance, &adapterOpts, callbackInfo);
@@ -200,15 +204,17 @@ namespace Rain {
     deviceCallbackInfo.callback = onDeviceRequestEnded;
     deviceCallbackInfo.userdata1 = &deviceRequestData;
 
-    WGPUDeviceDescriptor gpuDeviceDescriptor;
-    ZERO_INIT(gpuDeviceDescriptor);
-    gpuDeviceDescriptor.label = RenderUtils::MakeLabel("MyDevice");
-    gpuDeviceDescriptor.requiredFeatures = (WGPUFeatureName[]){
+    std::vector<WGPUFeatureName> requiredFeatures = {
         WGPUFeatureName_TimestampQuery,
         WGPUFeatureName_TextureCompressionBC,
         WGPUFeatureName_Float32Filterable,
         WGPUFeatureName_DepthClipControl};
-    gpuDeviceDescriptor.requiredFeatureCount = 4;
+
+    WGPUDeviceDescriptor gpuDeviceDescriptor;
+    ZERO_INIT(gpuDeviceDescriptor);
+    gpuDeviceDescriptor.label = RenderUtils::MakeLabel("MyDevice");
+    gpuDeviceDescriptor.requiredFeatures = requiredFeatures.data();
+    gpuDeviceDescriptor.requiredFeatureCount = requiredFeatures.size();
     gpuDeviceDescriptor.requiredLimits = requiredLimits;
     gpuDeviceDescriptor.defaultQueue.label = RenderUtils::MakeLabel("defq");
     gpuDeviceDescriptor.deviceLostCallbackInfo = deviceLostInfo;
@@ -221,23 +227,23 @@ namespace Rain {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
-    m_device = deviceRequestData.device;
+    m_Device = deviceRequestData.device;
 
-    m_queue = wgpuDeviceGetQueue(m_device);
-    RN_CORE_ASSERT(m_queue, "An error occurred while acquiring the queue. This might indicate unsupported browser/device.");
+    m_Queue = wgpuDeviceGetQueue(m_Device);
+    RN_CORE_ASSERT(m_Queue, "An error occurred while acquiring the queue. This might indicate unsupported browser/device.");
 
-    m_RenderContext = CreateRef<RenderContext>(adapter, m_surface, m_device, m_queue);
+    m_RenderContext = CreateRef<RenderContext>(adapter, m_Surface, m_Device, m_Queue);
 
     WGPUSurfaceCapabilities capabilities;
-    wgpuSurfaceGetCapabilities(m_surface, adapter, &capabilities);
+    wgpuSurfaceGetCapabilities(m_Surface, adapter, &capabilities);
 
     m_swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 
     int width, height;
-    glfwGetFramebufferSize(m_window, &width, &height);
+    glfwGetFramebufferSize(m_Window, &width, &height);
 
     WGPUSurfaceConfiguration config = {};
-    config.device = m_device;
+    config.device = m_Device;
     config.format = m_swapChainFormat;
     config.usage = WGPUTextureUsage_RenderAttachment;
     config.alphaMode = WGPUCompositeAlphaMode_Auto;
@@ -247,7 +253,7 @@ namespace Rain {
     config.viewFormatCount = 1;
     config.viewFormats = &m_swapChainFormat;
 
-    wgpuSurfaceConfigure(m_surface, &config);
+    wgpuSurfaceConfigure(m_Surface, &config);
 
     RendererPostInit();
     return true;
@@ -332,14 +338,14 @@ namespace Rain {
 
   WGPUTextureView Render::GetCurrentTextureView() {
     WGPUSurfaceTexture surfaceTexture = {};
-    wgpuSurfaceGetCurrentTexture(m_surface, &surfaceTexture);
+    wgpuSurfaceGetCurrentTexture(m_Surface, &surfaceTexture);
 
     if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_Success) {
       switch (surfaceTexture.status) {
         case WGPUSurfaceGetCurrentTextureStatus_Lost:
           // Reconfigure surface here
           // ConfigureSurface(m_swapChainDesc.width, m_swapChainDesc.height);
-          wgpuSurfaceGetCurrentTexture(m_surface, &surfaceTexture);
+          wgpuSurfaceGetCurrentTexture(m_Surface, &surfaceTexture);
           break;
         case WGPUSurfaceGetCurrentTextureStatus_OutOfMemory:
           RN_CORE_ASSERT(false, "Out of memory when acquiring next swapchain texture");
@@ -681,33 +687,27 @@ namespace Rain {
     RN_PROFILE_FUNC;
     pass->Prepare();
 
-    auto renderFrameBuffer = pass->GetTargetFrameBuffer();
+    const Ref<Framebuffer> renderFrameBuffer = pass->GetTargetFrameBuffer();
 
-    WGPUTextureView swp;
     WGPURenderPassDescriptor passDesc = {};
     ZERO_INIT(passDesc);
-
-    passDesc.nextInChain = nullptr;
     passDesc.label = RenderUtils::MakeLabel(pass->GetProps().DebugName);
-
-    WGPURenderPassColorAttachment colorAttachment{};
-    ZERO_INIT(colorAttachment);
-
-    colorAttachment.nextInChain = nullptr;
-    colorAttachment.loadOp = WGPULoadOp_Load;
-    colorAttachment.storeOp = WGPUStoreOp_Store;
-    colorAttachment.clearValue = WGPUColor{0, 0, 0, 1};
-    colorAttachment.resolveTarget = nullptr;
-
-    // #if __EMSCRIPTEN__
-    colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
-    // #endif
+    passDesc.depthStencilAttachment = nullptr;
+    passDesc.nextInChain = nullptr;
 
     if (renderFrameBuffer->HasColorAttachment()) {
+      WGPURenderPassColorAttachment colorAttachment{};
+      ZERO_INIT(colorAttachment);
+      colorAttachment.nextInChain = nullptr;
+      colorAttachment.loadOp = WGPULoadOp_Load;
+      colorAttachment.storeOp = WGPUStoreOp_Store;
+      colorAttachment.clearValue = Render::Instance->m_ClearColor;
+      colorAttachment.resolveTarget = nullptr;
+      colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+
       if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget) {
         Instance->m_SwapTexture = Render::Instance->GetCurrentSwapChainTexture();
         colorAttachment.resolveTarget = Instance->m_SwapTexture;
-        // colorAttachment.view = Instance->m_SwapTexture;
       }
 
       colorAttachment.view = renderFrameBuffer->GetAttachment(0)->GetReadableView();
@@ -720,13 +720,6 @@ namespace Rain {
       ZERO_INIT(depthAttachment);
 
       auto depth = renderFrameBuffer->GetDepthAttachment();
-      if (depth->m_ReadViews.size() > 1) {
-        int layerNum = renderFrameBuffer->m_FrameBufferSpec.ExistingImageLayers[0];
-        depthAttachment.view = renderFrameBuffer->GetDepthAttachment()->m_ReadViews[layerNum + 1];
-      } else {
-        depthAttachment.view = renderFrameBuffer->GetDepthAttachment()->GetReadableView();
-      }
-
       depthAttachment.depthClearValue = 1.0f;
       depthAttachment.depthLoadOp = WGPULoadOp_Clear;
       depthAttachment.depthStoreOp = WGPUStoreOp_Store;
@@ -736,15 +729,16 @@ namespace Rain {
       depthAttachment.stencilStoreOp = WGPUStoreOp_Undefined;
       depthAttachment.stencilReadOnly = true;
 
+      int layerNum = renderFrameBuffer->m_FrameBufferSpec.ExistingImageLayers.empty() ? 0 : renderFrameBuffer->m_FrameBufferSpec.ExistingImageLayers[0] + 1;
+      depthAttachment.view = renderFrameBuffer->GetDepthAttachment()->GetReadableView(layerNum);
+
       passDesc.depthStencilAttachment = &depthAttachment;
-    } else {
-      passDesc.depthStencilAttachment = nullptr;
     }
 
-    auto renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &passDesc);
-    auto bindings = pass->GetBindManager();
+    const WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &passDesc);
+    const Ref<BindingManager> bindManager = pass->GetBindManager();
 
-    for (const auto& [index, bindGroup] : bindings->GetBindGroups()) {
+    for (const auto& [index, bindGroup] : bindManager->GetBindGroups()) {
       wgpuRenderPassEncoderSetBindGroup(renderPass, index, bindGroup, 0, 0);
     }
 
@@ -757,6 +751,7 @@ namespace Rain {
     wgpuRenderPassEncoderRelease(encoder);
 
     const auto renderFrameBuffer = pass->GetTargetFrameBuffer();
+
     if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget) {
       wgpuTextureViewRelease(Instance->m_SwapTexture);
     }

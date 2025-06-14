@@ -8,6 +8,7 @@ namespace Rain {
   class ShaderManager {
    public:
     static Ref<Shader> LoadShader(const std::string& shaderId, const std::string& shaderPath);
+    static Ref<Shader> LoadShaderFromString(const std::string& shaderId, const std::string& shaderStr);
     static Ref<Shader> GetShader(const std::string& shaderId);
 
     // TODO: Make better API

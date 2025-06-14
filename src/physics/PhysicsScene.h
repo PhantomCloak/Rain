@@ -6,16 +6,21 @@
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/RegisterTypes.h>
 
-#include "PhysicsBody.h"
+#include "Physics/Vehicle/VehicleConstraint.h"
+#include "physics/PhysicsBody.h"
+#include "physics/PhysicsWheel.h"
 #include "physics/PhysicTypes.h"
 #include "scene/Entity.h"
 
+class RainTrackedVehicle;
 namespace Rain {
   class PhysicsScene {
    public:
     PhysicsScene(glm::vec3 gravity);
 
     Ref<PhysicsBody> CreateBody(Entity entity);
+    Ref<PhysicsWheel> CreateWheel(JPH::VehicleConstraintSettings& vehicleSettings, Entity entity);
+
     void PreUpdate(float dt);
     void Update(float dt);
     bool CastRay(const RayCastInfo* rayCastInfo, SceneQueryHit& outHit);
@@ -30,18 +35,19 @@ namespace Rain {
     }
 
     void SynchronizePendingBodyTransforms() {
-      // Synchronize bodies that requested it explicitly
       for (auto body : m_BodiesScheduledForSync) {
         SynchronizeBodyTransform(body);
       }
 
       m_BodiesScheduledForSync.clear();
     }
+    static PhysicsScene* m_Instance;
+    JPH::PhysicsSystem* m_PhysicsSystem = nullptr;
+
+   protected:
+    friend class RainTrackedVehicle;
 
    private:
-    static PhysicsScene* m_Instance;
-
-    JPH::PhysicsSystem* m_PhysicsSystem = nullptr;
     JPH::TempAllocatorImpl* m_TempAllocator = nullptr;
     JPH::JobSystemThreadPool* m_JobSystem = nullptr;
 
@@ -50,6 +56,18 @@ namespace Rain {
     ObjectLayerPairFilterImpl* m_ObjectLayerPairFilter = nullptr;
 
     std::unordered_map<UUID, Ref<PhysicsBody>> m_RigidBodies;
+    std::unordered_map<UUID, Ref<JPH::Wheel>> m_WheelColliders;
+
     std::vector<PhysicsBody*> m_BodiesScheduledForSync;
+    JPH::Body* mTankBody;
+    JPH::VehicleConstraint* mVehicleConstraint;
+    float mForward = 0.0f;
+    float mPreviousForward = 1.0f;  ///< Keeps track of last car direction so we know when to brake and when to accelerate
+    float mLeftRatio = 0.0f;
+    float mRightRatio = 0.0f;
+    float mBrake = 0.0f;
+    float mTurretHeading = 0.0f;
+    float mBarrelPitch = 0.0f;
+    bool mFire = false;
   };
 }  // namespace Rain

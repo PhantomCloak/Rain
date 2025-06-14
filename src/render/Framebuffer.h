@@ -2,6 +2,12 @@
 #include "render/Texture.h"
 
 namespace Rain {
+  enum FrameBufferType {
+    Offscreen,
+    DepthOnly,
+    Swapchain
+  };
+
   struct FramebufferSpec {
     uint32_t Width = 0;
     uint32_t Height = 0;
@@ -10,6 +16,8 @@ namespace Rain {
     bool ClearColorOnLoad = true;
     bool ClearDepthOnLoad = true;
     bool SwapChainTarget = false;
+
+    FrameBufferType FrameBufferType = FrameBufferType::Offscreen;
 
     TextureFormat ColorFormat = TextureFormat::Undefined;
     TextureFormat DepthFormat = TextureFormat::Undefined;

@@ -18,7 +18,6 @@ namespace Rain {
     static Ref<Sampler> GetDefaultSampler();
 
     static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
-
     static void EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder);
 
     static void RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
@@ -33,7 +32,7 @@ namespace Rain {
     static void SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WGPURenderPipeline pipeline);
 
     WGPUTextureView GetCurrentSwapChainTexture();
-    WGPUSurface GetActiveSurface() { return m_surface; }
+    WGPUSurface GetActiveSurface() { return m_Surface; }
 
     static void ComputeMip(Texture2D* output);
     static void ComputeMipCube(TextureCube* output);
@@ -54,15 +53,17 @@ namespace Rain {
 
    public:
     Ref<RenderContext> m_RenderContext;
-    WGPUSurface m_surface = nullptr;
-    GLFWwindow* m_window = nullptr;
-    WGPUDevice m_device = nullptr;
-    WGPUQueue m_queue = nullptr;
+    WGPUSurface m_Surface = nullptr;
+    GLFWwindow* m_Window = nullptr;
+    WGPUDevice m_Device = nullptr;
+    WGPUQueue m_Queue = nullptr;
     WGPUTextureView m_SwapTexture;
     WGPULimits m_Limits;
 
     WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_Undefined;
     WGPUTextureFormat m_depthTextureFormat = WGPUTextureFormat_Depth24Plus;
+
+    WGPUColor m_ClearColor = WGPUColor{0, 0, 0, 1};
 
     friend class RenderContext;
   };

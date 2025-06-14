@@ -9,7 +9,6 @@
 #include "io/cursor.h"
 #include "io/keyboard.h"
 #include "physics/Physics.h"
-#include "physics/PhysicsScene.h"
 #include "render/ResourceManager.h"
 
 #include "ImGuizmo.h"
@@ -33,30 +32,38 @@ namespace Rain {
   UUID entityIdDir = 0.0;
   UUID Select = 0;
   Entity entityCamera;
-  //Ref<MeshSource> cityModel;
+  // Ref<MeshSource> cityModel;
   Entity helment;
 
   void Scene::Init() {
     Instance = this;
     m_SceneCamera = std::make_unique<PlayerCamera>();
 
-    //cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/car/scene.gltf");
+    // cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/car/scene.gltf");
     auto boxModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
+    // auto tankModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/tank_tiger/scene2.gltf");
 
     helment = CreateEntity("Box");
     auto floorEntity = CreateEntity("Box2");
+    auto tankEntity = CreateEntity("Tank");
 
     helment.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 15, 0);
-		helment.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(0, 0, 90));
+    helment.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(0, 0, 90));
     helment.GetComponent<TransformComponent>()->Scale = glm::vec3(0.10f);
 
-    floorEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, -1, 0);
+    floorEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, -10, 0);
     floorEntity.GetComponent<TransformComponent>()->Scale = glm::vec3(100, 1.0f, 100);
+    auto bx = floorEntity.AddComponent<BoxColliderComponent>();
+    bx->Size = glm::vec3(100, 1, 100);
+
+    tankEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 10, 0);
+    tankEntity.GetComponent<TransformComponent>()->Scale = glm::vec3(0.1);
+
     auto floorBody = floorEntity.AddComponent<RigidBodyComponent>();
     floorBody->BodyType = EBodyType::Static;
 
-		//BuildMeshEntityHierarchy(helment, cityModel);
     BuildMeshEntityHierarchy(floorEntity, boxModel);
+    // BuildMeshEntityHierarchy(tankEntity, tankModel);
 
     Entity light = CreateEntity("DirectionalLight");
     light.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
@@ -67,18 +74,18 @@ namespace Rain {
     m_PhysicsScene = Physics::Instance->CreateScene(glm::vec3(0.0, -9.8f, 0.0));
     m_PhysicsScene->CreateBody(floorEntity);
 
-    for (int i = 1; i < 150; i++) {
-      auto boxEntity = CreateEntity(std::string("Box2") + std::to_string(i));
+    // for (int i = 1; i < 50; i++) {
+    //   auto boxEntity = CreateEntity(std::string("Box2") + std::to_string(i));
 
-      auto body = boxEntity.AddComponent<RigidBodyComponent>();
-      body->BodyType = EBodyType::Dynamic;
+    //  auto body = boxEntity.AddComponent<RigidBodyComponent>();
+    //  body->BodyType = EBodyType::Dynamic;
 
-      boxEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, i * 1.25f, 0);
-      boxEntity.GetComponent<TransformComponent>()->Scale = glm::vec3(1.0f);
+    //  boxEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, i * 1.25f, 0);
+    //  boxEntity.GetComponent<TransformComponent>()->Scale = glm::vec3(1.0f);
 
-      BuildMeshEntityHierarchy(boxEntity, boxModel);
-      m_PhysicsScene->CreateBody(boxEntity);
-    }
+    //  BuildMeshEntityHierarchy(boxEntity, boxModel);
+    //  m_PhysicsScene->CreateBody(boxEntity);
+    //}
   }
 
   Entity Scene::CreateChildEntity(Entity parent, std::string name) {
@@ -307,20 +314,20 @@ namespace Rain {
 
     static float metallic = 0.0, roughness = 0.0, ao = 0.0;
 
-    //if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
-    //  auto mat = cityModel->Materials->GetMaterial(0);
-    //  mat->Set("Metallic", metallic);
-    //}
+    // if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
+    //   auto mat = cityModel->Materials->GetMaterial(0);
+    //   mat->Set("Metallic", metallic);
+    // }
 
-    //if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
-    //  auto mat = cityModel->Materials->GetMaterial(0);
-    //  mat->Set("Roughness", roughness);
-    //}
+    // if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
+    //   auto mat = cityModel->Materials->GetMaterial(0);
+    //   mat->Set("Roughness", roughness);
+    // }
 
-    //if (ImGui::SliderFloat("Ao", &ao, 0.0f, 1.0f)) {
-    //  auto mat = cityModel->Materials->GetMaterial(0);
-    //  mat->Set("Ao", ao);
-    //}
+    // if (ImGui::SliderFloat("Ao", &ao, 0.0f, 1.0f)) {
+    //   auto mat = cityModel->Materials->GetMaterial(0);
+    //   mat->Set("Ao", ao);
+    // }
 
     ImGui::End();
 

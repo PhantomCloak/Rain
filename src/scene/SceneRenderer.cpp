@@ -1,16 +1,15 @@
 #include "SceneRenderer.h"
+#include <glm/glm.hpp>
 #include "Application.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_wgpu.h"
 #include "debug/Profiler.h"
-#include "glm/gtx/rotate_vector.hpp"
 #include "imgui.h"
 #include "io/filesystem.h"
-#include "io/keyboard.h"
 #include "render/Framebuffer.h"
 #include "render/Render.h"
 #include "render/ResourceManager.h"
-#include <glm/glm.hpp>
+#include "render/ShaderManager.h"
 
 namespace Rain {
   SceneRenderer* SceneRenderer::instance;
@@ -299,7 +298,6 @@ namespace Rain {
     m_SkyboxPass->Set("textureSampler", skyboxSampler);
     m_SkyboxPass->Set("u_Camera", m_CameraUniformBuffer);
     m_SkyboxPass->Bake();
-
     // Shadow
 
     m_ShadowUniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(ShadowUniform));
@@ -391,34 +389,7 @@ namespace Rain {
 
     m_PpfxPipeline = RenderPipeline::Create(ppfxPipeSpec);
 
-    // RenderPassSpec ppfxPassSpec = {.Pipeline = m_PpfxPipeline, .DebugName = "PpfxPass"};
-    // m_PpfxPass = RenderPass::Create(ppfxPassSpec);
-    // m_PpfxPass->Set("renderTexture", m_LitPass->GetOutput(0));
-    // m_PpfxPass->Set("textureSampler", Render::GetDefaultSampler());
-    // m_PpfxPass->Bake();
-
-    // ComputePipelineSpec mipmapSpec = {
-    //     .Shader = pbrShader,
-    //     .DebugName = "CP_Mipmap"};
-
-    // m_MipmapPipeline = PipelineCompute::Create(mipmapSpec);
-
     auto renderContext = Render::Instance->GetRenderContext();
-
-    auto placeHolder = Render::GetWhiteTexture();
-
-    // TextureProps textureProp = {};
-    // textureProp.DebugName = "Test";
-    // textureProp.CreateSampler = false;
-    // textureProp.GenerateMips = true;
-    // textureProp.GenerateMipsExperimental = true;
-
-    // auto p = std::filesystem::path(RESOURCE_DIR "/textures/back.jpg");
-
-    // auto texture = Texture::Create(textureProp, p);
-    // Render::ComputeMip(texture);
-    // Render::ComputeMip(texture);
-    // Render::saveTexture(RESOURCE_DIR "matrix2.png", RenderContext::GetDevice(), texture, 3);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -497,7 +468,6 @@ namespace Rain {
     m_SceneUniformBuffer->SetData(&m_SceneUniform, sizeof(SceneUniform));
     m_CameraUniformBuffer->SetData(&m_CameraData, sizeof(CameraData));
     m_ShadowUniformBuffer->SetData(&m_ShadowUniform, sizeof(ShadowUniform));
-
     if (m_NeedResize) {
       m_SkyboxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
       m_LitPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
@@ -505,6 +475,7 @@ namespace Rain {
       m_NeedResize = false;
     }
 
+    // JPH::DebugRenderer::sInstance = m_Renderer;
     ImGui_ImplWGPU_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -546,6 +517,11 @@ namespace Rain {
       for (auto& [mk, dc] : m_DrawList) {
         Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
       }
+
+      RenderDebug::Begin(&litPassEncoder, &commandEncoder);
+      RenderDebug::SetMVP(m_SceneUniform.ViewProjection);
+      RenderDebug::FlushDrawList();
+
       ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
       Render::EndRenderPass(m_LitPass, litPassEncoder);
     }
@@ -567,7 +543,7 @@ namespace Rain {
       wgpuCommandBufferRelease(commandBuffer);
       wgpuCommandEncoderRelease(commandEncoder);
 
-      wgpuSurfacePresent(Render::Instance->m_surface);
+      wgpuSurfacePresent(Render::Instance->m_Surface);
 
 #ifndef __EMSCRIPTEN__
       // wgpuSwapChainPresent(Render::Instance->m_swapChain);

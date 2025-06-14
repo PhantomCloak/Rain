@@ -1,7 +1,6 @@
 #include <iostream>
 #include <ostream>
 #include "Application.h"
-
 using namespace Rain;
 
 #ifdef __EMSCRIPTEN__
@@ -17,7 +16,6 @@ int main(int, char**) {
   props.Width = canvasWidth * emscripten_get_device_pixel_ratio();
   props.Height = canvasHeight * emscripten_get_device_pixel_ratio();
 #endif
-
   if (props.Height < 500 || props.Height < 500) {
     props.Height = 1080;
     props.Width = 1920;

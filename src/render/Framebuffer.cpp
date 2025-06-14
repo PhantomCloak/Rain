@@ -52,13 +52,4 @@ namespace Rain {
       m_ColorAttachment = Texture2D::Create(colorAttachmentSpec);
     }
   }
-
-  // Ref<Texture> Framebuffer::GetDepthAttachment() {
-  //	if(m_DepthAttachment != nullptr) {
-  //		return m_DepthAttachment;
-  //	}
-  //
-  //	int layerNumber = m_FrameBufferSpec.ExistingImageLayers[0];
-  //	return m_FrameBufferSpec.ExistingDepth->m_Views[layerNumber];
-  // }
 }  // namespace Rain

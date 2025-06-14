@@ -12,7 +12,6 @@ namespace Rain {
    public:
     static JPH::Vec3 ToJoltVector(const glm::vec3& vector);
     static JPH::Quat ToJoltQuat(const glm::quat& quat);
-
     static glm::vec3 FromJoltVector(const JPH::Vec3& vector);
     static glm::quat FromJoltQuat(const JPH::Quat& quat);
   };
