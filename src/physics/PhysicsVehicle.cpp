@@ -10,15 +10,37 @@ namespace Rain {
     m_VehicleSettings.mDrawConstraintSize = 0.1f;
     m_VehicleSettings.mMaxPitchRollAngle = JPH::DegreesToRadians(60.0f);
 
-    m_VehicleContrtoller = new JPH::TrackedVehicleControllerSettings;
-    m_VehicleSettings.mController = m_VehicleContrtoller;
+    m_VehicleController = new JPH::TrackedVehicleControllerSettings;
+    // Configure engine for tracked vehicle
+    m_VehicleController->mEngine.mMaxTorque = 8000.0f;  // High torque for heavy tank
+    m_VehicleController->mEngine.mMinRPM = 800.0f;      // Idle RPM
+    m_VehicleController->mEngine.mMaxRPM = 3600.0f;     // Max RPM
+    m_VehicleController->mEngine.mInertia = 50.0f;      // Engine inertia
 
-    auto* leftTrack = &m_VehicleContrtoller->mTracks[0];
-    auto* rightTrack = &m_VehicleContrtoller->mTracks[1];
+    // Configure transmission
+    m_VehicleController->mTransmission.mMode = JPH::ETransmissionMode::Auto;
+    m_VehicleController->mTransmission.mGearRatios = {4.0f, 2.5f, 1.8f, 1.2f, 1.1f};  // Reverse, neutral, forward gears
+    m_VehicleController->mTransmission.mSwitchTime = 0.5f;
 
-    leftTrack->mDrivenWheel = 8;
-    rightTrack->mDrivenWheel = 17;
+    m_VehicleSettings.mController = m_VehicleController;
 
+    auto* leftTrack = &m_VehicleController->mTracks[0];
+    auto* rightTrack = &m_VehicleController->mTracks[1];
+
+    // leftTrack->mDrivenWheel = 9;
+    // rightTrack->mDrivenWheel = 18;
+    leftTrack->mDrivenWheel = 9;    // Left track wheels: 0-9
+    rightTrack->mDrivenWheel = 19;  // Right track wheels: 10-19
+
+    // Increased track inertia and damping
+    leftTrack->mInertia = 25.0f;  // Much higher inertia
+    rightTrack->mInertia = 25.0f;
+
+    leftTrack->mAngularDamping = 0.6f;  // Higher damping
+    rightTrack->mAngularDamping = 0.6f;
+
+    leftTrack->mMaxBrakeTorque = 20000.0f;  // Higher brake torque
+    rightTrack->mMaxBrakeTorque = 20000.0f;
     m_TrackSettings.push_back(leftTrack);
     m_TrackSettings.push_back(rightTrack);
   }
@@ -65,7 +87,7 @@ namespace Rain {
   }
 
   void PhysicsVehicleController::CreateTrackWheel(Entity wheelEntity, int trackIndex) {
-    JPH::VehicleTrackSettings& track = m_VehicleContrtoller->mTracks[trackIndex];
+    JPH::VehicleTrackSettings& track = m_VehicleController->mTracks[trackIndex];
     track.mWheels.push_back((uint)m_VehicleSettings.mWheels.size());
 
     m_Wheels.push_back(PhysicsScene::m_Instance->CreateWheel(m_VehicleSettings, wheelEntity));
@@ -96,7 +118,7 @@ namespace Rain {
       const Ref<PhysicsWheel> wheel = m_Wheels[wheelIndex];
 
       JPH::RMat44 wheel_transform = m_VehicleConstraint->GetWheelWorldTransform(wheelIndex, JPH::Vec3::sAxisY(), JPH::Vec3::sAxisX());  // The cylinder we draw is aligned with Y so we specify that as rotational axis
-      JPH::DebugRenderer::sInstance->DrawCylinder(wheel_transform, 0.5f * wheel->Width, wheel->Radius, JPH::Color::sGreen);
+      // JPH::DebugRenderer::sInstance->DrawCylinder(wheel_transform, 0.5f * wheel->Width, wheel->Radius, JPH::Color::sGreen);
     }
   }
 }  // namespace Rain

@@ -16,14 +16,22 @@ namespace Rain {
     }
   }
 
-  WGPUStringView RenderUtils::MakeLabel(const char* str) {
-    return {str, strlen(str)};
-  }
-
   // For std::string if needed
+#ifndef EMSCRIPTTEN
   WGPUStringView RenderUtils::MakeLabel(const std::string& str) {
     return {str.c_str(), str.size()};
   }
+  WGPUStringView RenderUtils::MakeLabel(const char* str) {
+    return {str, strlen(str)};
+  }
+#else
+  const char* RenderUtils::MakeLabel(const std::string& str) {
+    return str.c_str();
+  }
+  const char* RenderUtils::MakeLabel(const char* str) {
+    return str;
+  }
+#endif
 
   void LayoutUtils::SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type) {
     switch (type) {

@@ -35,7 +35,7 @@ namespace Rain {
 
     Ref<PhysicsBody> m_Body;
     JPH::VehicleConstraintSettings m_VehicleSettings;
-    JPH::TrackedVehicleControllerSettings* m_VehicleContrtoller;
+    JPH::TrackedVehicleControllerSettings* m_VehicleController;
     JPH::VehicleConstraint* m_VehicleConstraint;
     std::vector<JPH::VehicleTrackSettings*> m_TrackSettings;
   };

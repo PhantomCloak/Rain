@@ -25,88 +25,65 @@ namespace Rain {
     return CreateChildEntity({}, name);
   }
 
-  float rotX = 90.0;
+  float rotX = 140.0;
   float rotY = 0.0;
   float rotZ = 25.0;
 
   UUID entityIdDir = 0.0;
   UUID Select = 0;
   Entity entityCamera;
-  // Ref<MeshSource> cityModel;
   Entity helment;
 
   void Scene::Init() {
     Instance = this;
     m_SceneCamera = std::make_unique<PlayerCamera>();
 
-    // cityModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/car/scene.gltf");
     auto boxModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
-    // auto tankModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/tank_tiger/scene2.gltf");
+    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/bochii/bochii.gltf");
 
     helment = CreateEntity("Box");
-    auto floorEntity = CreateEntity("Box2");
-    auto tankEntity = CreateEntity("Tank");
+    Entity floorEntity = CreateEntity("Box2");
+    Entity bump = CreateEntity("bump");
+    Entity tankEntity = CreateEntity("Tank");
 
-    helment.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 15, 0);
-    helment.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(0, 0, 90));
-    helment.GetComponent<TransformComponent>()->Scale = glm::vec3(0.10f);
+    floorEntity.Transform().Translation = glm::vec3(0, -10, 0);
+    floorEntity.Transform().Scale = glm::vec3(100, 1.0f, 100);
 
-    floorEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, -10, 0);
-    floorEntity.GetComponent<TransformComponent>()->Scale = glm::vec3(100, 1.0f, 100);
-    auto bx = floorEntity.AddComponent<BoxColliderComponent>();
-    bx->Size = glm::vec3(100, 1, 100);
-
-    tankEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 10, 0);
-    tankEntity.GetComponent<TransformComponent>()->Scale = glm::vec3(0.1);
-
-    auto floorBody = floorEntity.AddComponent<RigidBodyComponent>();
-    floorBody->BodyType = EBodyType::Static;
+    floorEntity.AddComponent<BoxColliderComponent>(glm::vec3(0), glm::vec3(100, 1, 100));
+    floorEntity.AddComponent<RigidBodyComponent>();
 
     BuildMeshEntityHierarchy(floorEntity, boxModel);
-    // BuildMeshEntityHierarchy(tankEntity, tankModel);
+    BuildMeshEntityHierarchy(bump, bochii);
 
     Entity light = CreateEntity("DirectionalLight");
-    light.GetComponent<TransformComponent>()->SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
+    light.GetComponent<TransformComponent>().SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
     light.AddComponent<DirectionalLightComponent>();
     entityIdDir = light.GetUUID();
 
     Physics::Instance = new Physics();
     m_PhysicsScene = Physics::Instance->CreateScene(glm::vec3(0.0, -9.8f, 0.0));
     m_PhysicsScene->CreateBody(floorEntity);
-
-    // for (int i = 1; i < 50; i++) {
-    //   auto boxEntity = CreateEntity(std::string("Box2") + std::to_string(i));
-
-    //  auto body = boxEntity.AddComponent<RigidBodyComponent>();
-    //  body->BodyType = EBodyType::Dynamic;
-
-    //  boxEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, i * 1.25f, 0);
-    //  boxEntity.GetComponent<TransformComponent>()->Scale = glm::vec3(1.0f);
-
-    //  BuildMeshEntityHierarchy(boxEntity, boxModel);
-    //  m_PhysicsScene->CreateBody(boxEntity);
-    //}
   }
 
   Entity Scene::CreateChildEntity(Entity parent, std::string name) {
-    auto entity = Entity(m_World.entity(), this);
+    Entity entity = Entity(m_World.entity(), this);
     uint32_t entityHandle = entity;
 
     entity.AddComponent<TransformComponent>();
     if (!name.empty()) {
-      TagComponent* tagComponent = entity.AddComponent<TagComponent>();
-      tagComponent->Tag = name;
+      TagComponent& tagComponent = entity.AddComponent<TagComponent>();
+      tagComponent.Tag = name;
     }
     entity.AddComponent<RelationshipComponent>();
-    IDComponent* idComponent = entity.AddComponent<IDComponent>();
-    idComponent->ID = {};
+    IDComponent& idComponent = entity.AddComponent<IDComponent>();
+    idComponent.ID = {};
 
     if (parent) {
       entity.SetParent(parent);
     }
 
     SceneLightInfo.LightPos = glm::vec3(0.0f);
-    m_EntityMap[idComponent->ID] = entity;
+    m_EntityMap[idComponent.ID] = entity;
 
     return entity;
   }
@@ -229,15 +206,17 @@ namespace Rain {
   }
 
   UUID RenderNode(Entity e, Scene* scene) {
-    auto tag = e.GetComponent<TagComponent>();
+    TagComponent tag = e.GetComponent<TagComponent>();
     static UUID selectedNode = -1;
-    UUID currentNode = e.GetComponent<IDComponent>()->ID;
+    UUID currentNode = e.GetComponent<IDComponent>().ID;
     int childCount = 0;
-    RelationshipComponent* r = nullptr;
+    RelationshipComponent r = {};
+    bool isRempty = true;
 
     if (e.HasComponent<RelationshipComponent>()) {
       r = e.GetComponent<RelationshipComponent>();
-      childCount = r->Children.size();
+      isRempty = true;
+      childCount = r.Children.size();
     }
 
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow;
@@ -248,18 +227,19 @@ namespace Rain {
       flags |= ImGuiTreeNodeFlags_Selected;
     }
 
-    if (ImGui::TreeNodeEx(tag->Tag.c_str(), flags)) {
+    if (ImGui::TreeNodeEx(tag.Tag.c_str(), flags)) {
       if (ImGui::IsItemClicked()) {
-        RN_LOG("Name: {} ID: {} C: {}", tag->Tag, (uint64_t)currentNode, (uint64_t)selectedNode);
+        RN_LOG("Name: {} ID: {} C: {}", tag.Tag, (uint64_t)currentNode, (uint64_t)selectedNode);
         selectedNode = currentNode;
       }
 
-      if (r != nullptr) {
-        if (r->Children.size() > 0) {
+      // if (r != {}) {
+      if (!isRempty) {
+        if (r.Children.size() > 0) {
           ImGui::Indent(0.5f);
         }
 
-        for (auto child : r->Children) {
+        for (auto child : r.Children) {
           Entity childEntity = scene->TryGetEntityWithUUID(child);
           RenderNode(childEntity, scene);
         }
@@ -309,7 +289,7 @@ namespace Rain {
 
       auto ent2 = TryGetEntityWithUUID(entityIdDir);
       auto transform2 = ent2.GetComponent<TransformComponent>();
-      transform2->SetRotationEuler(glm::radians(rotation));
+      transform2.SetRotationEuler(glm::radians(rotation));
     }
 
     static float metallic = 0.0, roughness = 0.0, ao = 0.0;
@@ -337,28 +317,28 @@ namespace Rain {
 
     static auto projectionMatrix1 = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1400.0f);
 
-    ImGui::Begin("Hierarchy");
+    // ImGui::Begin("Hierarchy");
 
-    m_World.each([this](flecs::entity e, IDComponent& id, RelationshipComponent& r, TagComponent& t) {
-      Entity entity = TryGetEntityWithUUID(id.ID);
-      if (r.ParentHandle == 0) {
-        auto uuid = RenderNode(entity, this);
+    // m_World.each([this](flecs::entity e, IDComponent& id, RelationshipComponent& r, TagComponent& t) {
+    //   Entity entity = TryGetEntityWithUUID(id.ID);
+    //   if (r.ParentHandle == 0) {
+    //     auto uuid = RenderNode(entity, this);
 
-        if (Select != 0 && Select == id.ID) {
-          auto pt = entity.GetComponent<TransformComponent>()->GetTransform();
-          auto tm = EditTransform(pt);
+    //    if (Select != 0 && Select == id.ID) {
+    //      auto pt = entity.GetComponent<TransformComponent>()->GetTransform();
+    //      auto tm = EditTransform(pt);
 
-          auto tc = entity.GetComponent<TransformComponent>();
-          tc->SetTransform(tm);
-          auto body = m_PhysicsScene->GetEntityBodyByID(Select);
-          if (body != 0) {
-            body->SetTranslation(tc->Translation);
-          }
-        }
-      }
-    });
+    //      auto tc = entity.GetComponent<TransformComponent>();
+    //      tc->SetTransform(tm);
+    //      auto body = m_PhysicsScene->GetEntityBodyByID(Select);
+    //      if (body != 0) {
+    //        body->SetTranslation(tc->Translation);
+    //      }
+    //    }
+    //  }
+    //});
 
-    ImGui::End();
+    // ImGui::End();
 
     renderer->EndScene();
   }
@@ -376,7 +356,7 @@ namespace Rain {
       nodeEntity.AddComponent<MeshComponent>(mesh->Id, (uint32_t)node->SubMeshId, materialId);
       nodeEntity.AddComponent<TransformComponent>();
 
-      nodeEntity.Transform()->SetTransform(node->LocalTransform);
+      nodeEntity.Transform().SetTransform(node->LocalTransform);
     }
   }
 
@@ -388,7 +368,7 @@ namespace Rain {
       transform = GetWorldSpaceTransformMatrix(parent);
     }
 
-    return transform * entity.GetComponent<TransformComponent>()->GetTransform();
+    return transform * entity.GetComponent<TransformComponent>().GetTransform();
   }
 
   void Scene::ConvertToLocalSpace(Entity entity) {
@@ -398,10 +378,10 @@ namespace Rain {
       return;
     }
 
-    const auto& transform = entity.Transform();
+    TransformComponent& transform = entity.Transform();
     glm::mat4 parentTransform = GetWorldSpaceTransformMatrix(parent);
-    glm::mat4 localTransform = glm::inverse(parentTransform) * transform->GetTransform();
-    transform->SetTransform(localTransform);
+    glm::mat4 localTransform = glm::inverse(parentTransform) * transform.GetTransform();
+    transform.SetTransform(localTransform);
   }
 
   TransformComponent Scene::GetWorldSpaceTransform(Entity entity) {

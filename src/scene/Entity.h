@@ -1,10 +1,10 @@
 #pragma once
 
+#include <flecs.h>
 #include <algorithm>
 #include <vector>
 #include "Components.h"
 #include "core/UUID.h"
-#include "flecs/flecs.h"
 
 #define NoName "NoName"
 
@@ -24,18 +24,18 @@ namespace Rain {
     }
 
     template <typename T, typename... Args>
-    T* AddComponent() {
+    T& AddComponent() {
       m_Entity.add<T>();
       return GetComponent<T>();
     }
 
     template <typename T>
-    T* GetComponent() {
+    T& GetComponent() {
       return m_Entity.get_mut<T>();
     }
 
     template <typename T>
-    const T* GetComponent() const {
+    const T& GetComponent() const {
       return m_Entity.get<T>();
     }
 
@@ -86,14 +86,14 @@ namespace Rain {
       }
     }
 
-    const std::string Name() const { return HasComponent<TagComponent>() ? GetComponent<TagComponent>()->Tag : NoName; }
-    void SetParentUUID(UUID parent) { GetComponent<RelationshipComponent>()->ParentHandle = parent; }
-    std::vector<UUID>& Children() { return GetComponent<RelationshipComponent>()->Children; }
-    UUID GetParentUUID() const { return GetComponent<RelationshipComponent>()->ParentHandle; }
-    UUID GetUUID() const { return GetComponent<IDComponent>()->ID; }
+    const std::string Name() const { return HasComponent<TagComponent>() ? GetComponent<TagComponent>().Tag : NoName; }
+    void SetParentUUID(UUID parent) { GetComponent<RelationshipComponent>().ParentHandle = parent; }
+    std::vector<UUID>& Children() { return GetComponent<RelationshipComponent>().Children; }
+    UUID GetParentUUID() const { return GetComponent<RelationshipComponent>().ParentHandle; }
+    UUID GetUUID() const { return GetComponent<IDComponent>().ID; }
 
-    TransformComponent* Transform() { return GetComponent<TransformComponent>(); }
-    const glm::mat4 Transform() const { return GetComponent<TransformComponent>()->GetTransform(); }
+    TransformComponent& Transform() { return GetComponent<TransformComponent>(); }
+    const glm::mat4 Transform() const { return GetComponent<TransformComponent>().GetTransform(); }
 
     operator bool() const;
 

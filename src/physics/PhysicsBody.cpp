@@ -19,10 +19,10 @@
 
 namespace Rain {
   PhysicsBody::PhysicsBody(JPH::BodyInterface& bodyInterface, Entity entity) {
-    const auto& rigidBodyComponent = entity.GetComponent<RigidBodyComponent>();
+    const RigidBodyComponent& rigidBodyComponent = entity.GetComponent<RigidBodyComponent>();
     m_Entity = entity;
 
-    switch (rigidBodyComponent->BodyType) {
+    switch (rigidBodyComponent.BodyType) {
       case EBodyType::Static: {
         CreateStaticBody(bodyInterface);
         break;
@@ -106,22 +106,22 @@ namespace Rain {
 
   void PhysicsBody::CreateCollisionShapesForEntity(Entity entity) {
     if (entity.HasComponent<BoxColliderComponent>()) {
-      auto* collider = entity.GetComponent<BoxColliderComponent>();
+      BoxColliderComponent& collider = entity.GetComponent<BoxColliderComponent>();
 
-      if (collider->Offset != glm::vec3(0.0)) {
-        m_Shape = JPH::OffsetCenterOfMassShapeSettings(PhysicsUtils::ToJoltVector(collider->Offset), new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider->Size))).Create().Get();
+      if (collider.Offset != glm::vec3(0.0)) {
+        m_Shape = JPH::OffsetCenterOfMassShapeSettings(PhysicsUtils::ToJoltVector(collider.Offset), new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider.Size))).Create().Get();
       } else {
-        m_Shape = new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider->Size));
+        m_Shape = new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider.Size));
       }
     } else if (entity.HasComponent<CylinderCollider>()) {
-      auto* collider = entity.GetComponent<CylinderCollider>();
-      m_Shape = new JPH::CylinderShape(collider->Size.x, collider->Size.y);
+      CylinderCollider& collider = entity.GetComponent<CylinderCollider>();
+      m_Shape = new JPH::CylinderShape(collider.Size.x, collider.Size.y);
     }
   }
 
   void PhysicsBody::CreateDynamicBody(JPH::BodyInterface& bodyInterface) {
     auto worldTransform = Scene::Instance->GetWorldSpaceTransform(m_Entity);
-    const auto& rigidBodyComponent = m_Entity.GetComponent<RigidBodyComponent>();
+    const RigidBodyComponent& rigidBodyComponent = m_Entity.GetComponent<RigidBodyComponent>();
 
     CreateCollisionShapesForEntity(m_Entity);
 
@@ -133,8 +133,8 @@ namespace Rain {
         Layers::MOVING);
 
     bodySettings.mAllowSleeping = false;
-    bodySettings.mLinearDamping = rigidBodyComponent->LinearDrag;
-    bodySettings.mAngularDamping = rigidBodyComponent->AngularDrag;
+    bodySettings.mLinearDamping = rigidBodyComponent.LinearDrag;
+    bodySettings.mAngularDamping = rigidBodyComponent.AngularDrag;
     // bodySettings.mGravityFactor = 1.0f;
     //  bodySettings.mLinearVelocity = PhysicsUtils::ToJoltVector(rigidBodyComponent->InitialLinearVelocity);
     //  bodySettings.mAngularVelocity = PhysicsUtils::ToJoltVector(rigidBodyComponent->InitialAngularVelocity);
@@ -148,9 +148,9 @@ namespace Rain {
     bodySettings.mMotionQuality = JPH::EMotionQuality::Discrete;
     // bodySettings.mAllowSleeping = true;
 
-    if (rigidBodyComponent->Mass != 1.0f) {
+    if (rigidBodyComponent.Mass != 1.0f) {
       bodySettings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
-      bodySettings.mMassPropertiesOverride.mMass = rigidBodyComponent->Mass;
+      bodySettings.mMassPropertiesOverride.mMass = rigidBodyComponent.Mass;
     }
 
     JPH::Body* body = bodyInterface.CreateBody(bodySettings);

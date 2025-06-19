@@ -1,4 +1,3 @@
-#ifndef __EMSCRIPTEN__
 #pragma once
 #ifndef NDEBUG
 #define NDEBUG
@@ -16,4 +15,3 @@ namespace Rain {
     static glm::quat FromJoltQuat(const JPH::Quat& quat);
   };
 }  // namespace Rain
-#endif

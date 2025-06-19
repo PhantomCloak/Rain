@@ -129,6 +129,7 @@ namespace Rain {
       requestData->requestEnded = true;
     };
 
+#ifndef __EMSCRIPTEN__
     static const char* enabledTogglesArray[] = {
         "chromium_disable_uniformity_analysis",
         "allow_unsafe_apis"};
@@ -139,10 +140,13 @@ namespace Rain {
     dawnToggles.enabledToggles = enabledTogglesArray;
     dawnToggles.enabledToggleCount = 2;
     dawnToggles.disabledToggleCount = 0;
+#endif
 
     WGPUInstanceDescriptor* instanceDesc = ZERO_ALLOC(WGPUInstanceDescriptor);
     instanceDesc->nextInChain = nullptr;
+#ifndef __EMSCRIPTEN__
     instanceDesc->nextInChain = &dawnToggles.chain;
+#endif
     instanceDesc->features.timedWaitAnyEnable = 0;
     instanceDesc->features.timedWaitAnyMaxCount = 64;
 

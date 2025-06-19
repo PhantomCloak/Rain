@@ -210,11 +210,11 @@ namespace Rain {
     cubeProps.Format = TextureFormat::RGBA16F;
 
     Ref<TextureCube> envUnfiltered = TextureCube::Create(cubeProps);
-    Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), RESOURCE_DIR "/textures/evening_road_01_puresky_4k.hdr");
+    Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), RESOURCE_DIR "/textures/flamingo_pan_4k.hdr");
 
     Render::ComputeEquirectToCubemap(envEquirect.get(), envUnfiltered.get());
 
-    auto [envFiltered, envIrradiance] = Render::CreateEnvironmentMap(RESOURCE_DIR "/textures/evening_road_01_puresky_4k.hdr");
+    auto [envFiltered, envIrradiance] = Render::CreateEnvironmentMap(RESOURCE_DIR "/textures/flamingo_pan_4k.hdr");
 
     FileSys::WatchFile(RESOURCE_DIR "/shaders/pbr.wgsl", [pbrShader](std::string filePath) {
       std::string b = FileSys::ReadFile(filePath);

@@ -280,10 +280,15 @@ namespace Rain {
    public:
     static uint32_t CalculateMipCount(uint32_t width, uint32_t height);
 
+#ifndef __EMSCRIPTEN__
     static WGPUStringView MakeLabel(const char* str);
     static WGPUStringView MakeLabel(const std::string& str);
-		const char* GetAdapterTypeString(WGPUAdapterType adapterType);
-		const char* GetBackendTypeString(WGPUBackendType backendType);
+#else
+    static const char* MakeLabel(const char* str);
+    static const char* MakeLabel(const std::string& str);
+#endif
+    const char* GetAdapterTypeString(WGPUAdapterType adapterType);
+    const char* GetBackendTypeString(WGPUBackendType backendType);
   };
 
   class TextureUtils {

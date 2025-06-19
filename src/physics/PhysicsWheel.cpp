@@ -7,19 +7,23 @@
 
 namespace Rain {
   PhysicsWheel::PhysicsWheel(JPH::VehicleConstraintSettings& vehicleSettings, Entity entity) {
-    const auto& wheelColliderComponent = entity.GetComponent<WheelColliderComponent>();
-
+    const WheelColliderComponent& wheelColliderComponent = entity.GetComponent<WheelColliderComponent>();
     JPH::WheelSettingsTV* wheelSetting = new JPH::WheelSettingsTV;
-    wheelSetting->mPosition = PhysicsUtils::ToJoltVector(wheelColliderComponent->LocalPosition);
-    // wheelSetting->mPosition.SetX(trackX);
-    wheelSetting->mRadius = wheelColliderComponent->Radius;
-    wheelSetting->mWidth = wheelColliderComponent->Width;
-    wheelSetting->mSuspensionMinLength = wheelColliderComponent->SuspensionMinLen;
-    wheelSetting->mSuspensionSpring.mFrequency = 1.0f;
+    wheelSetting->mPosition = PhysicsUtils::ToJoltVector(wheelColliderComponent.LocalPosition);
+    wheelSetting->mRadius = wheelColliderComponent.Radius;
+    wheelSetting->mWidth = wheelColliderComponent.Width;
+    wheelSetting->mSuspensionMinLength = wheelColliderComponent.SuspensionMinLen;
+
+    // Improved suspension settings
+    wheelSetting->mSuspensionSpring.mFrequency = 2.5f;  // Stiffer suspension
+    wheelSetting->mSuspensionSpring.mDamping = 0.8f;    // Higher damping for stability
+
+    // CRITICAL: Much higher lateral friction for tracked vehicles
+    wheelSetting->mLongitudinalFriction = 1.8f;  // Forward/backward grip
+    wheelSetting->mLateralFriction = 4.5f;       // Very high lateral friction - prevents sliding
 
     vehicleSettings.mWheels.push_back(wheelSetting);
-
-    Width = wheelColliderComponent->Width;
-    Radius = wheelColliderComponent->Radius;
+    Width = wheelColliderComponent.Width;
+    Radius = wheelColliderComponent.Radius;
   }
 }  // namespace Rain

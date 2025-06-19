@@ -15,9 +15,9 @@
 namespace Rain {
 
   void RainTrackedVehicle::CreateVehicle(PhysicsScene* Scene) {
-    m_Props.VehicleHeight = 1.5f;
-    m_Props.VehicleWidth = 3.4f;
-    m_Props.VehicleLenght = 5.4f;
+    m_Props.VehicleHeight = 1.4f;
+    m_Props.VehicleWidth = 3.56f;
+    m_Props.VehicleLenght = 5.3f;
 
     const float half_vehicle_length = m_Props.VehicleLenght / 2;
     const float half_vehicle_width = m_Props.VehicleWidth / 2;
@@ -25,20 +25,19 @@ namespace Rain {
     const float suspension_frequency = 1.0f;
 
     auto tankBodyModel = ResourceManager::LoadMeshSource(RESOURCE_DIR "/tank_tiger/tank_body.gltf");
+    auto tanKTurretModel = ResourceManager::LoadMeshSource(RESOURCE_DIR "/tank_tiger/turret.gltf");
     auto boxModel = ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
     auto wheelModel = ResourceManager::LoadMeshSource(RESOURCE_DIR "/cylinder.gltf");
 
     m_VehicleEntity = Scene::Instance->CreateEntity("TankBody");
-    // m_VehicleEntity.GetComponent<TransformComponent>()->Translation = glm::vec3(0, 2, 0);
-    // m_VehicleEntity.GetComponent<TransformComponent>()->Scale = glm::vec3(half_vehicle_width, half_vehicle_height, half_vehicle_length);
 
-    const auto vehicleRigidbody = m_VehicleEntity.AddComponent<RigidBodyComponent>();
-    vehicleRigidbody->BodyType = EBodyType::Dynamic;
-    vehicleRigidbody->Mass = 4000.0f;
+    RigidBodyComponent& vehicleRigidbody = m_VehicleEntity.AddComponent<RigidBodyComponent>();
+    vehicleRigidbody.BodyType = EBodyType::Dynamic;
+    vehicleRigidbody.Mass = 57000.0f;
 
-    const auto boxCollider = m_VehicleEntity.AddComponent<BoxColliderComponent>();
-    boxCollider->Offset = glm::vec3(0, -half_vehicle_height, 0);
-    boxCollider->Size = glm::vec3(half_vehicle_width, half_vehicle_height, half_vehicle_length);
+    BoxColliderComponent& boxCollider = m_VehicleEntity.AddComponent<BoxColliderComponent>();
+    boxCollider.Offset = glm::vec3(0, -half_vehicle_height, 0);
+    boxCollider.Size = glm::vec3(half_vehicle_width, half_vehicle_height, half_vehicle_length);
 
     Scene::Instance->BuildMeshEntityHierarchy(m_VehicleEntity, tankBodyModel);
 
@@ -46,44 +45,73 @@ namespace Rain {
     m_VehicleController = CreateRef<PhysicsVehicleController>(Scene->CreateBody(m_VehicleEntity));
 
     glm::vec3 wheel_pos[] = {
-        glm::vec3(0.0f, -0.0f, 2.85f),
-        glm::vec3(0.0f, -0.2f, 2.1f),
-        glm::vec3(0.0f, -0.2f, 1.4f),
-        glm::vec3(0.0f, -0.2f, 0.7f),
-        glm::vec3(0.0f, -0.2f, 0.0f),
-        glm::vec3(0.0f, -0.2f, -0.7f),
-        glm::vec3(0.0f, -0.2f, -1.4f),
-        glm::vec3(0.0f, -0.2f, -2.1f),
-        glm::vec3(0.0f, -0.0f, -2.75f),
+        glm::vec3(0.0f, 0.2f, 2.48f),  // Index 0: Front idler (raised)
+
+        // 8 Road wheels (interleaved pattern)
+        glm::vec3(0.0f, -0.15f, 1.8f),   // Index 1: Road wheel 1 (outer)
+        glm::vec3(0.0f, -0.25f, 1.3f),   // Index 2: Road wheel 2 (inner, lower)
+        glm::vec3(0.0f, -0.15f, 0.8f),   // Index 3: Road wheel 3 (outer)
+        glm::vec3(0.0f, -0.25f, 0.3f),   // Index 4: Road wheel 4 (inner, lower)
+        glm::vec3(0.0f, -0.15f, -0.2f),  // Index 5: Road wheel 5 (outer)
+        glm::vec3(0.0f, -0.25f, -0.7f),  // Index 6: Road wheel 6 (inner, lower)
+        glm::vec3(0.0f, -0.15f, -1.2f),  // Index 7: Road wheel 7 (outer)
+        glm::vec3(0.0f, -0.25f, -1.7f),  // Index 8: Road wheel 8 (inner, lower)
+
+        // Rear drive sprocket
+        glm::vec3(0.0f, 0.0f, -2.55f),  // Index 9: Drive sprocket (rear)
     };
+
     for (int trackIndex = 0; trackIndex < 2; ++trackIndex) {
       for (int wheelIndex = 0; wheelIndex < std::size(wheel_pos); wheelIndex++) {
         auto wheel = Scene::Instance->CreateEntity("Wheel_" + std::to_string(wheelIndex));
-        Scene::Instance->BuildMeshEntityHierarchy(wheel, wheelModel);
+        // Scene::Instance->BuildMeshEntityHierarchy(wheel, wheelModel);
 
         const float trackX = trackIndex == 0 ? half_vehicle_width : -half_vehicle_width;
 
-        const auto wheelCollider = wheel.AddComponent<WheelColliderComponent>();
-        wheelCollider->Radius = 0.3f;
-        wheelCollider->Width = 0.1f;
-        wheelCollider->SuspensionMinLen = 0.3f;
-        wheelCollider->SuspensionMaxLen = 0.5f;
-        wheelCollider->LocalPosition = glm::vec3(trackX, wheel_pos[wheelIndex].y, wheel_pos[wheelIndex].z);
+        WheelColliderComponent& wheelCollider = wheel.AddComponent<WheelColliderComponent>();
+        wheelCollider.Width = 0.25f;
+        wheelCollider.LocalPosition = glm::vec3(trackX, wheel_pos[wheelIndex].y, wheel_pos[wheelIndex].z);
+
+        bool isFrontIdler = (wheelIndex == 0);
+        bool isRearSprocket = (wheelIndex == 9);
+        bool isInnerRoadWheel = (wheelIndex % 2 == 0 && wheelIndex >= 2 && wheelIndex <= 8);
+        bool isOuterRoadWheel = (wheelIndex % 2 == 1 && wheelIndex >= 1 && wheelIndex <= 7);
+
+        if (isFrontIdler) {
+          // Front idler - minimal suspension, mainly for track tensioning
+          wheelCollider.SuspensionMinLen = 0.05f;
+          wheelCollider.SuspensionMaxLen = 0.15f;
+          wheelCollider.Radius = 0.35f;  // Slightly larger
+        } else if (isRearSprocket) {
+          // Drive sprocket - minimal suspension
+          wheelCollider.SuspensionMinLen = 0.05f;
+          wheelCollider.SuspensionMaxLen = 0.15f;
+          wheelCollider.Radius = 0.35f;  // Slightly larger
+        } else if (isInnerRoadWheel) {
+          // Inner road wheels (interleaved, lower position)
+          wheelCollider.SuspensionMinLen = 0.25f;
+          wheelCollider.SuspensionMaxLen = 0.45f;
+          wheelCollider.Radius = 0.32f;
+        } else if (isOuterRoadWheel) {
+          // Outer road wheels (interleaved, higher position)
+          wheelCollider.SuspensionMinLen = 0.15f;
+          wheelCollider.SuspensionMaxLen = 0.35f;
+          wheelCollider.Radius = 0.32f;
+        }
 
         bool isEndWheel = (wheelIndex == 0) || (wheelIndex == std::size(wheel_pos) - 1);
-        wheelCollider->SuspensionMaxLen = isEndWheel ? wheelCollider->SuspensionMinLen : wheelCollider->SuspensionMaxLen;
+        wheelCollider.SuspensionMaxLen = isEndWheel ? wheelCollider.SuspensionMinLen : wheelCollider.SuspensionMaxLen;
 
         auto wheelTransform = wheel.GetComponent<TransformComponent>();
-        wheelTransform->Scale = glm::vec3(0.3, 0.3f, 0.3f);
+        wheelTransform.Scale = glm::vec3(0.3, 0.3f, 0.3f);
 
         m_VehicleController->CreateTrackWheel(wheel, trackIndex);
         m_WheelEntities.push_back(wheel);
       }
     }
-
     m_VehicleController->Initalize();
 
-    const float half_turret_width = 0.5f;
+    const float half_turret_width = 0.8f;
     const float half_turret_length = 1.0f;
     const float half_turret_height = 0.4f;
 
@@ -95,40 +123,36 @@ namespace Rain {
 
     const glm::vec3 turretPosition = glm::vec3(0, half_vehicle_height + half_turret_height, 0);
 
-    const auto turretTransform = m_TurretEntity.GetComponent<TransformComponent>();
-    turretTransform->Translation = turretPosition;
-    turretTransform->Scale = glm::vec3(half_turret_width, half_turret_height, half_turret_length);
+    m_TurretEntity.Transform().Translation = turretPosition;
 
-    const auto turretRigidbody = m_TurretEntity.AddComponent<RigidBodyComponent>();
-    turretRigidbody->BodyType = EBodyType::Dynamic;
-    turretRigidbody->Mass = 2000.0f;
+    RigidBodyComponent& turretRigidbody = m_TurretEntity.AddComponent<RigidBodyComponent>();
+    turretRigidbody.BodyType = EBodyType::Dynamic;
+    turretRigidbody.Mass = 12000.0f;
 
-    const auto turretCollider = m_TurretEntity.AddComponent<BoxColliderComponent>();
-    // turretCollider->Offset = glm::vec3(0, -half_vehicle_height, 0);
-    turretCollider->Size = glm::vec3(half_turret_width, half_turret_height, half_turret_length);
+    m_TurretEntity.AddComponent<BoxColliderComponent>(glm::vec3(0), glm::vec3(half_turret_width, half_turret_height, half_turret_length));
 
-    Scene::Instance->BuildMeshEntityHierarchy(m_TurretEntity, boxModel);
+    Scene::Instance->BuildMeshEntityHierarchy(m_TurretEntity, tanKTurretModel);
     m_TurretBody = Scene->CreateBody(m_TurretEntity);
 
     m_TurretBarrelEntity = Scene::Instance->CreateEntity("TankBarrel");
 
-    const auto barrelTransform = m_TurretBarrelEntity.GetComponent<TransformComponent>();
+    TransformComponent& barrelTransform = m_TurretBarrelEntity.GetComponent<TransformComponent>();
     // barrelTransform->Translation = turrentTransform->Translation + glm::vec3(0, 0, half_turret_length + half_barrel_length - barrel_rotation_offset);
-    barrelTransform->Translation = turretPosition + glm::vec3(0, 0, (half_turret_length + half_barrel_length - barrel_rotation_offset));
+    barrelTransform.Translation = turretPosition + glm::vec3(0, 0, (half_turret_length + half_barrel_length - barrel_rotation_offset));
     // barrelTransform->Translation.y = 2.29 / 2;
-    barrelTransform->Scale = glm::vec3(barrel_radius, half_barrel_length, barrel_radius);
+    barrelTransform.Scale = glm::vec3(barrel_radius, half_barrel_length, barrel_radius);
     glm::quat rotation = glm::angleAxis(glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    barrelTransform->SetRotation(rotation);
+    barrelTransform.SetRotation(rotation);
 
-    const auto barrelRigidbody = m_TurretBarrelEntity.AddComponent<RigidBodyComponent>();
-    barrelRigidbody->BodyType = EBodyType::Dynamic;
-    barrelRigidbody->Mass = 200.0f;
+    RigidBodyComponent& barrelRigidbody = m_TurretBarrelEntity.AddComponent<RigidBodyComponent>();
+    barrelRigidbody.BodyType = EBodyType::Dynamic;
+    barrelRigidbody.Mass = 200.0f;
 
-    const auto barrelCollider = m_TurretBarrelEntity.AddComponent<CylinderCollider>();
+    CylinderCollider& barrelCollider = m_TurretBarrelEntity.AddComponent<CylinderCollider>();
     // turretCollider->Offset = glm::vec3(0, -half_vehicle_height, 0);
-    barrelCollider->Size = glm::vec3(half_barrel_length, barrel_radius, 0.0);
+    barrelCollider.Size = glm::vec3(half_barrel_length, barrel_radius, 0.0);
 
-    Scene::Instance->BuildMeshEntityHierarchy(m_TurretBarrelEntity, boxModel);
+    // Scene::Instance->BuildMeshEntityHierarchy(m_TurretBarrelEntity, boxModel);
     m_TurretBarrelBody = Scene->CreateBody(m_TurretBarrelEntity);
 
     JPH::BodyID bodyIds[] = {m_VehicleController->GetBody()->GetBodyId(), m_TurretBody->GetBodyId(), m_TurretBarrelBody->GetBodyId()};
@@ -215,16 +239,16 @@ namespace Rain {
       mPreviousForward = mForward;
     }
 
-    for (uint wheelIndex = 0; wheelIndex < m_VehicleController->GetWheelCount(); ++wheelIndex) {
-      Entity& wheelEntity = m_WheelEntities[wheelIndex];
-      auto transform = wheelEntity.GetComponent<TransformComponent>();
+    // for (uint wheelIndex = 0; wheelIndex < m_VehicleController->GetWheelCount(); ++wheelIndex) {
+    //   Entity& wheelEntity = m_WheelEntities[wheelIndex];
+    //   auto transform = wheelEntity.GetComponent<TransformComponent>();
 
-      glm::vec3 worldPos = m_VehicleController->GetWheelPosition(wheelIndex);
-      glm::quat worldRot = m_VehicleController->GetWheelRotation(wheelIndex);
+    //  glm::vec3 worldPos = m_VehicleController->GetWheelPosition(wheelIndex);
+    //  glm::quat worldRot = m_VehicleController->GetWheelRotation(wheelIndex);
 
-      transform->Translation = worldPos;
-      transform->Rotation = worldRot;
-    }
+    //  transform->Translation = worldPos;
+    //  transform->Rotation = worldRot;
+    //}
 
     // Apply inputs
     m_VehicleController->SetDriverInput(mForward, mLeftRatio, mRightRatio, mBrake);

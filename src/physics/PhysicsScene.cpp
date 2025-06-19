@@ -19,7 +19,6 @@
 #include "render/Render2D.h"
 #include "scene/Scene.h"
 #include "physics/RainTrackedVehicle.h"
-
 namespace Rain {
   PhysicsScene* PhysicsScene::m_Instance;
   RainTrackedVehicle* veh;
@@ -117,13 +116,13 @@ namespace Rain {
 
     Entity entity = Scene::Instance->TryGetEntityWithUUID(bodyRef.GetUserData());
 
-    auto transformComponent = entity.GetComponent<TransformComponent>();
-    glm::vec3 scale = transformComponent->Scale;
-    transformComponent->Translation = PhysicsUtils::FromJoltVector(bodyRef.GetPosition());
-    transformComponent->SetRotation(PhysicsUtils::FromJoltQuat(bodyRef.GetRotation()));
+    TransformComponent& transformComponent = entity.GetComponent<TransformComponent>();
+    glm::vec3 scale = transformComponent.Scale;
+    transformComponent.Translation = PhysicsUtils::FromJoltVector(bodyRef.GetPosition());
+    transformComponent.SetRotation(PhysicsUtils::FromJoltQuat(bodyRef.GetRotation()));
 
     Scene::Instance->ConvertToLocalSpace(entity);
-    transformComponent->Scale = scale;
+    transformComponent.Scale = scale;
   }
 
   void PhysicsScene::PreUpdate(float dt) {
@@ -195,14 +194,14 @@ namespace Rain {
 
       auto rigidBody = m_RigidBodies.at(entity.GetUUID());
 
-      auto transformComponent = entity.GetComponent<TransformComponent>();
-      glm::vec3 scale = transformComponent->Scale;
-      transformComponent->Translation = PhysicsUtils::FromJoltVector(body->GetPosition());
+      TransformComponent& transformComponent = entity.GetComponent<TransformComponent>();
+      glm::vec3 scale = transformComponent.Scale;
+      transformComponent.Translation = PhysicsUtils::FromJoltVector(body->GetPosition());
 
-      transformComponent->SetRotation(PhysicsUtils::FromJoltQuat(body->GetRotation()));
+      transformComponent.SetRotation(PhysicsUtils::FromJoltQuat(body->GetRotation()));
 
       Scene::Instance->ConvertToLocalSpace(entity);
-      transformComponent->Scale = scale;
+      transformComponent.Scale = scale;
     }
   }
 

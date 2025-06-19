@@ -1,6 +1,6 @@
 #pragma once
 
-#include <flecs/flecs.h>
+#include <flecs.h>
 #include <memory>
 #include <string>
 #include "Cam.h"
