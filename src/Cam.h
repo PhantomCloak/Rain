@@ -2,7 +2,7 @@
 #define CAMERA_H
 
 #include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp> 
+#include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 // Defines several possible options for camera movement. Used as abstraction to stay away from window-system specific input methods
@@ -17,7 +17,7 @@ enum PlayerCamera_Movement {
 
 // Default camera values
 const float YAW = 0.0f;
-const float PITCH = 0.0f;
+const float PITCH = -89.0f;
 const float SPEED = 2.5f;
 const float SENSITIVITY = 0.1f;
 const float ZOOM = 45.0f;

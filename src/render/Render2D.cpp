@@ -219,10 +219,11 @@ namespace Rain {
   void RenderDebug::DrawLine(JPH::RVec3Arg inFrom, JPH::RVec3Arg inTo, JPH::ColorArg inColor) {
     glm::vec3 from = PhysicsUtils::FromJoltVector(inFrom);
     glm::vec3 to = PhysicsUtils::FromJoltVector(inTo);
-    glm::vec4 color = glm::vec4(1.0, 0.0, 0.0, 1.0);
+    glm::vec4 color = glm::vec4(inColor.r, inColor.g, inColor.b, 1.0f);
 
     DrawLine(from, to, color);
   }
+
   void RenderDebug::DrawText3D(JPH::RVec3Arg inPosition, const JPH::string_view& inString, JPH::ColorArg inColor, float inHeight) {
     // TODO: Implement 3D text rendering if needed
     // For now, this is a stub to make the class non-abstract

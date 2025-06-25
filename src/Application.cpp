@@ -1,7 +1,5 @@
 // #include "imgui.h"
-#include "imgui.h"
-#include "scene/Entity.h"
-#include "scene/Scene.h"
+#include "scene/Entity.h" #include "scene/Scene.h"
 #define RN_DEBUG
 #include <GLFW/glfw3.h>
 #include <unistd.h>
@@ -73,11 +71,11 @@ namespace Rain {
   }
 
   void Application::OnMouseClick(Rain::MouseCode button) {
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.WantCaptureMouse) {
-      return;
-    }
-    //Cursor::CaptureMouse(true);
+    // ImGuiIO& io = ImGui::GetIO();
+    // if (io.WantCaptureMouse) {
+    //   return;
+    // }
+    //  Cursor::CaptureMouse(true);
   }
 
   void Application::OnMouseMove(double xPos, double yPos) {

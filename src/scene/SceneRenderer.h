@@ -126,6 +126,7 @@ namespace Rain {
     Ref<Texture2D> m_LitDepthTexture;
     Ref<Texture2D> m_LitPassTexture;
     SceneCamera Cam;
+    SceneCamera SavedCam;
 
     Ref<Sampler> m_ShadowSampler;
 

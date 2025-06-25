@@ -6,6 +6,7 @@
 #include "debug/Profiler.h"
 #include "imgui.h"
 #include "io/filesystem.h"
+#include "io/keyboard.h"
 #include "render/Framebuffer.h"
 #include "render/Render.h"
 #include "render/ResourceManager.h"
@@ -440,6 +441,62 @@ namespace Rain {
     m_NeedResize = true;
   }
 
+  void DrawCameraFrustum(SceneCamera camera) {
+    // Get the inverse of the view-projection matrix to transform from NDC to world space
+    glm::mat4 invViewProj = glm::inverse(camera.Projection * camera.ViewMatrix);
+
+    // Define the 8 corners of the frustum in NDC space (normalized device coordinates)
+    // Near plane corners
+    glm::vec4 nearCorners[4] = {
+        glm::vec4(-1.0f, -1.0f, -1.0f, 1.0f),  // Bottom-left near
+        glm::vec4(1.0f, -1.0f, -1.0f, 1.0f),   // Bottom-right near
+        glm::vec4(1.0f, 1.0f, -1.0f, 1.0f),    // Top-right near
+        glm::vec4(-1.0f, 1.0f, -1.0f, 1.0f)    // Top-left near
+    };
+
+    // Far plane corners
+    glm::vec4 farCorners[4] = {
+        glm::vec4(-1.0f, -1.0f, 1.0f, 1.0f),  // Bottom-left far
+        glm::vec4(1.0f, -1.0f, 1.0f, 1.0f),   // Bottom-right far
+        glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),    // Top-right far
+        glm::vec4(-1.0f, 1.0f, 1.0f, 1.0f)    // Top-left far
+    };
+
+    // Transform corners to world space
+    JPH::RVec3 nearWorldCorners[4];
+    JPH::RVec3 farWorldCorners[4];
+
+    for (int i = 0; i < 4; i++) {
+      // Transform near corners
+      glm::vec4 nearWorld = invViewProj * nearCorners[i];
+      nearWorld /= nearWorld.w;  // Perspective divide
+      nearWorldCorners[i] = JPH::RVec3(nearWorld.x, nearWorld.y, nearWorld.z);
+
+      // Transform far corners
+      glm::vec4 farWorld = invViewProj * farCorners[i];
+      farWorld /= farWorld.w;  // Perspective divide
+      farWorldCorners[i] = JPH::RVec3(farWorld.x, farWorld.y, farWorld.z);
+    }
+
+    // Draw the frustum lines
+    // Near plane edges
+    for (int i = 0; i < 4; i++) {
+      int next = (i + 1) % 4;
+      RenderDebug::sInstance->DrawLine(nearWorldCorners[i], nearWorldCorners[next], JPH::Color::sGreen);
+    }
+
+    // Far plane edges
+    for (int i = 0; i < 4; i++) {
+      int next = (i + 1) % 4;
+      RenderDebug::sInstance->DrawLine(farWorldCorners[i], farWorldCorners[next], JPH::Color::sGreen);
+    }
+
+    // Connecting edges (from near to far)
+    for (int i = 0; i < 4; i++) {
+      RenderDebug::sInstance->DrawLine(nearWorldCorners[i], farWorldCorners[i], JPH::Color::sGreen);
+    }
+  }
+
   void SceneRenderer::BeginScene(const SceneCamera& camera) {
     RN_PROFILE_FUNC;
     const glm::mat4 viewInverse = glm::inverse(camera.ViewMatrix);
@@ -479,10 +536,18 @@ namespace Rain {
     ImGui_ImplWGPU_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    if (SavedCam.Far != 400.0f) {
+      SavedCam = camera;
+    }
   }
 
   void SceneRenderer::FlushDrawList() {
     RN_PROFILE_FUNC;
+    if (Keyboard::IsKeyPressed(Key::F)) {
+      SavedCam = Cam;
+      RN_LOG("AAAAAAAAAAA");
+    }
+
     WGPUCommandEncoderDescriptor commandEncoderDesc = {};
     ZERO_INIT(commandEncoderDesc);
 
@@ -520,6 +585,8 @@ namespace Rain {
 
       RenderDebug::Begin(&litPassEncoder, &commandEncoder);
       RenderDebug::SetMVP(m_SceneUniform.ViewProjection);
+
+      DrawCameraFrustum(SavedCam);
       RenderDebug::FlushDrawList();
 
       ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);

@@ -90,8 +90,8 @@ namespace Rain {
     // auto mBarrelHinge = static_cast<JPH::HingeConstraint*>(barrel_hinge.Create(*mTurretBody, *mBarrelBody));
     // mBarrelHinge->SetMotorState(JPH::EMotorState::Position);
     // m_PhysicsSystem->AddConstraint(mBarrelHinge);
-    veh = new RainTrackedVehicle();
-    veh->CreateVehicle(this);
+    // veh = new RainTrackedVehicle();
+    // veh->CreateVehicle(this);
   }
 
   Ref<PhysicsBody> PhysicsScene::GetEntityBodyByID(UUID entityID) const {
@@ -160,7 +160,7 @@ namespace Rain {
 
   void PhysicsScene::Update(float dt) {
     // Input
-    veh->Update(this);
+    // veh->Update(this);
 
     m_PhysicsSystem->DrawBodies(JPH::BodyManager::DrawSettings(), JPH::DebugRenderer::sInstance);
 
