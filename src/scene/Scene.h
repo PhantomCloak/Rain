@@ -3,9 +3,9 @@
 #include <flecs.h>
 #include <memory>
 #include <string>
-#include "Cam.h"
 #include "core/UUID.h"
 #include "physics/PhysicsScene.h"
+#include "render/Camera.h"
 #include "render/Mesh.h"
 #include "scene/Entity.h"
 
@@ -36,13 +36,14 @@ namespace Rain {
     TransformComponent GetWorldSpaceTransform(Entity entity);
     glm::mat4 EditTransform(glm::mat4& matrix);
     void ConvertToLocalSpace(Entity entity);
+    Entity GetMainCameraEntity();
 
-    std::pair<glm::vec3, glm::vec3> CastRay(const PlayerCamera& camera, float mx, float my);
+    std::pair<glm::vec3, glm::vec3> CastRay(const Camera& camera, float mx, float my);
     void OnMouseMove(double xPos, double yPos);
     void ScanKeyPress();
 
     LightInfo SceneLightInfo;
-    std::unique_ptr<PlayerCamera> m_SceneCamera;
+    std::unique_ptr<Camera> m_SceneCamera;
     static Scene* Instance;
 
    private:

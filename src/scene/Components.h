@@ -8,6 +8,7 @@
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtx/quaternion.hpp"
 #include "render/Material.h"
+#include "render/Camera.h"
 
 namespace Rain {
   struct IDComponent {
@@ -168,6 +169,22 @@ namespace Rain {
     RelationshipComponent(const RelationshipComponent& other) = default;
     RelationshipComponent(UUID parent)
         : ParentHandle(parent) {}
+  };
+
+  struct CameraComponent {
+    enum class Type { None = -1,
+                      Perspective,
+                      Orthographic };
+    Type ProjectionType;
+
+    Camera SceneCamera;
+    bool Primary = true;
+
+    CameraComponent() = default;
+    CameraComponent(const CameraComponent& other) = default;
+
+    operator Camera&() { return SceneCamera; }
+    operator const Camera&() const { return SceneCamera; }
   };
 
   struct MeshComponent {
