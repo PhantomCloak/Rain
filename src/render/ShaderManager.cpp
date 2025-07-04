@@ -15,6 +15,7 @@
 #include "src/tint/lang/wgsl/ast/identifier.h"
 #include "src/tint/lang/wgsl/ast/module.h"
 #include "src/tint/lang/wgsl/sem/function.h"
+#include "ShaderReflection.h"
 
 namespace Rain {
   std::map<std::string, Ref<Shader>> ShaderManager::m_Shaders;
@@ -69,13 +70,16 @@ namespace Rain {
     tint::wgsl::reader::Options options;
     options.allowed_features = {};
 
-    tint::Source::File* file = new tint::Source::File(shader->GetName(), shader->GetSource());
-    tint::Program program = tint::wgsl::reader::Parse(file, options);
+    //tint::Source::File* file = new tint::Source::File(shader->GetName(), shader->GetSource());
+    //tint::Program program = tint::wgsl::reader::Parse(file, options);
 
-    if (program.Diagnostics().ContainsErrors()) {
-      RN_LOG_ERR("Shader Compilation Error: {0}", program.Diagnostics().Str());
-      return reflectionInfo;
-    }
+    ShaderReflector reflector;
+    auto info = reflector.GetShaderReflectionInfo("test_shader", shader->GetSource());
+
+    //if (program.Diagnostics().ContainsErrors()) {
+    //  RN_LOG_ERR("Shader Compilation Error: {0}", program.Diagnostics().Str());
+    //  return reflectionInfo;
+    //}
 
     tint::inspector::Inspector inspector(program);
 

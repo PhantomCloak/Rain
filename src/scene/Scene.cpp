@@ -102,55 +102,52 @@ namespace Rain {
     return {};
   }
 
-  std::pair<glm::vec3, glm::vec3> Scene::CastRay(const Camera& camera, float mx, float my) {
-    // Convert mouse coordinates to normalized device coordinates (NDC)
-    // float w = Application::Get()->GetWindowSize().x;
-    // float h = Application::Get()->GetWindowSize().y;
+  std::pair<glm::vec3, glm::vec3> Scene::CastRay(Entity& cameraEntity, float mx, float my) {
+    const Camera& camera = cameraEntity.GetComponent<CameraComponent>();
+    glm::mat4 cameraViewMatrix = glm::inverse(GetWorldSpaceTransformMatrix(cameraEntity));
 
-    //// Convert to clip space coordinates (-1 to 1 range)
-    // float x = (2.0f * mx / w) - 1.0f;
-    // float y = 1.0f - (2.0f * my / h);  // Invert Y for WebGPU/OpenGL
+    float w = Application::Get()->GetWindowSize().x;
+    float h = Application::Get()->GetWindowSize().y;
 
-    // glm::vec4 clipPos = glm::vec4(x, y, -1.0f, 1.0f);
+    float x = (2.0f * mx / w) - 1.0f;
+    float y = 1.0f - (2.0f * my / h);
 
-    //// Get current projection and view matrices (don't use static)
-    // glm::mat4 projMatrix = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1400.0f);
-    // glm::mat4 viewMatrix = camera.GetViewMatrix();
+    glm::vec4 clipPos = glm::vec4(x, y, -1.0f, 1.0f);
 
-    //// Calculate inverse matrices
-    // glm::mat4 invProj = glm::inverse(projMatrix);
-    // glm::mat4 invView = glm::inverse(viewMatrix);
+    glm::mat4 projMatrix = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1400.0f);
+    glm::mat4 viewMatrix = cameraViewMatrix;
 
-    //// Unproject the clip space position to view space
-    // glm::vec4 rayEye = invProj * clipPos;
-    // rayEye = glm::vec4(rayEye.x, rayEye.y, -1.0f, 0.0f);  // Reset z and set w=0 for direction
+    glm::mat4 invProj = glm::inverse(projMatrix);
+    glm::mat4 invView = glm::inverse(viewMatrix);
 
-    //// Transform to world space
-    // glm::vec4 rayWorld = invView * rayEye;
-    // glm::vec3 rayDir = glm::normalize(glm::vec3(rayWorld));
+    glm::vec4 rayEye = invProj * clipPos;
+    rayEye = glm::vec4(rayEye.x, rayEye.y, -1.0f, 0.0f);
 
-    //// Ray origin is the camera position
-    // glm::vec3 rayPos = camera.Position;
+    glm::vec4 rayWorld = invView * rayEye;
+    glm::vec3 rayDir = glm::normalize(glm::vec3(rayWorld));
 
-    // return {rayPos, rayDir};
+    glm::vec3 rayPos = cameraEntity.Transform().Translation;
+
+    return {rayPos, rayDir};
   }
 
   void Scene::OnUpdate() {
     ScanKeyPress();
 
-    // if (Cursor::WasLeftCursorPressed()) {
-    //  SceneQueryHit hit;
-    //  auto [origin, direction] = CastRay(*m_SceneCamera, Cursor::GetCursorPosition().x, Cursor::GetCursorPosition().y);
-    //  RayCastInfo info;
-    //  info.Origin = origin;
-    //  info.Direction = direction;
-    //  info.MaxDistance = 1000;
+    if (Cursor::WasLeftCursorPressed()) {
+      SceneQueryHit hit;
+      auto camera = GetMainCameraEntity();
+      auto [origin, direction] = CastRay(camera, Cursor::GetCursorPosition().x, Cursor::GetCursorPosition().y);
+      RayCastInfo info;
+      info.Origin = origin;
+      info.Direction = direction;
+      info.MaxDistance = 1000;
 
-    //  if (m_PhysicsScene->CastRay(&info, hit)) {
-    //    RN_LOG("Success Entity {}", hit.HitEntity);
-    //    Select = hit.HitEntity;
-    //  }
-    //}
+      if (m_PhysicsScene->CastRay(&info, hit)) {
+        RN_LOG("Success Entity {}", hit.HitEntity);
+        Select = hit.HitEntity;
+      }
+    }
 
     m_PhysicsScene->Update(1.0f / 60.0);
     Cursor::Update();
@@ -205,36 +202,6 @@ namespace Rain {
     return selectedNode;
   }
 
-  // void Scene::OnRender(Ref<SceneRenderer> renderer) {
-  //   RN_PROFILE_FUNC;
-  //   renderer->SetScene(this);
-
-  //  static float w = Application::Get()->GetWindowSize().x;
-  //  static float h = Application::Get()->GetWindowSize().y;
-
-  //  static auto projectionMatrix = glm::perspectiveFov(glm::radians(55.0f), w, h, 0.10f, 1400.0f);
-
-  //  renderer->BeginScene({m_SceneCamera->GetViewMatrix(), projectionMatrix, 0.10, 1400.0f});
-
-  //  static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
-  //  drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent) {
-  //    Entity e = Entity(entity, this);
-  //    Ref<MeshSource> meshSource = Rain::ResourceManager::GetMeshSource(meshComponent.MeshSourceId);
-  //    glm::mat4 entityTransform = GetWorldSpaceTransformMatrix(e);
-
-  //    renderer->SubmitMesh(meshSource, meshComponent.SubMeshId, meshComponent.Materials, entityTransform);
-  //  });
-
-  //  static flecs::query<TransformComponent, DirectionalLightComponent> lightsQuery = m_World.query<TransformComponent, DirectionalLightComponent>();
-  //  lightsQuery.each([&](flecs::entity entity, TransformComponent& transform, DirectionalLightComponent& directionalLight) {
-  //    // SceneLightInfo.LightDirection = glm::normalize(glm::mat3(transform.GetTransform()) * glm::vec3(1.0f));
-  //    SceneLightInfo.LightDirection = glm::normalize(glm::mat3(transform.GetTransform()) * glm::vec3(0.0f, 0.0f, -1.0f));
-  //    SceneLightInfo.LightPos = glm::vec3(0.0f);
-  //  });
-
-  //  renderer->EndScene();
-  //}
-
   Entity Scene::GetMainCameraEntity() {
     flecs::entity e = m_World.query_builder<CameraComponent>().build().first();
     if (e) {
@@ -254,85 +221,8 @@ namespace Rain {
 
     static float w = Application::Get()->GetWindowSize().x;
     static float h = Application::Get()->GetWindowSize().y;
-
     camera.SetPerspectiveProjectionMatrix(glm::radians(55.0f), w, h, 0.10f, far);
-
-    static float parallaxOffsetX = 0.0f;
-    static float parallaxOffsetY = 0.0f;
-    static float screenDistance = 10.0f;
-    static bool useCameraOrbit = true;
-    static bool useAsymmetricProjection = true;
-
-    static float maxOrbitAngle = 45.0f;
-
-    auto createParallaxProjection = [&](float offsetX, float offsetY) -> glm::mat4 {
-      float fov = glm::radians(55.0f);
-      float aspect = w / h;
-      float near = 0.10f;
-      float far = 1400.0f;
-
-      float top = near * tan(fov * 0.5f);
-      float bottom = -top;
-      float right = top * aspect;
-      float left = -right;
-
-      float parallaxX = offsetX * near / screenDistance;
-      float parallaxY = offsetY * near / screenDistance;
-
-      left += parallaxX;
-      right += parallaxX;
-      bottom += parallaxY;
-      top += parallaxY;
-
-      return glm::frustum(left, right, bottom, top, near, far);
-    };
-
-    glm::mat4 projectionMatrix;
-    if (useAsymmetricProjection) {
-      projectionMatrix = createParallaxProjection(parallaxOffsetX, parallaxOffsetY);
-    } else {
-      projectionMatrix = camera.GetProjectionMatrix();
-    }
-
-    glm::mat4 viewMatrix;
-    if (useCameraOrbit) {
-      glm::mat4 originalView = cameraViewMatrix;
-      glm::mat4 invView = glm::inverse(originalView);
-      glm::vec3 originalCameraPos = glm::vec3(invView[3]);
-      glm::vec3 originalForward = -glm::vec3(invView[2]);
-      glm::vec3 originalUp = glm::vec3(invView[1]);
-      glm::vec3 originalRight = glm::vec3(invView[0]);
-
-      float yawAngle = (parallaxOffsetX / 50.0f) * glm::radians(maxOrbitAngle);
-
-      // Apply yaw rotation (around up vector) to forward direction
-      glm::mat4 yawRotation = glm::rotate(glm::mat4(1.0f), yawAngle, originalUp);
-      glm::vec3 rotatedForward = glm::vec3(yawRotation * glm::vec4(originalForward, 0.0f));
-      glm::vec3 rotatedRight = glm::vec3(yawRotation * glm::vec4(originalRight, 0.0f));
-
-      // === Y LOGIC - SIMPLIFIED AND FIXED ===
-      glm::vec3 finalCameraPos = originalCameraPos;
-
-      // Always start with X logic for target (preserves working X behavior)
-      float lookDistance = 100.0f;
-      glm::vec3 finalTarget = originalCameraPos + rotatedForward * lookDistance;
-
-      // Original camera position offset for enhanced parallax (X logic)
-      float cameraOffsetStrength = 2.0f;
-      glm::vec3 cameraOffset =
-          rotatedRight * (parallaxOffsetX * cameraOffsetStrength * 0.1f) +
-          originalUp * (parallaxOffsetY * cameraOffsetStrength * 0.1f);
-
-      finalCameraPos += cameraOffset;
-
-      // Create view matrix
-      viewMatrix = glm::lookAt(finalCameraPos, finalTarget, originalUp);
-    } else {
-      // Use original view matrix
-      viewMatrix = cameraViewMatrix;
-    }
-
-    renderer->BeginScene({viewMatrix, projectionMatrix, 0.10, far});
+    renderer->BeginScene({cameraViewMatrix, camera.GetProjectionMatrix(), 10.0f, far});
 
     static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
     drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent) {
@@ -348,43 +238,9 @@ namespace Rain {
       SceneLightInfo.LightPos = glm::vec3(0.0f);
     });
 
-    ImGui::Begin("Scene Settings");
-    ImGui::Separator();
-    ImGui::Text("3D Parallax Effect");
-
-    ImGui::Checkbox("Use Camera Orbiting", &useCameraOrbit);
-    ImGui::Checkbox("Use Asymmetric Projection", &useAsymmetricProjection);
-
-    if (!useCameraOrbit && !useAsymmetricProjection) {
-      ImGui::TextColored(ImVec4(1, 1, 0, 1), "Warning: Both effects disabled!");
-    }
-
-    ImGui::Separator();
-    ImGui::Text("Parallax Controls");
-
-    if (ImGui::SliderFloat("Screen Distance", &screenDistance, 10.0f, 500.0f)) {
-    }
-
-    if (ImGui::SliderFloat("Max Orbit Angle", &maxOrbitAngle, 10.0f, 90.0f)) {
-    }
-
-    ImGui::Text("Current Offset: (%.2f, %.2f)", parallaxOffsetX, parallaxOffsetY);
-
-    if (ImGui::Button("Reset Parallax")) {
-      parallaxOffsetX = 0.0f;
-      parallaxOffsetY = 0.0f;
-    }
-
-    ImGui::SliderFloat("Manual Offset X (Head Turn)", &parallaxOffsetX, -90.0f, 90.0f);
-    ImGui::SliderFloat("Manual Offset Y (Vertical Orbit)", &parallaxOffsetY, -90.0f, 90.0f);
-
-    glm::mat4 invView = glm::inverse(viewMatrix);
-    glm::vec3 currentCamPos = glm::vec3(invView[3]);
-    ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", currentCamPos.x, currentCamPos.y, currentCamPos.z);
-
-    ImGui::End();
     renderer->EndScene();
   }
+
   void Scene::BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh) {
     const std::vector<Ref<MeshNode>> nodes = mesh->GetNodes();
 
@@ -456,11 +312,26 @@ namespace Rain {
       transform.Translation += up * velocity;
     } else if (Keyboard::IsKeyPressing(Rain::Key::LeftShift)) {
       transform.Translation -= up * velocity;
+    } else if (Keyboard::IsKeyPressing(Rain::Key::Left)) {
+      transform.Translation.x += 0.5;
+    } else if (Keyboard::IsKeyPressing(Rain::Key::Right)) {
+      transform.Translation.x += -0.5;
+    } else if (Keyboard::IsKeyPressing(Rain::Key::Up)) {
+      transform.Translation.z += 0.5;
+    } else if (Keyboard::IsKeyPressing(Rain::Key::Down)) {
+      transform.Translation.z += -0.5;
+    } else if (Keyboard::IsKeyPressing(Rain::Key::K)) {
+      transform.Translation.y += 0.5;
+    } else if (Keyboard::IsKeyPressing(Rain::Key::J)) {
+      transform.Translation.y -= 0.5;
     } else {
       return;
     }
   }
   void Scene::OnMouseMove(double xPos, double yPos) {
+    if (!Keyboard::IsKeyPressing(Rain::Key::C)) {
+      return;
+    }
     static glm::vec2 prevCursorPos = Cursor::GetCursorPosition();
     static bool firstMouse = true;
     static float yaw = -90.0f;  // Start facing forward

@@ -38,7 +38,7 @@ namespace Rain {
     void ConvertToLocalSpace(Entity entity);
     Entity GetMainCameraEntity();
 
-    std::pair<glm::vec3, glm::vec3> CastRay(const Camera& camera, float mx, float my);
+    std::pair<glm::vec3, glm::vec3> CastRay(Entity& cameraEntity, float mx, float my);
     void OnMouseMove(double xPos, double yPos);
     void ScanKeyPress();
 

@@ -862,7 +862,6 @@ namespace Rain {
     auto commandBuffer = wgpuCommandEncoderFinish(encoder, nullptr);
     wgpuQueueSubmit(*RenderContext::GetQueue(), 1, &commandBuffer);
 
-    // Cleanup WebGPU resources
     wgpuBindGroupRelease(bindGroup);
     wgpuPipelineLayoutRelease(pipelineLayout);
     wgpuComputePipelineRelease(pipeline);

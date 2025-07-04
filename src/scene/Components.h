@@ -51,6 +51,7 @@ namespace Rain {
       return Rotation;
     }
 
+    // from: Hazel Engine TransformComponent.SetRotation
     void SetRotation(const glm::quat& quat) {
       // wrap given euler angles to range [-pi, pi]
       auto wrapToPi = [](glm::vec3 v) {

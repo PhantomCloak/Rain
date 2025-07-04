@@ -62,7 +62,7 @@ namespace Rain {
     JPH::Body* mTankBody;
     JPH::VehicleConstraint* mVehicleConstraint;
     float mForward = 0.0f;
-    float mPreviousForward = 1.0f;  ///< Keeps track of last car direction so we know when to brake and when to accelerate
+    float mPreviousForward = 1.0f;
     float mLeftRatio = 0.0f;
     float mRightRatio = 0.0f;
     float mBrake = 0.0f;

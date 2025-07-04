@@ -54,6 +54,29 @@ set(JOLT_PHYSICS_BUILD_SAMPLES OFF CACHE BOOL "Build samples" FORCE)
 set(JPH_DEBUG_RENDERER ON CACHE BOOL "Enable debug renderer" FORCE)
 set(CPP_RTTI_ENABLED ON CACHE BOOL "Enable RTTI for Jolt" FORCE)
 add_subdirectory(vendor/JoltPhysics/Build)
+
+include(ExternalProject)
+ExternalProject_Add(ShaderReflectionLib_External
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor/wgsl-reflector
+    BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/shader_reflection_external
+    CMAKE_ARGS
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+        -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+        -DBUILD_EXAMPLES=OFF
+    BUILD_ALWAYS OFF
+    INSTALL_COMMAND ""
+)
+
+# Import the library after it's built
+add_library(ShaderReflectionLib STATIC IMPORTED)
+add_dependencies(ShaderReflectionLib ShaderReflectionLib_External)
+
+ExternalProject_Get_Property(ShaderReflectionLib_External BINARY_DIR)
+set_target_properties(ShaderReflectionLib PROPERTIES
+    IMPORTED_LOCATION ${BINARY_DIR}/libShaderReflectionLib.a
+    INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/vendor/wgsl-reflector
+)
+
 target_include_directories(ReEngine PRIVATE 
     vendor/JoltPhysics
     vendor/JoltPhysics/Jolt  # Add this line - this is where the actual headers are
@@ -123,6 +146,7 @@ else()
 	TracyClient
 	glfw
 	Jolt
+	ShaderReflectionLib
 	assimp)
 endif()
 
