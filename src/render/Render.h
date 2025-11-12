@@ -48,7 +48,7 @@ namespace Rain {
 
    private:
     void RendererPostInit();
-    WGPURequiredLimits* GetRequiredLimits(WGPUAdapter adapter);
+    // WGPURequiredLimits* GetRequiredLimits(WGPUAdapter adapter);
     WGPUTextureView GetCurrentTextureView();
 
    public:

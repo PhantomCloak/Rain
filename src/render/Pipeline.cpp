@@ -203,7 +203,8 @@ namespace Rain {
     layoutDesc->bindGroupLayoutCount = bindGroupLayouts.size();
     layoutDesc->bindGroupLayouts = bindGroupLayouts.data();
     layoutDesc->nextInChain = nullptr;
-    layoutDesc->immediateDataRangeByteSize = 0;
+    layoutDesc->immediateSize = 0;
+    // layoutDesc->immediateDataRangeByteSize = 0;
     layoutDesc->label = RenderUtils::MakeLabel(m_PipelineSpec.DebugName);
 
     WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, layoutDesc);

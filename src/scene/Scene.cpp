@@ -5,23 +5,25 @@
 #include "SceneRenderer.h"
 #include "debug/Profiler.h"
 #include "glm/gtc/type_ptr.hpp"
-#include "imgui.h"
+// #include "imgui.h"
 #include "io/cursor.h"
 #include "io/keyboard.h"
 #include "physics/Physics.h"
 #include "render/ResourceManager.h"
 
-#include "ImGuizmo.h"
+// #include "ImGuizmo.h"
 
 // Jolt includes
 
-namespace Rain {
+namespace Rain
+{
   Scene* Scene::Instance = nullptr;
 
   Scene::Scene(std::string sceneName)
       : m_Name(sceneName) {}
 
-  Entity Scene::CreateEntity(std::string name) {
+  Entity Scene::CreateEntity(std::string name)
+  {
     return CreateChildEntity({}, name);
   }
 
@@ -34,7 +36,8 @@ namespace Rain {
   Entity entityCamera;
   Entity helment;
 
-  void Scene::Init() {
+  void Scene::Init()
+  {
     Instance = this;
 
     auto camera = CreateEntity("MainCamera");
@@ -56,8 +59,8 @@ namespace Rain {
     floorEntity.Transform().Translation = glm::vec3(0, 0, 0);
     floorEntity.Transform().Scale = glm::vec3(100, 1.0f, 100);
 
-    floorEntity.AddComponent<BoxColliderComponent>(glm::vec3(0), glm::vec3(100, 1, 100));
-    floorEntity.AddComponent<RigidBodyComponent>();
+    // floorEntity.AddComponent<BoxColliderComponent>(glm::vec3(0), glm::vec3(100, 1, 100));
+    // floorEntity.AddComponent<RigidBodyComponent>();
 
     BuildMeshEntityHierarchy(floorEntity, boxModel);
     BuildMeshEntityHierarchy(galata, bochii);
@@ -67,17 +70,19 @@ namespace Rain {
     light.AddComponent<DirectionalLightComponent>();
     entityIdDir = light.GetUUID();
 
-    Physics::Instance = new Physics();
-    m_PhysicsScene = Physics::Instance->CreateScene(glm::vec3(0.0, -9.8f, 0.0));
-    m_PhysicsScene->CreateBody(floorEntity);
+    // Physics::Instance = new Physics();
+    // m_PhysicsScene = Physics::Instance->CreateScene(glm::vec3(0.0, -9.8f, 0.0));
+    // m_PhysicsScene->CreateBody(floorEntity);
   }
 
-  Entity Scene::CreateChildEntity(Entity parent, std::string name) {
+  Entity Scene::CreateChildEntity(Entity parent, std::string name)
+  {
     Entity entity = Entity(m_World.entity(), this);
     uint32_t entityHandle = entity;
 
     entity.AddComponent<TransformComponent>();
-    if (!name.empty()) {
+    if (!name.empty())
+    {
       TagComponent& tagComponent = entity.AddComponent<TagComponent>();
       tagComponent.Tag = name;
     }
@@ -85,7 +90,8 @@ namespace Rain {
     IDComponent& idComponent = entity.AddComponent<IDComponent>();
     idComponent.ID = {};
 
-    if (parent) {
+    if (parent)
+    {
       entity.SetParent(parent);
     }
 
@@ -95,14 +101,17 @@ namespace Rain {
     return entity;
   }
 
-  Entity Scene::TryGetEntityWithUUID(UUID id) const {
-    if (const auto iter = m_EntityMap.find(id); iter != m_EntityMap.end()) {
+  Entity Scene::TryGetEntityWithUUID(UUID id) const
+  {
+    if (const auto iter = m_EntityMap.find(id); iter != m_EntityMap.end())
+    {
       return iter->second;
     }
     return {};
   }
 
-  std::pair<glm::vec3, glm::vec3> Scene::CastRay(Entity& cameraEntity, float mx, float my) {
+  std::pair<glm::vec3, glm::vec3> Scene::CastRay(Entity& cameraEntity, float mx, float my)
+  {
     const Camera& camera = cameraEntity.GetComponent<CameraComponent>();
     glm::mat4 cameraViewMatrix = glm::inverse(GetWorldSpaceTransformMatrix(cameraEntity));
 
@@ -131,10 +140,12 @@ namespace Rain {
     return {rayPos, rayDir};
   }
 
-  void Scene::OnUpdate() {
+  void Scene::OnUpdate()
+  {
     ScanKeyPress();
 
-    if (Cursor::WasLeftCursorPressed()) {
+    if (Cursor::WasLeftCursorPressed())
+    {
       SceneQueryHit hit;
       auto camera = GetMainCameraEntity();
       auto [origin, direction] = CastRay(camera, Cursor::GetCursorPosition().x, Cursor::GetCursorPosition().y);
@@ -143,7 +154,8 @@ namespace Rain {
       info.Direction = direction;
       info.MaxDistance = 1000;
 
-      if (m_PhysicsScene->CastRay(&info, hit)) {
+      if (m_PhysicsScene->CastRay(&info, hit))
+      {
         RN_LOG("Success Entity {}", hit.HitEntity);
         Select = hit.HitEntity;
       }
@@ -153,64 +165,69 @@ namespace Rain {
     Cursor::Update();
   }
 
-  glm::mat4 Scene::EditTransform(glm::mat4& matrix) {
+  glm::mat4 Scene::EditTransform(glm::mat4& matrix)
+  {
   }
 
-  UUID RenderNode(Entity e, Scene* scene) {
-    TagComponent tag = e.GetComponent<TagComponent>();
-    static UUID selectedNode = -1;
-    UUID currentNode = e.GetComponent<IDComponent>().ID;
-    int childCount = 0;
-    RelationshipComponent r = {};
-    bool isRempty = true;
+  UUID RenderNode(Entity e, Scene* scene)
+  {
+    // TagComponent tag = e.GetComponent<TagComponent>();
+    // static UUID selectedNode = -1;
+    // UUID currentNode = e.GetComponent<IDComponent>().ID;
+    // int childCount = 0;
+    // RelationshipComponent r = {};
+    // bool isRempty = true;
 
-    if (e.HasComponent<RelationshipComponent>()) {
-      r = e.GetComponent<RelationshipComponent>();
-      isRempty = true;
-      childCount = r.Children.size();
-    }
+    // if (e.HasComponent<RelationshipComponent>()) {
+    //   r = e.GetComponent<RelationshipComponent>();
+    //   isRempty = true;
+    //   childCount = r.Children.size();
+    // }
 
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow;
-    if (childCount == 0) {
-      flags |= ImGuiTreeNodeFlags_Leaf;
-    }
-    if (selectedNode == currentNode) {
-      flags |= ImGuiTreeNodeFlags_Selected;
-    }
+    // ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow;
+    // if (childCount == 0) {
+    //   flags |= ImGuiTreeNodeFlags_Leaf;
+    // }
+    // if (selectedNode == currentNode) {
+    //   flags |= ImGuiTreeNodeFlags_Selected;
+    // }
 
-    if (ImGui::TreeNodeEx(tag.Tag.c_str(), flags)) {
-      if (ImGui::IsItemClicked()) {
-        RN_LOG("Name: {} ID: {} C: {}", tag.Tag, (uint64_t)currentNode, (uint64_t)selectedNode);
-        selectedNode = currentNode;
-      }
+    // if (ImGui::TreeNodeEx(tag.Tag.c_str(), flags)) {
+    //   if (ImGui::IsItemClicked()) {
+    //     RN_LOG("Name: {} ID: {} C: {}", tag.Tag, (uint64_t)currentNode, (uint64_t)selectedNode);
+    //     selectedNode = currentNode;
+    //   }
 
-      // if (r != {}) {
-      if (!isRempty) {
-        if (r.Children.size() > 0) {
-          ImGui::Indent(0.5f);
-        }
+    //  // if (r != {}) {
+    //  if (!isRempty) {
+    //    if (r.Children.size() > 0) {
+    //      ImGui::Indent(0.5f);
+    //    }
 
-        for (auto child : r.Children) {
-          Entity childEntity = scene->TryGetEntityWithUUID(child);
-          RenderNode(childEntity, scene);
-        }
-      }
+    //    for (auto child : r.Children) {
+    //      Entity childEntity = scene->TryGetEntityWithUUID(child);
+    //      RenderNode(childEntity, scene);
+    //    }
+    //  }
 
-      ImGui::TreePop();
-    }
+    //  ImGui::TreePop();
+    //}
 
-    return selectedNode;
+    // return selectedNode;
   }
 
-  Entity Scene::GetMainCameraEntity() {
+  Entity Scene::GetMainCameraEntity()
+  {
     flecs::entity e = m_World.query_builder<CameraComponent>().build().first();
-    if (e) {
+    if (e)
+    {
       return Entity(e, this);
     }
     return {};
   }
 
-  void Scene::OnRender(Ref<SceneRenderer> renderer) {
+  void Scene::OnRender(Ref<SceneRenderer> renderer)
+  {
     RN_PROFILE_FUNC;
     renderer->SetScene(this);
 
@@ -225,27 +242,30 @@ namespace Rain {
     renderer->BeginScene({cameraViewMatrix, camera.GetProjectionMatrix(), 10.0f, far});
 
     static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
-    drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent) {
+    drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent)
+                       {
       Entity e = Entity(entity, this);
       Ref<MeshSource> meshSource = Rain::ResourceManager::GetMeshSource(meshComponent.MeshSourceId);
       glm::mat4 entityTransform = GetWorldSpaceTransformMatrix(e);
-      renderer->SubmitMesh(meshSource, meshComponent.SubMeshId, meshComponent.Materials, entityTransform);
-    });
+      renderer->SubmitMesh(meshSource, meshComponent.SubMeshId, meshComponent.Materials, entityTransform); });
 
     static flecs::query<TransformComponent, DirectionalLightComponent> lightsQuery = m_World.query<TransformComponent, DirectionalLightComponent>();
-    lightsQuery.each([&](flecs::entity entity, TransformComponent& transform, DirectionalLightComponent& directionalLight) {
+    lightsQuery.each([&](flecs::entity entity, TransformComponent& transform, DirectionalLightComponent& directionalLight)
+                     {
       SceneLightInfo.LightDirection = glm::normalize(glm::mat3(transform.GetTransform()) * glm::vec3(0.0f, 0.0f, -1.0f));
-      SceneLightInfo.LightPos = glm::vec3(0.0f);
-    });
+      SceneLightInfo.LightPos = glm::vec3(0.0f); });
 
     renderer->EndScene();
   }
 
-  void Scene::BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh) {
+  void Scene::BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh)
+  {
     const std::vector<Ref<MeshNode>> nodes = mesh->GetNodes();
 
-    for (const Ref<MeshNode> node : mesh->GetNodes()) {
-      if (node->IsRoot() && mesh->m_SubMeshes[node->SubMeshId].VertexCount == 0) {
+    for (const Ref<MeshNode> node : mesh->GetNodes())
+    {
+      if (node->IsRoot() && mesh->m_SubMeshes[node->SubMeshId].VertexCount == 0)
+      {
         continue;
       }
       Entity nodeEntity = CreateChildEntity(parent, node->Name);
@@ -258,21 +278,25 @@ namespace Rain {
     }
   }
 
-  glm::mat4 Scene::GetWorldSpaceTransformMatrix(Entity entity) {
+  glm::mat4 Scene::GetWorldSpaceTransformMatrix(Entity entity)
+  {
     glm::mat4 transform = glm::identity<glm::mat4>();
 
     Entity parent = TryGetEntityWithUUID(entity.GetParentUUID());
-    if (parent) {
+    if (parent)
+    {
       transform = GetWorldSpaceTransformMatrix(parent);
     }
 
     return transform * entity.GetComponent<TransformComponent>().GetTransform();
   }
 
-  void Scene::ConvertToLocalSpace(Entity entity) {
+  void Scene::ConvertToLocalSpace(Entity entity)
+  {
     Entity parent = TryGetEntityWithUUID(entity.GetParentUUID());
 
-    if (!parent) {
+    if (!parent)
+    {
       return;
     }
 
@@ -282,14 +306,16 @@ namespace Rain {
     transform.SetTransform(localTransform);
   }
 
-  TransformComponent Scene::GetWorldSpaceTransform(Entity entity) {
+  TransformComponent Scene::GetWorldSpaceTransform(Entity entity)
+  {
     glm::mat4 transform = GetWorldSpaceTransformMatrix(entity);
     TransformComponent transformComponent;
     transformComponent.SetTransform(transform);
     return transformComponent;
   }
 
-  void Scene::ScanKeyPress() {
+  void Scene::ScanKeyPress()
+  {
     float velocity = 0.55f;
 
     Entity camera = GetMainCameraEntity();
@@ -300,51 +326,76 @@ namespace Rain {
     glm::vec3 right = glm::vec3(rotationMatrix[0]);   // Right (positive X)
     glm::vec3 up = glm::vec3(rotationMatrix[1]);      // Up (positive Y)
 
-    if (Keyboard::IsKeyPressing(Rain::Key::W)) {
+    if (Keyboard::IsKeyPressing(Rain::Key::W))
+    {
       transform.Translation += front * velocity;
-    } else if (Keyboard::IsKeyPressing(Rain::Key::S)) {
+    }
+    else if (Keyboard::IsKeyPressing(Rain::Key::S))
+    {
       transform.Translation -= front * velocity;
-    } else if (Keyboard::IsKeyPressing(Rain::Key::A)) {
+    }
+    else if (Keyboard::IsKeyPressing(Rain::Key::A))
+    {
       transform.Translation -= right * velocity;
-    } else if (Keyboard::IsKeyPressing(Rain::Key::D)) {
+    }
+    else if (Keyboard::IsKeyPressing(Rain::Key::D))
+    {
       transform.Translation += right * velocity;
-    } else if (Keyboard::IsKeyPressing(Rain::Key::Space)) {
+    }
+    else if (Keyboard::IsKeyPressing(Rain::Key::Space))
+    {
       transform.Translation += up * velocity;
-    } else if (Keyboard::IsKeyPressing(Rain::Key::LeftShift)) {
+    }
+    else if (Keyboard::IsKeyPressing(Rain::Key::LeftShift))
+    {
       transform.Translation -= up * velocity;
-    } else if (Keyboard::IsKeyPressing(Rain::Key::Left)) {
+    }
+    else if (Keyboard::IsKeyPressing(Rain::Key::Left))
+    {
       transform.Translation.x += 0.5;
-    } else if (Keyboard::IsKeyPressing(Rain::Key::Right)) {
+    }
+    else if (Keyboard::IsKeyPressing(Rain::Key::Right))
+    {
       transform.Translation.x += -0.5;
-    } else if (Keyboard::IsKeyPressing(Rain::Key::Up)) {
+    }
+    else if (Keyboard::IsKeyPressing(Rain::Key::Up))
+    {
       transform.Translation.z += 0.5;
-    } else if (Keyboard::IsKeyPressing(Rain::Key::Down)) {
+    }
+    else if (Keyboard::IsKeyPressing(Rain::Key::Down))
+    {
       transform.Translation.z += -0.5;
-    } else if (Keyboard::IsKeyPressing(Rain::Key::K)) {
+    }
+    else if (Keyboard::IsKeyPressing(Rain::Key::K))
+    {
       transform.Translation.y += 0.5;
-    } else if (Keyboard::IsKeyPressing(Rain::Key::J)) {
+    }
+    else if (Keyboard::IsKeyPressing(Rain::Key::J))
+    {
       transform.Translation.y -= 0.5;
-    } else {
+    }
+    else
+    {
       return;
     }
   }
-  void Scene::OnMouseMove(double xPos, double yPos) {
-    if (!Keyboard::IsKeyPressing(Rain::Key::C)) {
-      return;
-    }
+  void Scene::OnMouseMove(double xPos, double yPos)
+  {
     static glm::vec2 prevCursorPos = Cursor::GetCursorPosition();
     static bool firstMouse = true;
     static float yaw = -90.0f;  // Start facing forward
     static float pitch = 0.0f;
 
-    if (!Cursor::IsMouseCaptured()) {
+    if (!Cursor::IsMouseCaptured())
+    {
       firstMouse = true;
       return;
     }
 
     glm::vec2 cursorPos = glm::vec2(xPos, yPos);
 
-    if (firstMouse) {
+    if (firstMouse)
+    {
       prevCursorPos = cursorPos;
       firstMouse = false;
       return;

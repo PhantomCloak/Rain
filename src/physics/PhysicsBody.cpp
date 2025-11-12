@@ -17,85 +17,106 @@
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Physics/Collision/GroupFilterTable.h>
 
-namespace Rain {
-  PhysicsBody::PhysicsBody(JPH::BodyInterface& bodyInterface, Entity entity) {
+namespace Rain
+{
+  PhysicsBody::PhysicsBody(JPH::BodyInterface& bodyInterface, Entity entity)
+  {
     const RigidBodyComponent& rigidBodyComponent = entity.GetComponent<RigidBodyComponent>();
     m_Entity = entity;
 
-    switch (rigidBodyComponent.BodyType) {
-      case EBodyType::Static: {
+    switch (rigidBodyComponent.BodyType)
+    {
+      case EBodyType::Static:
+      {
         CreateStaticBody(bodyInterface);
         break;
       }
-      case EBodyType::Dynamic: {
+      case EBodyType::Dynamic:
+      {
         CreateDynamicBody(bodyInterface);
         break;
       }
     }
   }
 
-  glm::vec3 PhysicsBody::GetTranslation() const {
+  glm::vec3 PhysicsBody::GetTranslation() const
+  {
     return PhysicsUtils::FromJoltVector(PhysicsScene::GetBodyInterface().GetPosition(m_BodyID));
   }
 
-  glm::quat PhysicsBody::GetRotation() const {
+  glm::quat PhysicsBody::GetRotation() const
+  {
     return PhysicsUtils::FromJoltQuat(PhysicsScene::GetBodyInterface().GetRotation(m_BodyID));
   }
 
-  glm::vec3 PhysicsBody::GetLinearVelocity() const {
+  glm::vec3 PhysicsBody::GetLinearVelocity() const
+  {
     return PhysicsUtils::FromJoltVector(PhysicsScene::GetBodyInterface().GetLinearVelocity(m_BodyID));
   }
 
-  bool PhysicsBody::IsKinematic() const {
+  bool PhysicsBody::IsKinematic() const
+  {
     return PhysicsScene::GetBodyInterface().GetMotionType(m_BodyID) == JPH::EMotionType::Kinematic;
   }
 
-  bool PhysicsBody::IsSleeping() const {
+  bool PhysicsBody::IsSleeping() const
+  {
     JPH::BodyLockRead lock(PhysicsScene::GetBodyLockInterface(), m_BodyID);
     return !lock.GetBody().IsActive();
   }
 
-  void PhysicsBody::Activate() {
+  void PhysicsBody::Activate()
+  {
     return PhysicsScene::GetBodyInterface().ActivateBody(m_BodyID);
   }
 
-  void PhysicsBody::MoveKinematic(const glm::vec3& targetPosition, const glm::quat& targetRotation, float deltaSeconds) {
+  void PhysicsBody::MoveKinematic(const glm::vec3& targetPosition, const glm::quat& targetRotation, float deltaSeconds)
+  {
     JPH::BodyLockWrite bodyLock(PhysicsScene::GetBodyLockInterface(), m_BodyID);
 
     JPH::Body& body = bodyLock.GetBody();
 
-    if (body.GetMotionType() != JPH::EMotionType::Kinematic) {
+    if (body.GetMotionType() != JPH::EMotionType::Kinematic)
+    {
       return;
     }
 
     body.MoveKinematic(PhysicsUtils::ToJoltVector(targetPosition), PhysicsUtils::ToJoltQuat(targetRotation), deltaSeconds);
   }
 
-  void PhysicsBody::SetSleepState(bool inSleep) {
+  void PhysicsBody::SetSleepState(bool inSleep)
+  {
     JPH::BodyLockWrite lock(PhysicsScene::GetBodyLockInterface(), m_BodyID);
 
-    if (!lock.Succeeded()) {
+    if (!lock.Succeeded())
+    {
       return;
     }
 
     auto& body = lock.GetBody();
 
-    if (inSleep) {
+    if (inSleep)
+    {
       PhysicsScene::GetBodyInterface(false).DeactivateBody(m_BodyID);
-    } else if (body.IsInBroadPhase()) {
+    }
+    else if (body.IsInBroadPhase())
+    {
       PhysicsScene::GetBodyInterface(false).ActivateBody(m_BodyID);
     }
   }
 
-  void PhysicsBody::Update() {
+  void PhysicsBody::Update()
+  {
     PhysicsScene::MarkForSynchronization(this);
   }
 
-  void PhysicsBody::SetTranslation(const glm::vec3& translation) {
+  void PhysicsBody::SetTranslation(const glm::vec3& translation)
+  {
     JPH::BodyLockWrite bodyLock(PhysicsScene::GetBodyLockInterface(), m_BodyID);
     JPH::Body& body = bodyLock.GetBody();
 
-    if (!body.IsStatic()) {
+    if (!body.IsStatic())
+    {
       return;
     }
 
@@ -104,22 +125,24 @@ namespace Rain {
     PhysicsScene::MarkForSynchronization(this);
   }
 
-  void PhysicsBody::CreateCollisionShapesForEntity(Entity entity) {
-    if (entity.HasComponent<BoxColliderComponent>()) {
-      BoxColliderComponent& collider = entity.GetComponent<BoxColliderComponent>();
+  void PhysicsBody::CreateCollisionShapesForEntity(Entity entity)
+  {
+    // if (entity.HasComponent<BoxColliderComponent>()) {
+    //   BoxColliderComponent& collider = entity.GetComponent<BoxColliderComponent>();
 
-      if (collider.Offset != glm::vec3(0.0)) {
-        m_Shape = JPH::OffsetCenterOfMassShapeSettings(PhysicsUtils::ToJoltVector(collider.Offset), new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider.Size))).Create().Get();
-      } else {
-        m_Shape = new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider.Size));
-      }
-    } else if (entity.HasComponent<CylinderCollider>()) {
-      CylinderCollider& collider = entity.GetComponent<CylinderCollider>();
-      m_Shape = new JPH::CylinderShape(collider.Size.x, collider.Size.y);
-    }
+    //  if (collider.Offset != glm::vec3(0.0)) {
+    //    m_Shape = JPH::OffsetCenterOfMassShapeSettings(PhysicsUtils::ToJoltVector(collider.Offset), new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider.Size))).Create().Get();
+    //  } else {
+    //    m_Shape = new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider.Size));
+    //  }
+    //} else if (entity.HasComponent<CylinderCollider>()) {
+    //  CylinderCollider& collider = entity.GetComponent<CylinderCollider>();
+    //  m_Shape = new JPH::CylinderShape(collider.Size.x, collider.Size.y);
+    //}
   }
 
-  void PhysicsBody::CreateDynamicBody(JPH::BodyInterface& bodyInterface) {
+  void PhysicsBody::CreateDynamicBody(JPH::BodyInterface& bodyInterface)
+  {
     auto worldTransform = Scene::Instance->GetWorldSpaceTransform(m_Entity);
     const RigidBodyComponent& rigidBodyComponent = m_Entity.GetComponent<RigidBodyComponent>();
 
@@ -148,13 +171,15 @@ namespace Rain {
     bodySettings.mMotionQuality = JPH::EMotionQuality::Discrete;
     // bodySettings.mAllowSleeping = true;
 
-    if (rigidBodyComponent.Mass != 1.0f) {
+    if (rigidBodyComponent.Mass != 1.0f)
+    {
       bodySettings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
       bodySettings.mMassPropertiesOverride.mMass = rigidBodyComponent.Mass;
     }
 
     JPH::Body* body = bodyInterface.CreateBody(bodySettings);
-    if (body == nullptr) {
+    if (body == nullptr)
+    {
       return;
     }
 
@@ -162,7 +187,8 @@ namespace Rain {
     m_BodyID = body->GetID();
   }
 
-  void PhysicsBody::CreateStaticBody(JPH::BodyInterface& bodyInterface) {
+  void PhysicsBody::CreateStaticBody(JPH::BodyInterface& bodyInterface)
+  {
     auto worldTransform = Scene::Instance->GetWorldSpaceTransform(m_Entity);
     const auto& rigidBodyComponent = m_Entity.GetComponent<RigidBodyComponent>();
 
@@ -181,7 +207,8 @@ namespace Rain {
     bodySettings.mAllowSleeping = false;
 
     JPH::Body* body = bodyInterface.CreateBody(bodySettings);
-    if (body == nullptr) {
+    if (body == nullptr)
+    {
       return;
     }
 

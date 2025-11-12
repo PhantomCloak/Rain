@@ -2,261 +2,272 @@
 #include <iostream>
 #include "render/RenderUtils.h"
 
-// #include "src/tint/api/tint.h"
-#include "core/Log.h"
+#include "render/RenderContext.h"
+#include "src/tint/lang/core/type/array.h"
+#include "src/tint/lang/core/type/i32.h"
+#include "src/tint/lang/core/type/u32.h"
+#include "src/tint/lang/core/type/f32.h"
+#include "src/tint/lang/core/type/matrix.h"
+#include "src/tint/lang/core/type/texture.h"
 #include "src/tint/lang/core/type/storage_texture.h"
+#include "src/tint/lang/core/type/sampled_texture.h"
+#include "src/tint/lang/core/type/multisampled_texture.h"
 #include "src/tint/lang/wgsl/inspector/inspector.h"
 #include "src/tint/lang/wgsl/reader/reader.h"
-
-#include <tint.h>
-
-#include "render/RenderContext.h"
 #include "src/tint/lang/core/type/depth_texture.h"
 #include "src/tint/lang/wgsl/ast/identifier.h"
 #include "src/tint/lang/wgsl/ast/module.h"
 #include "src/tint/lang/wgsl/sem/function.h"
-#include "ShaderReflection.h"
 
-namespace Rain {
+namespace Rain
+{
   std::map<std::string, Ref<Shader>> ShaderManager::m_Shaders;
-
-  WGPUTextureSampleType GetSampleType(tint::inspector::ResourceBinding::SampledKind kind) {
-    switch (kind) {
-      case tint::inspector::ResourceBinding::SampledKind::kFloat:
-        return WGPUTextureSampleType_Float;
-      case tint::inspector::ResourceBinding::SampledKind::kUInt:
-        return WGPUTextureSampleType_Uint;
-      case tint::inspector::ResourceBinding::SampledKind::kSInt:
-        return WGPUTextureSampleType_Sint;
-      case tint::inspector::ResourceBinding::SampledKind::kUnknown:
-        return WGPUTextureSampleType_Undefined;
-    }
-  }
-
-  WGPUTextureViewDimension GetDimensionType(tint::inspector::ResourceBinding::TextureDimension type) {
-    switch (type) {
-      case tint::inspector::ResourceBinding::TextureDimension::k1d:
+  WGPUTextureViewDimension GetDimensionType(tint::core::type::TextureDimension type)
+  {
+    switch (type)
+    {
+      case tint::core::type::TextureDimension::k1d:
         return WGPUTextureViewDimension_1D;
-      case tint::inspector::ResourceBinding::TextureDimension::k2d:
+      case tint::core::type::TextureDimension::k2d:
         return WGPUTextureViewDimension_2D;
-      case tint::inspector::ResourceBinding::TextureDimension::k2dArray:
+      case tint::core::type::TextureDimension::k2dArray:
         return WGPUTextureViewDimension_2DArray;
-      case tint::inspector::ResourceBinding::TextureDimension::k3d:
+      case tint::core::type::TextureDimension::k3d:
         return WGPUTextureViewDimension_3D;
-      case tint::inspector::ResourceBinding::TextureDimension::kCube:
+      case tint::core::type::TextureDimension::kCube:
         return WGPUTextureViewDimension_Cube;
-      case tint::inspector::ResourceBinding::TextureDimension::kCubeArray:
+      case tint::core::type::TextureDimension::kCubeArray:
         return WGPUTextureViewDimension_CubeArray;
-      case tint::inspector::ResourceBinding::TextureDimension::kNone:
+      case tint::core::type::TextureDimension::kNone:
         return WGPUTextureViewDimension_Undefined;
         break;
     }
   }
 
-  WGPUTextureFormat GetImageFormat(tint::inspector::ResourceBinding::TexelFormat type) {
-    switch (type) {
-      case tint::inspector::ResourceBinding::TexelFormat::kRgba8Unorm:
-        return WGPUTextureFormat_RGBA8Unorm;
-      case tint::inspector::ResourceBinding::TexelFormat::kRgba32Float:
-        return WGPUTextureFormat_RGBA32Float;
-      case tint::inspector::ResourceBinding::TexelFormat::kRgba16Float:
-        return WGPUTextureFormat_RGBA16Float;
-        break;
+  static void GetTextureReflectionInfo(const tint::core::type::Texture* tex, WGPUTextureFormat& outFormat, WGPUTextureViewDimension& outDimension, WGPUTextureSampleType& outSampleType, BindingType& outTextureBindingType)
+  {
+    outFormat = WGPUTextureFormat_Undefined;
+    outDimension = WGPUTextureViewDimension_Undefined;
+    outSampleType = WGPUTextureSampleType_Undefined;
+    outTextureBindingType = BindingType::TextureBindingType;
+
+    if (!tex)
+    {
+      return;
+    }
+
+    if (const auto* st = tex->As<tint::core::type::StorageTexture>())
+    {
+      switch (st->TexelFormat())
+      {
+        case tint::core::TexelFormat::kRgba8Unorm:
+          outFormat = WGPUTextureFormat_RGBA8Unorm;
+          break;
+        case tint::core::TexelFormat::kRgba16Float:
+          outFormat = WGPUTextureFormat_RGBA16Float;
+          break;
+        case tint::core::TexelFormat::kRgba32Float:
+          outFormat = WGPUTextureFormat_RGBA32Float;
+          break;
+        default:
+          break;
+      }
+    }
+
+    outDimension = GetDimensionType(tex->Dim());
+
+    const tint::core::type::Type* BaseSampledTypePtr = nullptr;
+    if (const auto* sampledTexture = tex->As<tint::core::type::SampledTexture>())
+    {
+      BaseSampledTypePtr = sampledTexture->Type();
+    }
+    else if (const auto* multisampledTexture = tex->As<tint::core::type::MultisampledTexture>())
+    {
+      BaseSampledTypePtr = multisampledTexture->Type();
+    }
+    else if (const auto* storageTexture = tex->As<tint::core::type::StorageTexture>())
+    {
+      BaseSampledTypePtr = storageTexture->Type();
+      outTextureBindingType = BindingType::StorageBindingType;
+    }
+    else if (const auto* depthTexture = tex->As<tint::core::type::DepthTexture>())
+    {
+      outTextureBindingType = BindingType::TextureDepthBindingType;
+    }
+
+    if (BaseSampledTypePtr)
+    {
+      if (const auto* a = BaseSampledTypePtr->As<tint::core::type::Array>())
+      {
+        BaseSampledTypePtr = a->ElemType();
+      }
+      else if (const auto* mat = BaseSampledTypePtr->As<tint::core::type::Matrix>())
+      {
+        BaseSampledTypePtr = mat->Type();
+      }
+      else if (const auto* v = BaseSampledTypePtr->As<tint::core::type::Vector>())
+      {
+        BaseSampledTypePtr = v->Type();
+      }
+
+      if (BaseSampledTypePtr->Is<tint::core::type::F32>())
+      {
+        outSampleType = WGPUTextureSampleType_Float;
+      }
+      else if (BaseSampledTypePtr->Is<tint::core::type::U32>())
+      {
+        outSampleType = WGPUTextureSampleType_Uint;
+      }
+      else if (BaseSampledTypePtr->Is<tint::core::type::I32>())
+      {
+        outSampleType = WGPUTextureSampleType_Sint;
+      }
     }
   }
 
-  ShaderReflectionInfo ReflectShader(Ref<Shader> shader) {
+  ShaderReflectionInfo ReflectShader(Ref<Shader> shader)
+  {
     ShaderReflectionInfo reflectionInfo;
+
     tint::wgsl::reader::Options options;
     options.allowed_features = {};
 
-    //tint::Source::File* file = new tint::Source::File(shader->GetName(), shader->GetSource());
-    //tint::Program program = tint::wgsl::reader::Parse(file, options);
+    tint::Source::File* file = new tint::Source::File(shader->GetName(), shader->GetSource());
+    tint::Program program = tint::wgsl::reader::Parse(file, options);
 
-    ShaderReflector reflector;
-    auto info = reflector.GetShaderReflectionInfo("test_shader", shader->GetSource());
-
-    //if (program.Diagnostics().ContainsErrors()) {
-    //  RN_LOG_ERR("Shader Compilation Error: {0}", program.Diagnostics().Str());
-    //  return reflectionInfo;
-    //}
+    if (program.Diagnostics().ContainsErrors())
+    {
+      RN_LOG_ERR("Shader Compilation Error: {0}", program.Diagnostics().Str());
+      return reflectionInfo;
+    }
 
     tint::inspector::Inspector inspector(program);
 
-    std::unordered_map<uint32_t, std::unordered_map<uint32_t, tint::inspector::ResourceBinding>> inspectorResourceBindings;
-
-    auto& userTypes = reflectionInfo.UserTypes;
+    auto& uniformTypes = reflectionInfo.UniformTypes;
     auto& resourceBindings = reflectionInfo.ResourceDeclarations;
 
-    // TODO: Check shader is valid
-    for (auto& entryPoint : inspector.GetEntryPoints()) {
-      auto textureBindings = inspector.GetSampledTextureResourceBindings(entryPoint.name);
-      auto depthTextureBindings = inspector.GetDepthTextureResourceBindings(entryPoint.name);
-      auto storageTextureBindings = inspector.GetStorageTextureResourceBindings(entryPoint.name);
+    auto alreadyAdded = [&](uint32_t group, uint32_t binding, std::string_view name)
+    {
+      for (auto& r : resourceBindings[group])
+      {
+        if (r.LocationIndex == binding && r.Name == name)
+        {
+          return true;
+        }
+      }
+      return false;
+    };
 
-      for (auto& entry : textureBindings) {
-        inspectorResourceBindings[entry.bind_group][entry.binding] = entry;
-      }
-      for (auto& entry : depthTextureBindings) {
-        inspectorResourceBindings[entry.bind_group][entry.binding] = entry;
-      }
-      for (auto& entry : storageTextureBindings) {
-        inspectorResourceBindings[entry.bind_group][entry.binding] = entry;
-      }
-    }
-
-    // TODO: If variable shared across two stage it will duplicate
-    for (auto& entryPoint : inspector.GetEntryPoints()) {
+    for (const auto& entryPoint : inspector.GetEntryPoints())
+    {
       auto* func = program.AST().Functions().Find(program.Symbols().Get(entryPoint.name));
       auto* func_sem = program.Sem().Get(func);
-
-      for (auto& ruv : func_sem->TransitivelyReferencedUniformVariables()) {
-        auto* var = ruv.first;
-        auto binding_info = ruv.second;
-        auto* unwrapped_type = var->Type()->UnwrapRef();
-
-        auto* uniformType = var->Type()->UnwrapRef()->As<tint::core::type::Struct>();
-        auto typeName = uniformType->Name().Name();
-
-        if (userTypes.find(typeName) == userTypes.end()) {
-          for (const auto& member : uniformType->Members()) {
-            auto memberName = member->Name().Name();
-            userTypes[typeName][memberName] = {
-                .Name = memberName,
-                .Type = ShaderUniformType::Int,
-                .Size = member->Size(),
-                .Offset = member->Offset()};
-          }
-        }
-
-        ResourceDeclaration info;
-        info.Type = BindingType::UniformBindingType;
-        info.Name = var->Declaration()->name->symbol.Name();
-        info.GroupIndex = binding_info.group;
-        info.LocationIndex = binding_info.binding;
-        info.Size = unwrapped_type->Size();
-
-        if (resourceBindings[info.GroupIndex].size() == 0) {
-          resourceBindings[info.GroupIndex].push_back(info);
-        }
+      if (!func_sem)
+      {
+        continue;
       }
 
-      for (auto& ruv : func_sem->TransitivelyReferencedSampledTextureVariables()) {
-        auto* var = ruv.first;
-        auto binding_info = ruv.second;
-        auto* unwrapped_type = var->Type()->UnwrapRef();
-
-        auto dec = var->Declaration();
-        ResourceDeclaration info;
-        info.Type = BindingType::TextureBindingType;
-        info.Name = var->Declaration()->name->symbol.Name();
-        info.GroupIndex = binding_info.group;
-        info.LocationIndex = binding_info.binding;
-        info.Size = unwrapped_type->Size();
-
-        resourceBindings[info.GroupIndex].push_back(info);
-      }
-
-      for (auto* global : func_sem->TransitivelyReferencedGlobals()) {
-        auto* unwrapped_type = global->Type()->UnwrapRef();
-        auto* storage_texture = unwrapped_type->As<tint::core::type::StorageTexture>();
-
-        // Only continue if the variable is a storage texture
-        if (storage_texture == nullptr) {
+      for (const auto* shaderResource : func_sem->TransitivelyReferencedGlobals())
+      {
+        const auto& bp_opt = shaderResource->Attributes().binding_point;
+        if (!bp_opt.has_value())
+        {
           continue;
         }
 
-        // Check if there is a binding point for this texture
-        if (auto bp = global->Attributes().binding_point) {
-          auto* unwrapped_type = global->Type()->UnwrapRef();
-          auto binding_info = *bp;
-          auto dec = global->Declaration();
-          ResourceDeclaration info;
-          info.Type = BindingType::StorageBindingType;
-          info.Name = global->Declaration()->name->symbol.Name();
-          info.GroupIndex = binding_info.group;
-          info.LocationIndex = binding_info.binding;
-          info.Size = unwrapped_type->Size();
+        const auto bp = *bp_opt;
+        const auto* unwrapped = shaderResource->Type()->UnwrapRef();
 
-          resourceBindings[info.GroupIndex].push_back(info);
+        ResourceDeclaration info{};
+        info.Name = shaderResource->Declaration()->name->symbol.Name();
+        info.GroupIndex = bp.group;
+        info.LocationIndex = bp.binding;
+        info.Size = unwrapped->Size();
+        info.SampleType = WGPUTextureSampleType_Undefined;
+        info.ViewDimension = WGPUTextureViewDimension_Undefined;
+        info.ImageFormat = WGPUTextureFormat_Undefined;
+
+        if (shaderResource->AddressSpace() == tint::core::AddressSpace::kUniform)
+        {
+          if (const auto* s = unwrapped->As<tint::core::type::Struct>())
+          {
+            const auto symbolName = s->Name().Name();
+            if (uniformTypes.find(symbolName) == uniformTypes.end())
+            {
+              for (const auto* m : s->Members())
+              {
+                auto name = m->Name().Name();
+                uniformTypes[symbolName][name] = {
+                    .Name = name,
+                    .Type = ShaderUniformType::Int,
+                    .Size = m->Size(),
+                    .Offset = m->Offset()};
+              }
+            }
+            info.Type = BindingType::UniformBindingType;
+            if (!alreadyAdded(info.GroupIndex, info.LocationIndex, info.Name))
+            {
+              resourceBindings[info.GroupIndex].push_back(info);
+            }
+            continue;
+          }
         }
-      }
 
-      for (auto& ruv : func_sem->TransitivelyReferencedVariablesOfType(&tint::TypeInfo::Of<tint::core::type::DepthTexture>())) {
-        auto* var = ruv.first;
-        auto binding_info = ruv.second;
-        auto* unwrapped_type = var->Type()->UnwrapRef();
+        if (const auto* Texture = unwrapped->As<tint::core::type::Texture>())
+        {
+          GetTextureReflectionInfo(Texture, info.ImageFormat, info.ViewDimension, info.SampleType, info.Type);
 
-        auto dec = var->Declaration();
-        ResourceDeclaration info;
-        info.Type = BindingType::TextureDepthBindingType;
-        info.Name = var->Declaration()->name->symbol.Name();
-        info.GroupIndex = binding_info.group;
-        info.LocationIndex = binding_info.binding;
-        info.Size = unwrapped_type->Size();
+          if (!alreadyAdded(info.GroupIndex, info.LocationIndex, info.Name))
+          {
+            resourceBindings[info.GroupIndex].push_back(info);
+          }
+          continue;
+        }
 
-        resourceBindings[info.GroupIndex].push_back(info);
-      }
-
-      for (auto& ruv : func_sem->TransitivelyReferencedSamplerVariables()) {
-        auto* var = ruv.first;
-        auto binding_info = ruv.second;
-        auto* unwrapped_type = var->Type()->UnwrapRef();
-
-        ResourceDeclaration info;
-        info.Type = BindingType::SamplerBindingType;
-        info.Name = var->Declaration()->name->symbol.Name();
-        info.GroupIndex = binding_info.group;
-        info.LocationIndex = binding_info.binding;
-        info.Size = unwrapped_type->Size();
-
-        resourceBindings[info.GroupIndex].push_back(info);
-      }
-
-      for (auto& ruv : func_sem->TransitivelyReferencedComparisonSamplerVariables()) {
-        auto* var = ruv.first;
-        auto binding_info = ruv.second;
-        auto* unwrapped_type = var->Type()->UnwrapRef();
-
-        ResourceDeclaration info;
-        info.Type = BindingType::CompareSamplerBindingType;
-        info.Name = var->Declaration()->name->symbol.Name();
-        info.GroupIndex = binding_info.group;
-        info.LocationIndex = binding_info.binding;
-        info.Size = unwrapped_type->Size();
-
-        resourceBindings[info.GroupIndex].push_back(info);
+        if (const auto* samp = unwrapped->As<tint::core::type::Sampler>())
+        {
+          info.Type = (samp->Kind() == tint::core::type::SamplerKind::kComparisonSampler)
+                          ? BindingType::CompareSamplerBindingType
+                          : BindingType::SamplerBindingType;
+          if (!alreadyAdded(info.GroupIndex, info.LocationIndex, info.Name))
+          {
+            resourceBindings[info.GroupIndex].push_back(info);
+          }
+        }
       }
     }
 
-    for (auto& [groupIndex, entries] : resourceBindings) {
+    for (auto& [groupIndex, entries] : resourceBindings)
+    {
       std::vector<WGPUBindGroupLayoutEntry> layoutEntries;
-      std::sort(entries.begin(), entries.end(), [&](const ResourceDeclaration& current, const ResourceDeclaration& second) {
-        return current.LocationIndex < second.LocationIndex;
-      });
+      std::sort(entries.begin(), entries.end(), [&](const ResourceDeclaration& current, const ResourceDeclaration& second)
+                { return current.LocationIndex < second.LocationIndex; });
 
-      for (const auto& entry : entries) {
+      for (const auto& entry : entries)
+      {
         WGPUBindGroupLayoutEntry groupEntry = {};
         groupEntry.binding = entry.LocationIndex;
         groupEntry.nextInChain = nullptr;
 
-        switch (entry.Type) {
+        switch (entry.Type)
+        {
           case UniformBindingType:
             groupEntry.buffer.type = WGPUBufferBindingType_Uniform;
 
             groupEntry.buffer.hasDynamicOffset = !entry.Name.empty() && entry.Name[0] == 'u' && entry.Name[1] == 'd';
             groupEntry.buffer.nextInChain = nullptr;
             groupEntry.buffer.minBindingSize = 0;
+
             groupEntry.visibility = WGPUShaderStage_Fragment | WGPUShaderStage_Vertex | WGPUShaderStage_Compute;
             break;
           case TextureBindingType:
-            groupEntry.texture.sampleType = GetSampleType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].sampled_kind);
-            groupEntry.texture.viewDimension = GetDimensionType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].dim);
+            groupEntry.texture.sampleType = entry.SampleType;
+            groupEntry.texture.viewDimension = entry.ViewDimension;
             groupEntry.visibility = WGPUShaderStage_Fragment | WGPUShaderStage_Compute;
             break;
           case TextureDepthBindingType:
             groupEntry.texture.sampleType = WGPUTextureSampleType_Depth;
-            groupEntry.texture.viewDimension = GetDimensionType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].dim);
+            groupEntry.texture.viewDimension = entry.ViewDimension;
             groupEntry.visibility = WGPUShaderStage_Fragment;
             break;
           case SamplerBindingType:
@@ -268,13 +279,9 @@ namespace Rain {
             groupEntry.visibility = WGPUShaderStage_Fragment;
             break;
           case StorageBindingType:
-            auto v = inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].image_format;
             groupEntry.storageTexture.access = WGPUStorageTextureAccess_WriteOnly;
-            groupEntry.storageTexture.format = GetImageFormat(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].image_format);
-            groupEntry.storageTexture.viewDimension = GetDimensionType(inspectorResourceBindings[entry.GroupIndex][entry.LocationIndex].dim);
-
-            // groupEntry.storageTexture.format = WGPUTextureFormat_RGBA8Unorm;
-            //  groupEntry.storageTexture.viewDimension = WGPUTextureViewDimension_2D;
+            groupEntry.storageTexture.format = entry.ImageFormat;
+            groupEntry.storageTexture.viewDimension = entry.ViewDimension;
 
             groupEntry.visibility = WGPUShaderStage_Compute;
             break;
@@ -299,7 +306,8 @@ namespace Rain {
   }
 
   Ref<Shader> ShaderManager::LoadShader(const std::string& shaderId,
-                                        const std::string& shaderPath) {
+                                        const std::string& shaderPath)
+  {
     Ref<Shader> shader = Shader::Create(shaderId, shaderPath);
     auto reflectionInfo = ReflectShader(shader);
 
@@ -310,7 +318,8 @@ namespace Rain {
   };
 
   Ref<Shader> ShaderManager::LoadShaderFromString(const std::string& shaderId,
-                                                  const std::string& shaderStr) {
+                                                  const std::string& shaderStr)
+  {
     Ref<Shader> shader = Shader::CreateFromSring(shaderId, shaderStr);
     auto reflectionInfo = ReflectShader(shader);
 
@@ -320,8 +329,10 @@ namespace Rain {
     return shader;
   };
 
-  Ref<Shader> ShaderManager::GetShader(const std::string& shaderId) {
-    if (m_Shaders.find(shaderId) == m_Shaders.end()) {
+  Ref<Shader> ShaderManager::GetShader(const std::string& shaderId)
+  {
+    if (m_Shaders.find(shaderId) == m_Shaders.end())
+    {
       std::cout << "cannot find the shader";
       return nullptr;
     }

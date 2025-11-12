@@ -27,23 +27,23 @@ namespace Rain {
   std::unordered_map<AssetHandle, Ref<MeshSource>> Rain::ResourceManager::m_LoadedMeshSources;
 
   void WriteTexture2(void* pixelData, const WGPUTexture& target, uint32_t width, uint32_t height, uint32_t targetMip) {
-    Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
-    auto queue = renderContext->GetQueue();
-    WGPUOrigin3D targetOrigin = {0, 0, 0};
+    // Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
+    // auto queue = renderContext->GetQueue();
+    // WGPUOrigin3D targetOrigin = {0, 0, 0};
 
-    WGPUImageCopyTexture dest = {
-        .texture = target,
-        .mipLevel = targetMip,
-        .origin = targetOrigin,
-        .aspect = WGPUTextureAspect_All};
+    // WGPUImageCopyTexture dest = {
+    //     .texture = target,
+    //     .mipLevel = targetMip,
+    //     .origin = targetOrigin,
+    //     .aspect = WGPUTextureAspect_All};
 
-    WGPUTextureDataLayout textureLayout = {
-        .offset = 0,
-        .bytesPerRow = 4 * width,
-        .rowsPerImage = height};
+    // WGPUTextureDataLayout textureLayout = {
+    //     .offset = 0,
+    //     .bytesPerRow = 4 * width,
+    //     .rowsPerImage = height};
 
-    WGPUExtent3D textureSize = {.width = width, .height = height, .depthOrArrayLayers = 1};
-    wgpuQueueWriteTexture(*queue, &dest, pixelData, (4 * width * height), &textureLayout, &textureSize);
+    // WGPUExtent3D textureSize = {.width = width, .height = height, .depthOrArrayLayers = 1};
+    // wgpuQueueWriteTexture(*queue, &dest, pixelData, (4 * width * height), &textureLayout, &textureSize);
   }
 
   void writeMipMaps(
@@ -53,59 +53,59 @@ namespace Rain {
       uint32_t mipLevelCount,
       const unsigned char* pixelData,
       WGPUOrigin3D targetOrigin = {0, 0, 0}) {
-    RN_PROFILE_FUNCN("Generate Mips");
-    auto m_queue = wgpuDeviceGetQueue(m_device);
+    // RN_PROFILE_FUNCN("Generate Mips");
+    // auto m_queue = wgpuDeviceGetQueue(m_device);
 
-    WGPUImageCopyTexture destination = {
-        .texture = m_texture,
-        .mipLevel = 0,
-        .origin = targetOrigin,
-        .aspect = WGPUTextureAspect_All};
+    // WGPUImageCopyTexture destination = {
+    //     .texture = m_texture,
+    //     .mipLevel = 0,
+    //     .origin = targetOrigin,
+    //     .aspect = WGPUTextureAspect_All};
 
-    WGPUTextureDataLayout currentTextureLayout = {
-        .offset = 0,
-        .bytesPerRow = 4 * textureSize.width,
-        .rowsPerImage = textureSize.height};
+    // WGPUTextureDataLayout currentTextureLayout = {
+    //     .offset = 0,
+    //     .bytesPerRow = 4 * textureSize.width,
+    //     .rowsPerImage = textureSize.height};
 
-    auto origSize = (4 * textureSize.width * textureSize.height);
-    wgpuQueueWriteTexture(m_queue, &destination, pixelData, origSize, &currentTextureLayout, &textureSize);
-    // WriteTexture2((void*)pixelData, m_texture, (uint32_t)textureSize.width, (uint32_t)textureSize.height, 0);
+    // auto origSize = (4 * textureSize.width * textureSize.height);
+    // wgpuQueueWriteTexture(m_queue, &destination, pixelData, origSize, &currentTextureLayout, &textureSize);
+    //// WriteTexture2((void*)pixelData, m_texture, (uint32_t)textureSize.width, (uint32_t)textureSize.height, 0);
 
-    std::vector<unsigned char> prevPixelBuffer(origSize);
-    std::memcpy(prevPixelBuffer.data(), pixelData, origSize);
+    // std::vector<unsigned char> prevPixelBuffer(origSize);
+    // std::memcpy(prevPixelBuffer.data(), pixelData, origSize);
 
-    WGPUExtent3D currentWriteInfo = textureSize;
-    int prevWidth = textureSize.width, prevHeight = textureSize.height;
+    // WGPUExtent3D currentWriteInfo = textureSize;
+    // int prevWidth = textureSize.width, prevHeight = textureSize.height;
 
-    for (uint32_t level = 1; level < mipLevelCount; level++) {
-      currentWriteInfo.width = currentWriteInfo.width > 1 ? currentWriteInfo.width / 2 : 1;
-      currentWriteInfo.height = currentWriteInfo.height > 1 ? currentWriteInfo.height / 2 : 1;
-      std::vector<unsigned char> buffer(4 * currentWriteInfo.width * currentWriteInfo.height);
+    // for (uint32_t level = 1; level < mipLevelCount; level++) {
+    //   currentWriteInfo.width = currentWriteInfo.width > 1 ? currentWriteInfo.width / 2 : 1;
+    //   currentWriteInfo.height = currentWriteInfo.height > 1 ? currentWriteInfo.height / 2 : 1;
+    //   std::vector<unsigned char> buffer(4 * currentWriteInfo.width * currentWriteInfo.height);
 
-      stbir_resize_uint8_linear(prevPixelBuffer.data(),
-                                prevWidth,
-                                prevHeight,
-                                0,
-                                buffer.data(),
-                                currentWriteInfo.width,
-                                currentWriteInfo.height,
-                                0,
-                                STBIR_RGBA);
+    //  stbir_resize_uint8_linear(prevPixelBuffer.data(),
+    //                            prevWidth,
+    //                            prevHeight,
+    //                            0,
+    //                            buffer.data(),
+    //                            currentWriteInfo.width,
+    //                            currentWriteInfo.height,
+    //                            0,
+    //                            STBIR_RGBA);
 
-      currentTextureLayout.bytesPerRow = 4 * currentWriteInfo.width;
-      currentTextureLayout.rowsPerImage = currentWriteInfo.height;
-      destination.mipLevel = level;
+    //  currentTextureLayout.bytesPerRow = 4 * currentWriteInfo.width;
+    //  currentTextureLayout.rowsPerImage = currentWriteInfo.height;
+    //  destination.mipLevel = level;
 
-      wgpuQueueWriteTexture(m_queue, &destination, buffer.data(), buffer.size(), &currentTextureLayout, &currentWriteInfo);
-      // WriteTexture2((void*)buffer.data(), m_texture, currentWriteInfo.width, currentWriteInfo.height, level);
+    //  wgpuQueueWriteTexture(m_queue, &destination, buffer.data(), buffer.size(), &currentTextureLayout, &currentWriteInfo);
+    //  // WriteTexture2((void*)buffer.data(), m_texture, currentWriteInfo.width, currentWriteInfo.height, level);
 
-      prevWidth = currentWriteInfo.width;
-      prevHeight = currentWriteInfo.height;
+    //  prevWidth = currentWriteInfo.width;
+    //  prevHeight = currentWriteInfo.height;
 
-      prevPixelBuffer = std::move(buffer);
-    }
+    //  prevPixelBuffer = std::move(buffer);
+    //}
 
-    wgpuQueueRelease(m_queue);
+    // wgpuQueueRelease(m_queue);
   }
 
   WGPUTexture loadTexture(const char* path, WGPUDevice m_device, WGPUTextureView* pTextureView) {

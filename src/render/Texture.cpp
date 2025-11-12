@@ -45,8 +45,7 @@ namespace Rain {
   void Texture2D::Resize(uint width, uint height) {
     m_TextureProps.Width = width;
     m_TextureProps.Height = height;
-    Invalidate();
-  }
+    Invalidate(); }
 
   void Texture2D::Release() {
     wgpuTextureRelease(TextureBuffer);
@@ -303,7 +302,7 @@ namespace Rain {
 
     WGPUOrigin3D targetOrigin = {0, 0, targetLayer};
 
-    WGPUImageCopyTexture dest = {
+    WGPUTexelCopyTextureInfo dest = {
         .texture = target,
         .mipLevel = targetMip,
         .origin = targetOrigin,
@@ -312,7 +311,7 @@ namespace Rain {
     uint32_t unalignedBytesPerRow = bytesPerPixel * width;
     uint32_t alignedBytesPerRow = (unalignedBytesPerRow + 255) & ~255;  // Align to 256 bytes
 
-    WGPUTextureDataLayout textureLayout = {
+    WGPUTexelCopyBufferLayout textureLayout = {
         .offset = 0,
         .bytesPerRow = alignedBytesPerRow,
         .rowsPerImage = height};

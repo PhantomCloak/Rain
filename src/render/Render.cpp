@@ -17,15 +17,18 @@
 #include <dawn/dawn_proc.h>
 #endif
 
-namespace Rain {
+namespace Rain
+{
   Render* Render::Instance = nullptr;
 
-  struct WGPURendererData {
+  struct WGPURendererData
+  {
     Ref<GPUBuffer> QuadVertexBuffer;
     Ref<GPUBuffer> QuadIndexBuffer;
   };
 
-  struct ShaderDependencies {
+  struct ShaderDependencies
+  {
     std::vector<RenderPipeline*> Pipelines;
     std::vector<Material*> Materials;
   };
@@ -38,22 +41,26 @@ namespace Rain {
 
 #include "glfw3webgpu.h"
 
-  struct UserData {
+  struct UserData
+  {
     WGPUAdapter adapter = nullptr;
     bool requestEnded = false;
   };
 
-  struct AdapterRequestData {
+  struct AdapterRequestData
+  {
     WGPUAdapter adapter = nullptr;
     bool requestEnded = false;
   };
 
-  struct DeviceRequestData {
+  struct DeviceRequestData
+  {
     WGPUDevice device = nullptr;
     bool requestEnded = false;
   };
 
-  struct ComputeDispatchInfo {
+  struct ComputeDispatchInfo
+  {
     uint32_t workgroupsX;
     uint32_t workgroupsY;
     uint32_t workgroupsZ;
@@ -64,7 +71,8 @@ namespace Rain {
       uint32_t width,
       uint32_t height,
       uint32_t depth = 1,
-      uint32_t workgroupSize = 32) {
+      uint32_t workgroupSize = 32)
+  {
     ComputeDispatchInfo info;
     info.workgroupSize = workgroupSize;
     info.workgroupsX = (width + workgroupSize - 1) / workgroupSize;
@@ -74,14 +82,16 @@ namespace Rain {
     return info;
   }
 
-  bool Render::Init(void* window) {
+  bool Render::Init(void* window)
+  {
     Instance = this;
 
     WGPUDeviceLostCallback deviceLostCb = [](WGPUDevice const* device,
                                              WGPUDeviceLostReason reason,
                                              WGPUStringView message,
                                              void* userdata1,
-                                             void* userdata2) {
+                                             void* userdata2)
+    {
       fprintf(stderr, "GPU device lost: %.*s\n", (int)message.length, message.data);
     };
 
@@ -89,9 +99,11 @@ namespace Rain {
                                                    WGPUErrorType type,
                                                    WGPUStringView message,
                                                    void* userdata1,
-                                                   void* userdata2) {
+                                                   void* userdata2)
+    {
       const char* errorTypeName = "";
-      switch (type) {
+      switch (type)
+      {
         case WGPUErrorType_Validation:
           errorTypeName = "Validation";
           break;
@@ -117,12 +129,16 @@ namespace Rain {
                                             WGPUAdapter adapter,
                                             WGPUStringView message,
                                             void* userdata1,
-                                            void* userdata2) {
+                                            void* userdata2)
+    {
       auto* requestData = static_cast<AdapterRequestData*>(userdata1);
-      if (status == WGPURequestAdapterStatus_Success) {
+      if (status == WGPURequestAdapterStatus_Success)
+      {
         requestData->adapter = adapter;
         RN_LOG("Adapter request successful");
-      } else {
+      }
+      else
+      {
         std::string errorMessage(message.data, message.length);
         RN_LOG_ERR("Failed to request adapter: {}", errorMessage.c_str());
       }
@@ -147,8 +163,8 @@ namespace Rain {
 #ifndef __EMSCRIPTEN__
     instanceDesc->nextInChain = &dawnToggles.chain;
 #endif
-    instanceDesc->features.timedWaitAnyEnable = 0;
-    instanceDesc->features.timedWaitAnyMaxCount = 64;
+    // instanceDesc->features.timedWaitAnyEnable = 0;
+    // instanceDesc->features.timedWaitAnyMaxCount = 64;
 
     static const WGPUInstance gpuInstance = wgpuCreateInstance(instanceDesc);
 
@@ -171,14 +187,19 @@ namespace Rain {
 
     wgpuInstanceRequestAdapter(gpuInstance, &adapterOpts, callbackInfo);
 
-    while (!requestData.requestEnded) {
+    while (!requestData.requestEnded)
+    {
       wgpuInstanceProcessEvents(gpuInstance);
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     WGPUAdapter adapter = requestData.adapter;
 
-    WGPURequiredLimits* requiredLimits = GetRequiredLimits(adapter);
+    WGPULimits* requiredLimits = ZERO_ALLOC(WGPULimits);
+    requiredLimits->minUniformBufferOffsetAlignment = 256;
+    requiredLimits->minStorageBufferOffsetAlignment = 256;
+
+    requiredLimits->maxComputeInvocationsPerWorkgroup = 1024;
 
     WGPUUncapturedErrorCallbackInfo uncapturedErrorInfo;
     ZERO_INIT(uncapturedErrorInfo);
@@ -193,10 +214,12 @@ namespace Rain {
                                    WGPUDevice device,
                                    WGPUStringView message,
                                    void* userdata1,
-                                   void* userdata2) {
+                                   void* userdata2)
+    {
       auto* userData = static_cast<DeviceRequestData*>(userdata1);
-      RN_CORE_ASSERT(status == WGPURequestDeviceStatus_Success,
-                     "An error occurred while acquiring WebGPU device");
+
+      std::string errorMessage(message.data, message.length);
+      RN_CORE_ASSERT(status == WGPURequestDeviceStatus_Success, "An error occurred while acquiring WebGPU device: {}", errorMessage.c_str());
       userData->device = device;
       userData->requestEnded = true;
     };
@@ -226,7 +249,8 @@ namespace Rain {
 
     wgpuAdapterRequestDevice(adapter, &gpuDeviceDescriptor, deviceCallbackInfo);
 
-    while (!deviceRequestData.requestEnded) {
+    while (!deviceRequestData.requestEnded)
+    {
       wgpuInstanceProcessEvents(gpuInstance);
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
@@ -263,13 +287,15 @@ namespace Rain {
     return true;
   }
 
-  void Render::RendererPostInit() {
+  void Render::RendererPostInit()
+  {
     s_Data = new WGPURendererData();
 
     float x = -1;
     float y = -1;
     float width = 2, height = 2;
-    struct QuadVertex {
+    struct QuadVertex
+    {
       glm::vec3 Position;
       float _pad0 = 0;
       glm::vec2 TexCoord;
@@ -307,55 +333,55 @@ namespace Rain {
     s_Data->QuadIndexBuffer->SetData(indices, sizeof(uint32_t) * 6);
   }
 
-  WGPURequiredLimits* Render::GetRequiredLimits(WGPUAdapter adapter) {
-    static WGPUSupportedLimits supportedLimits = {};
-    supportedLimits.nextInChain = nullptr;
+  // WGPULimits* Render::GetRequiredLimits(WGPUAdapter adapter) {
+  //   static WGPUSupportedLimits supportedLimits = {};
+  //   supportedLimits.nextInChain = nullptr;
 
-#ifdef __EMSCRIPTEN__
-    // Specific limits required for Emscripten
-    supportedLimits.limits.minStorageBufferOffsetAlignment = 256;
-    supportedLimits.limits.minUniformBufferOffsetAlignment = 256;
-#else
-    wgpuAdapterGetLimits(adapter, &supportedLimits);
-#endif
+  // #i  // fdef __EMSCRIPTEN__
+  //    // Specific limits required for Emscripten
+  //    supportedLimits.limits.minStorageBufferOffsetAlignment = 256;
+  //    supportedLimits.limits.minUniformBufferOffsetAlignment = 256;
+  // #e  // lse
+  //    wgpuAdapterGetLimits(adapter, &supportedLimits);
+  // #e  // ndif
 
-    WGPURequiredLimits* requiredLimits = (WGPURequiredLimits*)malloc(sizeof(WGPURequiredLimits));
-    requiredLimits->limits = supportedLimits.limits;  // Copy all supported limits
-    m_Limits = supportedLimits.limits;
+  //  WGPURequiredLimits* requiredLimits = (WGPURequiredLimits*)malloc(sizeof(WGPURequiredLimits));
+  //  requiredLimits->limits = supportedLimits.limits;  // Copy all supported limits
+  //  m_Limits = supportedLimits.limits;
 
-    // Override specific limits as needed
-    requiredLimits->limits.maxBufferSize = 150000 * sizeof(VertexAttribute);
-    requiredLimits->limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);  // Ensure only one assignment
-    requiredLimits->limits.maxTextureDimension1D = 4096;
-    requiredLimits->limits.maxTextureDimension2D = 4096;
+  //  // Override specific limits as needed
+  //  requiredLimits->limits.maxBufferSize = 150000 * sizeof(VertexAttribute);
+  //  requiredLimits->limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);  // Ensure only one assignment
+  //  requiredLimits->limits.maxTextureDimension1D = 4096;
+  //  requiredLimits->limits.maxTextureDimension2D = 4096;
 
-#ifndef __EMSCRIPTEN__
-    requiredLimits->limits.maxTextureDimension1D = 6098;
-    requiredLimits->limits.maxTextureDimension2D = 6098;
-#endif
-    // Add any additional specific overrides below
+  // #i  // fndef __EMSCRIPTEN__
+  //    requiredLimits->limits.maxTextureDimension1D = 6098;
+  //    requiredLimits->limits.maxTextureDimension2D = 6098;
+  // #e  // ndif
+  //    // Add any additional specific overrides below
 
-    RN_LOG("Max Texture Limit: {}", supportedLimits.limits.maxTextureDimension2D);
-    requiredLimits->nextInChain = nullptr;
-    return requiredLimits;
-  }
+  //  RN_LOG("Max Texture Limit: {}", supportedLimits.limits.maxTextureDimension2D);
+  //  requiredLimits->nextInChain = nullptr;
+  //  return requiredLimits;
+  //}
 
-  WGPUTextureView Render::GetCurrentTextureView() {
+  WGPUTextureView Render::GetCurrentTextureView()
+  {
     WGPUSurfaceTexture surfaceTexture = {};
     wgpuSurfaceGetCurrentTexture(m_Surface, &surfaceTexture);
 
-    if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_Success) {
-      switch (surfaceTexture.status) {
+    if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal)
+    {
+      switch (surfaceTexture.status)
+      {
         case WGPUSurfaceGetCurrentTextureStatus_Lost:
           // Reconfigure surface here
           // ConfigureSurface(m_swapChainDesc.width, m_swapChainDesc.height);
           wgpuSurfaceGetCurrentTexture(m_Surface, &surfaceTexture);
           break;
-        case WGPUSurfaceGetCurrentTextureStatus_OutOfMemory:
+        case WGPUSurfaceGetCurrentTextureStatus_Error:
           RN_CORE_ASSERT(false, "Out of memory when acquiring next swapchain texture");
-          return nullptr;
-        case WGPUSurfaceGetCurrentTextureStatus_DeviceLost:
-          RN_CORE_ASSERT(false, "Device lost when acquiring next swapchain texture");
           return nullptr;
         default:
           RN_CORE_ASSERT(false, "Unknown error when acquiring next swapchain texture");
@@ -374,25 +400,29 @@ namespace Rain {
     // Don't call wgpuSurfacePresent here, do it after rendering is complete
   }
 
-  Ref<Texture2D> Render::GetWhiteTexture() {
+  Ref<Texture2D> Render::GetWhiteTexture()
+  {
     static auto whiteTexture = Rain::ResourceManager::GetTexture("T_Default");
     RN_ASSERT(whiteTexture->GetReadableView() != 0, "Material: Default texture couldn't found.");
     return whiteTexture;
   }
 
-  Ref<Sampler> Render::GetDefaultSampler() {
+  Ref<Sampler> Render::GetDefaultSampler()
+  {
     static auto sampler = Sampler::Create(Sampler::GetDefaultProps("S_DefaultSampler"));
     RN_ASSERT(sampler != 0, "Material: Default sampler couldn't found.");
     return sampler;
   }
 
-  void Render::ComputeMip(Texture2D* input) {
+  void Render::ComputeMip(Texture2D* input)
+  {
     auto dir = RESOURCE_DIR "/shaders/ComputeMip.wgsl";
     static Ref<Shader> computeShader = ShaderManager::LoadShader("SH_Compute", dir);
     auto device = RenderContext::GetDevice();
 
     std::vector<WGPUBindGroupLayout> bindGroupLayouts;
-    for (const auto& [_, layout] : computeShader->GetReflectionInfo().LayoutDescriptors) {
+    for (const auto& [_, layout] : computeShader->GetReflectionInfo().LayoutDescriptors)
+    {
       bindGroupLayouts.push_back(layout);
     }
 
@@ -411,7 +441,8 @@ namespace Rain {
 
     int mipCount = RenderUtils::CalculateMipCount(input->GetSpec().Width, input->GetSpec().Height);
 
-    for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
+    for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel)
+    {
       auto encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
 
       WGPUComputePassDescriptor computePassDesc = {};
@@ -449,7 +480,8 @@ namespace Rain {
     wgpuComputePipelineRelease(pipeline);
   }
 
-  void Render::ComputeMipCube(TextureCube* input) {
+  void Render::ComputeMipCube(TextureCube* input)
+  {
     auto computeShader = ShaderManager::LoadShader("SH_ComputeCube", RESOURCE_DIR "/shaders/ComputeMipCube.wgsl");
 
     auto device = RenderContext::GetDevice();
@@ -470,7 +502,8 @@ namespace Rain {
         input->GetSpec().Width,
         input->GetSpec().Height);
 
-    for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel) {
+    for (uint32_t mipLevel = 1; mipLevel < mipCount; ++mipLevel)
+    {
       WGPUTextureViewDescriptor* viewDesc = ZERO_ALLOC(WGPUTextureViewDescriptor);
       viewDesc->nextInChain = nullptr;
       viewDesc->format = RenderTypeUtils::ToRenderType(input->GetFormat());
@@ -518,13 +551,15 @@ namespace Rain {
     wgpuComputePipelineRelease(pipeline);
   }
 
-  struct PrefilterUniform {
+  struct PrefilterUniform
+  {
     uint32_t currentMipLevel;
     uint32_t mipLevelCount;
     uint32_t _pad[2];
   };
 
-  std::pair<Ref<TextureCube>, Ref<TextureCube>> Render::CreateEnvironmentMap(const std::string& filepath) {
+  std::pair<Ref<TextureCube>, Ref<TextureCube>> Render::CreateEnvironmentMap(const std::string& filepath)
+  {
     const uint32_t cubemapSize = 2048;
     const uint32_t irradianceMapSize = 32;
 
@@ -556,14 +591,16 @@ namespace Rain {
     return std::make_pair(envFiltered, irradianceMap);
   }
 
-  void Render::ComputePreFilter(TextureCube* input, TextureCube* output) {
+  void Render::ComputePreFilter(TextureCube* input, TextureCube* output)
+  {
     auto computeShader = ShaderManager::LoadShader("SH_ComputeCube2", RESOURCE_DIR "/shaders/environment_prefilter.wgsl");
 
     const uint32_t mipCount = RenderUtils::CalculateMipCount(input->GetSpec().Width, input->GetSpec().Height);
-    const uint32_t uniformStride = std::max((uint32_t)sizeof(PrefilterUniform), (uint32_t)Instance->m_Limits.minUniformBufferOffsetAlignment);
+    const uint32_t uniformStride = std::max((uint32_t)sizeof(PrefilterUniform), 256u);
     auto uniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, uniformStride * mipCount);
 
-    for (uint32_t mipLevel = 0; mipLevel < mipCount; ++mipLevel) {
+    for (uint32_t mipLevel = 0; mipLevel < mipCount; ++mipLevel)
+    {
       PrefilterUniform uniform = {
           .currentMipLevel = mipLevel,
           .mipLevelCount = mipCount};
@@ -589,7 +626,8 @@ namespace Rain {
     pipelineDesc.compute.module = computeShader->GetNativeShaderModule();
     const auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
 
-    for (uint32_t mipLevel = 0; mipLevel < mipCount; ++mipLevel) {
+    for (uint32_t mipLevel = 0; mipLevel < mipCount; ++mipLevel)
+    {
       WGPUBindGroupEntry bindGroupEntries[4] = {
           {.binding = 0, .textureView = input->GetReadableView(0)},  // Always sample from mip 0
           {.binding = 1, .textureView = output->GetWriteableView(mipLevel)},
@@ -629,7 +667,8 @@ namespace Rain {
     wgpuComputePipelineRelease(pipeline);
   }
 
-  void Render::ComputeEnvironmentIrradiance(TextureCube* input, TextureCube* output) {
+  void Render::ComputeEnvironmentIrradiance(TextureCube* input, TextureCube* output)
+  {
     auto computeShader = ShaderManager::LoadShader("SH_EnvironmentIrradiance", RESOURCE_DIR "/shaders/environment_irradiance.wgsl");
 
     auto sampler = Sampler::Create({.Name = "S_Skybox",
@@ -687,7 +726,8 @@ namespace Rain {
     wgpuCommandBufferRelease(commandBuffer);
   }
 
-  WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder) {
+  WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder)
+  {
     RN_PROFILE_FUNC;
     pass->Prepare();
 
@@ -699,7 +739,8 @@ namespace Rain {
     passDesc.depthStencilAttachment = nullptr;
     passDesc.nextInChain = nullptr;
 
-    if (renderFrameBuffer->HasColorAttachment()) {
+    if (renderFrameBuffer->HasColorAttachment())
+    {
       WGPURenderPassColorAttachment colorAttachment{};
       ZERO_INIT(colorAttachment);
       colorAttachment.nextInChain = nullptr;
@@ -709,7 +750,8 @@ namespace Rain {
       colorAttachment.resolveTarget = nullptr;
       colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
 
-      if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget) {
+      if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget)
+      {
         Instance->m_SwapTexture = Render::Instance->GetCurrentSwapChainTexture();
         colorAttachment.resolveTarget = Instance->m_SwapTexture;
       }
@@ -719,7 +761,8 @@ namespace Rain {
       passDesc.colorAttachments = &colorAttachment;
     }
 
-    if (renderFrameBuffer->HasDepthAttachment()) {
+    if (renderFrameBuffer->HasDepthAttachment())
+    {
       WGPURenderPassDepthStencilAttachment depthAttachment = {};
       ZERO_INIT(depthAttachment);
 
@@ -742,21 +785,24 @@ namespace Rain {
     const WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(encoder, &passDesc);
     const Ref<BindingManager> bindManager = pass->GetBindManager();
 
-    for (const auto& [index, bindGroup] : bindManager->GetBindGroups()) {
+    for (const auto& [index, bindGroup] : bindManager->GetBindGroups())
+    {
       wgpuRenderPassEncoderSetBindGroup(renderPass, index, bindGroup, 0, 0);
     }
 
     return renderPass;
   }
 
-  void Render::EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder) {
+  void Render::EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder)
+  {
     RN_PROFILE_FUNC;
     wgpuRenderPassEncoderEnd(encoder);
     wgpuRenderPassEncoderRelease(encoder);
 
     const auto renderFrameBuffer = pass->GetTargetFrameBuffer();
 
-    if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget) {
+    if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget)
+    {
       wgpuTextureViewRelease(Instance->m_SwapTexture);
     }
   }
@@ -768,7 +814,8 @@ namespace Rain {
                           Ref<MaterialTable> materialTable,
                           Ref<GPUBuffer> transformBuffer,
                           uint32_t transformOffset,
-                          uint32_t instanceCount) {
+                          uint32_t instanceCount)
+  {
     wgpuRenderPassEncoderSetPipeline(renderCommandBuffer, pipeline);
 
     wgpuRenderPassEncoderSetVertexBuffer(renderCommandBuffer,
@@ -796,7 +843,8 @@ namespace Rain {
     wgpuRenderPassEncoderDrawIndexed(renderCommandBuffer, subMesh.IndexCount, instanceCount, subMesh.BaseIndex, subMesh.BaseVertex, 0);
   }
 
-  void Render::SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WGPURenderPipeline pipeline) {
+  void Render::SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WGPURenderPipeline pipeline)
+  {
     wgpuRenderPassEncoderSetPipeline(renderCommandBuffer, pipeline);
 
     wgpuRenderPassEncoderSetVertexBuffer(renderCommandBuffer,
@@ -813,7 +861,8 @@ namespace Rain {
     wgpuRenderPassEncoderDrawIndexed(renderCommandBuffer, 6, 1, 0, 0, 0);
   }
 
-  void Render::ComputeEquirectToCubemap(Texture2D* equirectTexture, TextureCube* outputCubemap) {
+  void Render::ComputeEquirectToCubemap(Texture2D* equirectTexture, TextureCube* outputCubemap)
+  {
     auto computeShader = ShaderManager::LoadShader("SH_EquirectToCubemap", RESOURCE_DIR "/shaders/equirectangular_to_cubemap.wgsl");
 
     auto sampler = Sampler::Create({.Name = "S_EquirectSampler",
@@ -869,26 +918,32 @@ namespace Rain {
     wgpuCommandBufferRelease(commandBuffer);
   }
 
-  void Render::RegisterShaderDependency(Ref<Shader> shader, Material* material) {
+  void Render::RegisterShaderDependency(Ref<Shader> shader, Material* material)
+  {
     s_ShaderDependencies[shader->GetName()].Materials.push_back(material);
   }
 
-  void Render::RegisterShaderDependency(Ref<Shader> shader, RenderPipeline* material) {
+  void Render::RegisterShaderDependency(Ref<Shader> shader, RenderPipeline* material)
+  {
     s_ShaderDependencies[shader->GetName()].Pipelines.push_back(material);
   }
 
-  void Render::ReloadShader(Ref<Shader> shader) {
+  void Render::ReloadShader(Ref<Shader> shader)
+  {
     auto dependencies = s_ShaderDependencies[shader->GetName()];
-    for (auto& material : dependencies.Materials) {
+    for (auto& material : dependencies.Materials)
+    {
       material->OnShaderReload();
     }
 
-    for (auto& pipeline : dependencies.Pipelines) {
+    for (auto& pipeline : dependencies.Pipelines)
+    {
       pipeline->Invalidate();
     }
   }
 
-  WGPUTextureView Render::GetCurrentSwapChainTexture() {
+  WGPUTextureView Render::GetCurrentSwapChainTexture()
+  {
     return GetCurrentTextureView();
   }
 }  // namespace Rain

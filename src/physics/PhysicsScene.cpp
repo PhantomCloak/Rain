@@ -19,10 +19,12 @@
 #include "render/Render2D.h"
 #include "scene/Scene.h"
 #include "physics/RainTrackedVehicle.h"
-namespace Rain {
+namespace Rain
+{
   PhysicsScene* PhysicsScene::m_Instance;
   RainTrackedVehicle* veh;
-  PhysicsScene::PhysicsScene(glm::vec3 gravity) {
+  PhysicsScene::PhysicsScene(glm::vec3 gravity)
+  {
     JPH::RegisterDefaultAllocator();
     JPH::Factory::sInstance = new JPH::Factory();
     JPH::RegisterTypes();
@@ -94,23 +96,28 @@ namespace Rain {
     // veh->CreateVehicle(this);
   }
 
-  Ref<PhysicsBody> PhysicsScene::GetEntityBodyByID(UUID entityID) const {
-    if (auto iter = m_RigidBodies.find(entityID); iter != m_RigidBodies.end()) {
+  Ref<PhysicsBody> PhysicsScene::GetEntityBodyByID(UUID entityID) const
+  {
+    if (auto iter = m_RigidBodies.find(entityID); iter != m_RigidBodies.end())
+    {
       return iter->second;
     }
 
     return nullptr;
   }
 
-  JPH::BodyInterface& PhysicsScene::GetBodyInterface(bool shouldLock) {
+  JPH::BodyInterface& PhysicsScene::GetBodyInterface(bool shouldLock)
+  {
     return shouldLock ? m_Instance->m_PhysicsSystem->GetBodyInterface() : m_Instance->m_PhysicsSystem->GetBodyInterfaceNoLock();
   }
 
-  const JPH::BodyLockInterface& PhysicsScene::GetBodyLockInterface() {
+  const JPH::BodyLockInterface& PhysicsScene::GetBodyLockInterface()
+  {
     return m_Instance->m_PhysicsSystem->GetBodyLockInterface();
   }
 
-  void PhysicsScene::SynchronizeBodyTransform(PhysicsBody* body) {
+  void PhysicsScene::SynchronizeBodyTransform(PhysicsBody* body)
+  {
     JPH::BodyLockRead bodyLock(PhysicsScene::GetBodyLockInterface(), body->m_BodyID);
     const JPH::Body& bodyRef = bodyLock.GetBody();
 
@@ -125,26 +132,33 @@ namespace Rain {
     transformComponent.Scale = scale;
   }
 
-  void PhysicsScene::PreUpdate(float dt) {
-    for (auto& [entityID, body] : m_RigidBodies) {
-      if (body->IsKinematic()) {
+  void PhysicsScene::PreUpdate(float dt)
+  {
+    for (auto& [entityID, body] : m_RigidBodies)
+    {
+      if (body->IsKinematic())
+      {
         Entity entity = Scene::Instance->TryGetEntityWithUUID(entityID);
         auto tc = Scene::Instance->GetWorldSpaceTransform(entity);
 
         glm::vec3 currentBodyTranslation = body->GetTranslation();
         glm::quat currentBodyRotation = body->GetRotation();
-        if (glm::any(glm::epsilonNotEqual(currentBodyTranslation, tc.Translation, 0.00001f)) || glm::any(glm::epsilonNotEqual(currentBodyRotation, tc.GetRotation(), 0.00001f))) {
-          if (body->IsSleeping()) {
+        if (glm::any(glm::epsilonNotEqual(currentBodyTranslation, tc.Translation, 0.00001f)) || glm::any(glm::epsilonNotEqual(currentBodyRotation, tc.GetRotation(), 0.00001f)))
+        {
+          if (body->IsSleeping())
+          {
             body->SetSleepState(false);
           }
 
           glm::vec3 targetTranslation = tc.Translation;
           glm::quat targetRotation = tc.GetRotation();
-          if (glm::dot(currentBodyRotation, targetRotation) < 0.0f) {
+          if (glm::dot(currentBodyRotation, targetRotation) < 0.0f)
+          {
             targetRotation = -targetRotation;
           }
 
-          if (glm::any(glm::epsilonNotEqual(currentBodyRotation, targetRotation, 0.000001f))) {
+          if (glm::any(glm::epsilonNotEqual(currentBodyRotation, targetRotation, 0.000001f)))
+          {
             glm::vec3 currentBodyEuler = glm::eulerAngles(currentBodyRotation);
             glm::vec3 targetBodyEuler = glm::eulerAngles(tc.GetRotation());
 
@@ -158,10 +172,12 @@ namespace Rain {
     }
   }
 
-  void PhysicsScene::Update(float dt) {
+  void PhysicsScene::Update(float dt)
+  {
     // Input
     // veh->Update(this);
 
+    return;
     m_PhysicsSystem->DrawBodies(JPH::BodyManager::DrawSettings(), JPH::DebugRenderer::sInstance);
 
     PreUpdate(dt);
@@ -173,12 +189,14 @@ namespace Rain {
     m_PhysicsSystem->GetActiveBodies(JPH::EBodyType::RigidBody, activeBodies);
     JPH::BodyLockMultiWrite activeBodiesLock(bodyLockInterface, activeBodies.data(), static_cast<int32_t>(activeBodies.size()));
 
-    for (int32_t i = 0; i < activeBodies.size(); i++) {
+    for (int32_t i = 0; i < activeBodies.size(); i++)
+    {
       JPH::Body* body = activeBodiesLock.GetBody(i);
       // The position of kinematic rigid bodies is synced _before_ the physics simulation by setting its velocity such that
       // the simulation will move it to the game world position.  This gives a better collision response than synching the
       // position here.
-      if (body == nullptr || body->IsKinematic()) {
+      if (body == nullptr || body->IsKinematic())
+      {
         continue;
       }
 
@@ -188,7 +206,8 @@ namespace Rain {
       // Synchronize the transform
       Entity entity = Scene::Instance->TryGetEntityWithUUID(body->GetUserData());
 
-      if (!entity) {
+      if (!entity)
+      {
         continue;
       }
 
@@ -205,7 +224,8 @@ namespace Rain {
     }
   }
 
-  Ref<PhysicsBody> PhysicsScene::CreateBody(Entity entity) {
+  Ref<PhysicsBody> PhysicsScene::CreateBody(Entity entity)
+  {
     // if (!entity.HasAny<CompoundColliderComponent, BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, MeshColliderComponent>()) {
     //   // This can happen as a result of a user trying to create a RigidBodyComponent from C# script on an entity that does
     //   // not have a collider.
@@ -214,14 +234,16 @@ namespace Rain {
     //   return nullptr;
     // }
 
-    if (auto existingBody = GetEntityBody(entity)) {
+    if (auto existingBody = GetEntityBody(entity))
+    {
       return existingBody;
     }
 
     JPH::BodyInterface& bodyInterface = m_PhysicsSystem->GetBodyInterface();
     Ref<PhysicsBody> rigidBody = CreateRef<PhysicsBody>(bodyInterface, entity);
 
-    if (rigidBody->GetBodyId().IsInvalid()) {
+    if (rigidBody->GetBodyId().IsInvalid())
+    {
       return nullptr;
     }
 
@@ -231,11 +253,13 @@ namespace Rain {
     return rigidBody;
   }
 
-  Ref<PhysicsWheel> PhysicsScene::CreateWheel(JPH::VehicleConstraintSettings& vehicleSettings, Entity entity) {
+  Ref<PhysicsWheel> PhysicsScene::CreateWheel(JPH::VehicleConstraintSettings& vehicleSettings, Entity entity)
+  {
     return CreateRef<PhysicsWheel>(vehicleSettings, entity);
   }
 
-  bool PhysicsScene::CastRay(const RayCastInfo* rayCastInfo, SceneQueryHit& outHit) {
+  bool PhysicsScene::CastRay(const RayCastInfo* rayCastInfo, SceneQueryHit& outHit)
+  {
     outHit.Clear();
 
     JPH::RayCast ray;
@@ -247,7 +271,8 @@ namespace Rain {
     m_PhysicsSystem->GetNarrowPhaseQuery().CastRay(JPH::RRayCast(ray), rayCastSettings, hitCollector, {}, {}, {});
 
     JPH::BodyLockRead bodyLock(m_PhysicsSystem->GetBodyLockInterface(), hitCollector.mHit.mBodyID);
-    if (bodyLock.Succeeded()) {
+    if (bodyLock.Succeeded())
+    {
       const JPH::Body& body = bodyLock.GetBody();
 
       JPH::Vec3 hitPosition = ray.GetPointOnRay(hitCollector.mHit.mFraction);

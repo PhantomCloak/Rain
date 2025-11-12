@@ -6,17 +6,21 @@
 #include "core/Ref.h"
 #include "webgpu/webgpu.h"
 
-namespace Rain {
-  enum BindingType {
+namespace Rain
+{
+  enum BindingType
+  {
     UniformBindingType,
     TextureBindingType,
     StorageBindingType,
     TextureDepthBindingType,
     SamplerBindingType,
-    CompareSamplerBindingType
+    CompareSamplerBindingType,
+    EmptyBinding
   };
 
-  enum ShaderUniformType {
+  enum ShaderUniformType
+  {
     None = 0,
     Int,
     Float,
@@ -26,40 +30,50 @@ namespace Rain {
     Bool
   };
 
-  struct ShaderTypeDecl {
+  struct ShaderTypeDecl
+  {
     std::string Name;
     ShaderUniformType Type = ShaderUniformType::None;
     uint32_t Size;
     uint32_t Offset;
   };
 
-  struct ResourceDeclaration {
+  struct ResourceDeclaration
+  {
     std::string Name;
     BindingType Type;
     uint32_t GroupIndex;
     uint32_t LocationIndex;
     uint32_t Size;
+
+    WGPUTextureSampleType SampleType;
+    WGPUTextureViewDimension ViewDimension;
+    WGPUTextureFormat ImageFormat;
   };
 
-  struct TextureSpec {
+  struct TextureSpec
+  {
     uint32_t SampleType;
     uint32_t DimensionType;
   };
 
-  struct ShaderReflectionInfo {
+  struct ShaderReflectionInfo
+  {
     std::map<int, std::vector<ResourceDeclaration>> ResourceDeclarations;
     std::map<int, WGPUBindGroupLayout> LayoutDescriptors;
-    std::map<std::string, std::map<std::string, ShaderTypeDecl>> UserTypes;
+    std::map<std::string, std::map<std::string, ShaderTypeDecl>> UniformTypes;
   };
 
-  class Shader {
+  class Shader
+  {
    public:
     const std::string& GetName() const { return m_Name; }
     const std::string& GetSource() const { return m_Content; }
 
     void Reload(std::string& content);
 
-    const WGPUBindGroupLayout& GetLayout(uint32_t index) {
+    const WGPUBindGroupLayout& GetLayout(uint32_t index)
+    {
       RN_ASSERT(index < m_ReflectionInfo.LayoutDescriptors.size(), "Index out of bounds");
       return m_ReflectionInfo.LayoutDescriptors.at(index);
     }

@@ -1,10 +1,10 @@
 #include "SceneRenderer.h"
 #include <glm/glm.hpp>
 #include "Application.h"
-#include "backends/imgui_impl_glfw.h"
-#include "backends/imgui_impl_wgpu.h"
+// #include "backends/imgui_impl_glfw.h"
+// #include "backends/imgui_impl_wgpu.h"
 #include "debug/Profiler.h"
-#include "imgui.h"
+// #include "imgui.h"
 #include "io/filesystem.h"
 #include "io/keyboard.h"
 #include "render/Framebuffer.h"
@@ -12,17 +12,20 @@
 #include "render/ResourceManager.h"
 #include "render/ShaderManager.h"
 
-namespace Rain {
+namespace Rain
+{
   SceneRenderer* SceneRenderer::instance;
 
-  struct CascadeData {
+  struct CascadeData
+  {
     glm::mat4 ViewProj;
     glm::mat4 View;
     float SplitDepth;
   };
   float m_ScaleShadowCascadesToOrigin = 0.0f;
 
-  void CalculateCascades(CascadeData* cascades, const SceneCamera& sceneCamera, glm::vec3 lightDirection) {
+  void CalculateCascades(CascadeData* cascades, const SceneCamera& sceneCamera, glm::vec3 lightDirection)
+  {
     float scaleToOrigin = m_ScaleShadowCascadesToOrigin;
 
     glm::mat4 viewMatrix = sceneCamera.ViewMatrix;
@@ -54,7 +57,8 @@ namespace Rain {
     // float CascadeFarPlaneOffset = 320.0f, CascadeNearPlaneOffset = -100.0f;
 
     // Calculate split depths based on view camera frustum
-    for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++) {
+    for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++)
+    {
       float p = (i + 1) / static_cast<float>(SHADOW_MAP_CASCADE_COUNT);
       float log = minZ * std::pow(ratio, p);
       float uniform = minZ + range * p;
@@ -72,7 +76,8 @@ namespace Rain {
 
     // Calculate orthographic projection matrix for each cascade
     float lastSplitDist = 0.0;
-    for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++) {
+    for (uint32_t i = 0; i < SHADOW_MAP_CASCADE_COUNT; i++)
+    {
       float splitDist = cascadeSplits[i];
 
       glm::vec3 frustumCorners[8] =
@@ -89,12 +94,14 @@ namespace Rain {
 
       // Project frustum corners into world space
       glm::mat4 invCam = glm::inverse(viewProjection);
-      for (uint32_t i = 0; i < 8; i++) {
+      for (uint32_t i = 0; i < 8; i++)
+      {
         glm::vec4 invCorner = invCam * glm::vec4(frustumCorners[i], 1.0f);
         frustumCorners[i] = invCorner / invCorner.w;
       }
 
-      for (uint32_t i = 0; i < 4; i++) {
+      for (uint32_t i = 0; i < 4; i++)
+      {
         glm::vec3 dist = frustumCorners[i + 4] - frustumCorners[i];
         frustumCorners[i + 4] = frustumCorners[i] + (dist * splitDist);
         frustumCorners[i] = frustumCorners[i] + (dist * lastSplitDist);
@@ -102,14 +109,16 @@ namespace Rain {
 
       // Get frustum center
       glm::vec3 frustumCenter = glm::vec3(0.0f);
-      for (uint32_t i = 0; i < 8; i++) {
+      for (uint32_t i = 0; i < 8; i++)
+      {
         frustumCenter += frustumCorners[i];
       }
 
       frustumCenter /= 8.0f;
 
       float radius = 0.0f;
-      for (uint32_t i = 0; i < 8; i++) {
+      for (uint32_t i = 0; i < 8; i++)
+      {
         float distance = glm::length(frustumCorners[i] - frustumCenter);
         radius = glm::max(radius, distance);
       }
@@ -155,7 +164,8 @@ namespace Rain {
     }
   }
 
-  void SceneRenderer::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform) {
+  void SceneRenderer::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform)
+  {
     const auto& submesh = meshSource->m_SubMeshes[submeshIndex];
     const auto materialHandle = materialTable->HasMaterial(submesh.MaterialIndex) ? materialTable->GetMaterial(submesh.MaterialIndex) : meshSource->Materials->GetMaterial(submesh.MaterialIndex);
 
@@ -176,7 +186,8 @@ namespace Rain {
   }
   std::vector<std::function<void(std::string fileName)>> callbacks;
 
-  void SceneRenderer::Init() {
+  void SceneRenderer::Init()
+  {
     m_TransformBuffer = GPUAllocator::GAlloc("scene_global_transform", WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex, 1024 * sizeof(TransformVertexData));
     m_SceneUniform = {};
 
@@ -217,12 +228,13 @@ namespace Rain {
 
     auto [envFiltered, envIrradiance] = Render::CreateEnvironmentMap(RESOURCE_DIR "/textures/flamingo_pan_4k.hdr");
 
-    FileSys::WatchFile(RESOURCE_DIR "/shaders/pbr.wgsl", [pbrShader](std::string filePath) {
-      std::string b = FileSys::ReadFile(filePath);
-      pbrShader->Reload(b);
-      Render::ReloadShader(pbrShader);
-      // callbacks()
-    });
+    FileSys::WatchFile(RESOURCE_DIR "/shaders/pbr.wgsl", [pbrShader](std::string filePath)
+                       {
+                         std::string b = FileSys::ReadFile(filePath);
+                         pbrShader->Reload(b);
+                         Render::ReloadShader(pbrShader);
+                         // callbacks()
+                       });
 
     glm::vec2 screenSize = Application::Get()->GetWindowSize();
     uint32_t screenWidth = static_cast<uint32_t>(screenSize.x);
@@ -323,7 +335,8 @@ namespace Rain {
     shadowPipeSpec.CullingMode = PipelineCullingMode::BACK,
     shadowPipeSpec.Shader = shadowShader;
 
-    for (int i = 0; i < m_NumOfCascades; i++) {
+    for (int i = 0; i < m_NumOfCascades; i++)
+    {
       shadowFboSpec.DebugName = fmt::format("FB_Shadow_{}", i);
 
       shadowFboSpec.ExistingImageLayers.clear();
@@ -392,35 +405,38 @@ namespace Rain {
 
     auto renderContext = Render::Instance->GetRenderContext();
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    auto& io = ImGui::GetIO();
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(2.0f);  // Scale everything by 2x
-    io.FontGlobalScale = 2.0f;
-    ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
+    // IMGUI_CHECKVERSION();
+    // ImGui::CreateContext();
+    // auto& io = ImGui::GetIO();
+    // ImGuiStyle& style = ImGui::GetStyle();
+    // style.ScaleAllSizes(2.0f);  // Scale everything by 2x
+    // io.FontGlobalScale = 2.0f;
+    // ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
 
-    ImGui_ImplWGPU_InitInfo initInfo;
-    initInfo.Device = RenderContext::GetDevice();
-    // initInfo.RenderTargetFormat = render->m_swapChainFormat;
-    initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
-    initInfo.PipelineMultisampleState = {
-        .nextInChain = nullptr,
-        .count = 4,
-        .mask = ~0u,
-        .alphaToCoverageEnabled = false};
-    initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
-    ImGui_ImplWGPU_Init(&initInfo);
+    // ImGui_ImplWGPU_InitInfo initInfo;
+    // initInfo.Device = RenderContext::GetDevice();
+    //// initInfo.RenderTargetFormat = render->m_swapChainFormat;
+    // initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
+    // initInfo.PipelineMultisampleState = {
+    //     .nextInChain = nullptr,
+    //     .count = 4,
+    //     .mask = ~0u,
+    //     .alphaToCoverageEnabled = false};
+    // initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
+    // ImGui_ImplWGPU_Init(&initInfo);
   }
 
-  void SceneRenderer::PreRender() {
+  void SceneRenderer::PreRender()
+  {
     RN_PROFILE_FUNC;
     static TransformVertexData* submeshTransforms = (TransformVertexData*)malloc(1024 * sizeof(TransformVertexData));
 
     uint32_t offset = 0;
-    for (auto& [key, transformData] : m_MeshTransformMap) {
+    for (auto& [key, transformData] : m_MeshTransformMap)
+    {
       transformData.TransformOffset = offset * sizeof(TransformVertexData);
-      for (const auto& transform : transformData.Transforms) {
+      for (const auto& transform : transformData.Transforms)
+      {
         submeshTransforms[offset] = (transform);
         offset++;
       }
@@ -429,19 +445,22 @@ namespace Rain {
     m_TransformBuffer->SetData(submeshTransforms, offset * sizeof(TransformVertexData));
   }
 
-  void SceneRenderer::SetScene(Scene* scene) {
+  void SceneRenderer::SetScene(Scene* scene)
+  {
     RN_ASSERT(scene != nullptr, "Scene cannot be null");
     m_Scene = scene;
   }
 
-  void SceneRenderer::SetViewportSize(int height, int width) {
+  void SceneRenderer::SetViewportSize(int height, int width)
+  {
     m_ViewportWidth = width;
     m_ViewportHeight = height;
 
     m_NeedResize = true;
   }
 
-  void DrawCameraFrustum(SceneCamera camera) {
+  void DrawCameraFrustum(SceneCamera camera)
+  {
     // Get the inverse of the view-projection matrix to transform from NDC to world space
     glm::mat4 invViewProj = glm::inverse(camera.Projection * camera.ViewMatrix);
 
@@ -466,7 +485,8 @@ namespace Rain {
     JPH::RVec3 nearWorldCorners[4];
     JPH::RVec3 farWorldCorners[4];
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++)
+    {
       // Transform near corners
       glm::vec4 nearWorld = invViewProj * nearCorners[i];
       nearWorld /= nearWorld.w;  // Perspective divide
@@ -480,24 +500,28 @@ namespace Rain {
 
     // Draw the frustum lines
     // Near plane edges
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++)
+    {
       int next = (i + 1) % 4;
       RenderDebug::sInstance->DrawLine(nearWorldCorners[i], nearWorldCorners[next], JPH::Color::sGreen);
     }
 
     // Far plane edges
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++)
+    {
       int next = (i + 1) % 4;
       RenderDebug::sInstance->DrawLine(farWorldCorners[i], farWorldCorners[next], JPH::Color::sGreen);
     }
 
     // Connecting edges (from near to far)
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++)
+    {
       RenderDebug::sInstance->DrawLine(nearWorldCorners[i], farWorldCorners[i], JPH::Color::sGreen);
     }
   }
 
-  void SceneRenderer::BeginScene(const SceneCamera& camera) {
+  void SceneRenderer::BeginScene(const SceneCamera& camera)
+  {
     RN_PROFILE_FUNC;
     const glm::mat4 viewInverse = glm::inverse(camera.ViewMatrix);
     const glm::vec3 cameraPosition = viewInverse[3];
@@ -525,7 +549,8 @@ namespace Rain {
     m_SceneUniformBuffer->SetData(&m_SceneUniform, sizeof(SceneUniform));
     m_CameraUniformBuffer->SetData(&m_CameraData, sizeof(CameraData));
     m_ShadowUniformBuffer->SetData(&m_ShadowUniform, sizeof(ShadowUniform));
-    if (m_NeedResize) {
+    if (m_NeedResize)
+    {
       m_SkyboxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
       m_LitPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
       // m_PpfxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
@@ -533,17 +558,20 @@ namespace Rain {
     }
 
     // JPH::DebugRenderer::sInstance = m_Renderer;
-    ImGui_ImplWGPU_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-    if (SavedCam.Far != 400.0f) {
+    // ImGui_ImplWGPU_NewFrame();
+    // ImGui_ImplGlfw_NewFrame();
+    // ImGui::NewFrame();
+    if (SavedCam.Far != 400.0f)
+    {
       SavedCam = camera;
     }
   }
 
-  void SceneRenderer::FlushDrawList() {
+  void SceneRenderer::FlushDrawList()
+  {
     RN_PROFILE_FUNC;
-    if (Keyboard::IsKeyPressed(Key::F)) {
+    if (Keyboard::IsKeyPressed(Key::F))
+    {
       SavedCam = Cam;
       RN_LOG("AAAAAAAAAAA");
     }
@@ -567,9 +595,11 @@ namespace Rain {
     {
       RN_PROFILE_FUNCN("Shadow Pass");
 
-      for (int i = 0; i < m_NumOfCascades; i++) {
+      for (int i = 0; i < m_NumOfCascades; i++)
+      {
         auto shadowPassEncoder = Render::BeginRenderPass(m_ShadowPass[i], commandEncoder);
-        for (auto& [mk, dc] : m_DrawList) {
+        for (auto& [mk, dc] : m_DrawList)
+        {
           Render::Instance->RenderMesh(shadowPassEncoder, m_ShadowPipeline[i]->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
         }
         Render::EndRenderPass(m_ShadowPass[i], shadowPassEncoder);
@@ -579,17 +609,18 @@ namespace Rain {
     {
       RN_PROFILE_FUNCN("Geometry Pass");
       auto litPassEncoder = Render::BeginRenderPass(m_LitPass, commandEncoder);
-      for (auto& [mk, dc] : m_DrawList) {
+      for (auto& [mk, dc] : m_DrawList)
+      {
         Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
       }
 
-      RenderDebug::Begin(&litPassEncoder, &commandEncoder);
-      RenderDebug::SetMVP(m_SceneUniform.ViewProjection);
+      // RenderDebug::Begin(&litPassEncoder, &commandEncoder);
+      // RenderDebug::SetMVP(m_SceneUniform.ViewProjection);
 
-      DrawCameraFrustum(SavedCam);
-      RenderDebug::FlushDrawList();
+      // DrawCameraFrustum(SavedCam);
+      //  RenderDebug::FlushDrawList();
 
-      ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
+      // ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
       Render::EndRenderPass(m_LitPass, litPassEncoder);
     }
 
@@ -622,9 +653,10 @@ namespace Rain {
     m_MeshTransformMap.clear();
   }
 
-  void SceneRenderer::EndScene() {
-    ImGui::EndFrame();
-    ImGui::Render();
+  void SceneRenderer::EndScene()
+  {
+    // ImGui::EndFrame();
+    // ImGui::Render();
     PreRender();
     FlushDrawList();
   }
