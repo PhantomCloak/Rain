@@ -12,13 +12,13 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -v")
 
 file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
 
-file(GLOB IMGUI_SOURCES 
-  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/*.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_glfw.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_wgpu.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/ImGuizmo/*.cpp")
+#file(GLOB IMGUI_SOURCES 
+#  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/*.cpp"
+#  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_glfw.cpp"
+#  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_wgpu.cpp"
+#  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/ImGuizmo/*.cpp")
 
-list(APPEND SOURCES ${IMGUI_SOURCES})
+#list(APPEND SOURCES ${IMGUI_SOURCES})
 
 if(APPLE)
   list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/osx/macos_window.mm")
@@ -27,13 +27,14 @@ add_definitions(-DIMGUI_IMPL_WEBGPU_BACKEND_DAWN)
 add_executable(ReEngine ${SOURCES})
 
 set_target_properties(ReEngine PROPERTIES
-  CXX_STANDARD 17
+  CXX_STANDARD 20
   CXX_STANDARD_REQUIRED ON
   CXX_EXTENSIONS OFF
   EXPORT_COMPILE_COMMANDS ON
 )
 
-target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui" "vendor/ImGuizmo")
+#target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui" "vendor/ImGuizmo")
+target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb)
 target_compile_definitions(ReEngine PRIVATE RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources")
 
 #if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
