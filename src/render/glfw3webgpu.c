@@ -97,26 +97,26 @@ WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window) {
         });
     }
 #elif WGPU_TARGET == WGPU_TARGET_LINUX_X11
-    {
-        Display* x11_display = glfwGetX11Display();
-        Window x11_window = glfwGetX11Window(window);
-        return wgpuInstanceCreateSurface(
-            instance,
-            &(WGPUSurfaceDescriptor){
-            .label = NULL,
-                .nextInChain =
-                (const WGPUChainedStruct*)&(
-                    WGPUSurfaceDescriptorFromXlibWindow) {
-                .chain =
-                    (WGPUChainedStruct){
-                        .next = NULL,
-                        .sType = WGPUSType_SurfaceSourceXlibWindow,
-                },
-                .display = x11_display,
-                .window = x11_window,
-            },
-        });
-    }
+    //{
+    //    Display* x11_display = glfwGetX11Display();
+    //    Window x11_window = glfwGetX11Window(window);
+    //    return wgpuInstanceCreateSurface(
+    //        instance,
+    //        &(WGPUSurfaceDescriptor){
+    //        .label = NULL,
+    //            .nextInChain =
+    //            (const WGPUChainedStruct*)&(
+    //                WGPUSurfaceDescriptorFromXlibWindow) {
+    //            .chain =
+    //                (WGPUChainedStruct){
+    //                    .next = NULL,
+    //                    .sType = WGPUSType_SurfaceSourceXlibWindow,
+    //            },
+    //            .display = x11_display,
+    //            .window = x11_window,
+    //        },
+    //    });
+    //}
 #elif WGPU_TARGET == WGPU_TARGET_LINUX_WAYLAND
     {
         struct wl_display* wayland_display = glfwGetWaylandDisplay();

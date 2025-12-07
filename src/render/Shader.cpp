@@ -3,9 +3,12 @@
 #include "render/RenderContext.h"
 #include "render/RenderUtils.h"
 
-namespace Rain {
-  Ref<Shader> Shader::Create(const std::string& name, const std::string& filePath) {
-    if (!FileSys::IsFileExist(filePath)) {
+namespace Rain
+{
+  Ref<Shader> Shader::Create(const std::string& name, const std::string& filePath)
+  {
+    if (!FileSys::IsFileExist(filePath))
+    {
       RN_LOG_ERR("Shader Creation Failed: File '{0}' does not exist", filePath);
       return nullptr;
     }
@@ -14,10 +17,11 @@ namespace Rain {
     return CreateFromSring(name, content);
   }
 
-  Ref<Shader> Shader::CreateFromSring(const std::string& name, const std::string& content) {
+  Ref<Shader> Shader::CreateFromSring(const std::string& name, const std::string& content)
+  {
     Ref<Shader> shader = CreateRef<Shader>(name, content);
 
-    WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
+    WGPUShaderSourceWGSL shaderCodeDesc;
     shaderCodeDesc.chain.next = nullptr;
     shaderCodeDesc.chain.sType = WGPUSType_ShaderSourceWGSL;
     shaderCodeDesc.code = RenderUtils::MakeLabel(content);
@@ -29,8 +33,9 @@ namespace Rain {
     return shader;
   }
 
-  void Shader::Reload(std::string& content) {
-    WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
+  void Shader::Reload(std::string& content)
+  {
+    WGPUShaderSourceWGSL shaderCodeDesc;
     shaderCodeDesc.chain.next = nullptr;
     shaderCodeDesc.chain.sType = WGPUSType_ShaderSourceWGSL;
     shaderCodeDesc.code = RenderUtils::MakeLabel(content);

@@ -29,7 +29,7 @@ namespace Rain
 
   float rotX = 140.0;
   float rotY = 0.0;
-  float rotZ = 25.0;
+  float rotZ = 40.0;
 
   UUID entityIdDir = 0.0;
   UUID Select = 0;
@@ -46,15 +46,15 @@ namespace Rain
     camera.AddComponent<CameraComponent>();
 
     auto boxModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
-    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/galata/galata.gltf");
+    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/Helment/untitled.gltf");
 
     helment = CreateEntity("Box");
     Entity floorEntity = CreateEntity("Box2");
     Entity galata = CreateEntity("bump");
     Entity tankEntity = CreateEntity("Tank");
 
-    galata.Transform().Translation = glm::vec3(0, 1, 0);
-    galata.Transform().Scale = glm::vec3(0.08f);
+    galata.Transform().Translation = glm::vec3(0, 10, 0);
+    galata.Transform().Scale = glm::vec3(5.0f);
 
     floorEntity.Transform().Translation = glm::vec3(0, 0, 0);
     floorEntity.Transform().Scale = glm::vec3(100, 1.0f, 100);
@@ -62,7 +62,7 @@ namespace Rain
     // floorEntity.AddComponent<BoxColliderComponent>(glm::vec3(0), glm::vec3(100, 1, 100));
     // floorEntity.AddComponent<RigidBodyComponent>();
 
-    BuildMeshEntityHierarchy(floorEntity, boxModel);
+    // BuildMeshEntityHierarchy(floorEntity, boxModel);
     BuildMeshEntityHierarchy(galata, bochii);
 
     Entity light = CreateEntity("DirectionalLight");

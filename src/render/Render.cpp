@@ -2,13 +2,17 @@
 #include "Mesh.h"
 #include "ResourceManager.h"
 #include "core/Assert.h"
+#include "core/Log.h"
 #include "core/Ref.h"
+#include "dawn/native/DawnNative.h"
 #include "debug/Profiler.h"
 #include "render/ShaderManager.h"
+#include "webgpu/webgpu_glfw.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image.h>
 #include <stb_image_write.h>
+#include <GLFW/glfw3native.h>
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -36,10 +40,6 @@ namespace Rain
   static std::map<std::string, ShaderDependencies> s_ShaderDependencies;
 
   static WGPURendererData* s_Data = nullptr;
-
-  // extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window);
-
-#include "glfw3webgpu.h"
 
   struct UserData
   {
@@ -82,8 +82,14 @@ namespace Rain
     return info;
   }
 
-  bool Render::Init(void* window)
+  bool Render::Init(void* nativeWindowPtr)
   {
+    if (!nativeWindowPtr)
+    {
+      RN_LOG_ERR("Native window pointer is null!");
+      return false;
+    }
+
     Instance = this;
 
     WGPUDeviceLostCallback deviceLostCb = [](WGPUDevice const* device,
@@ -92,14 +98,102 @@ namespace Rain
                                              void* userdata1,
                                              void* userdata2)
     {
-      fprintf(stderr, "GPU device lost: %.*s\n", (int)message.length, message.data);
+      RN_LOG_ERR("GPU device lost: len: {} data: {} \n", (int)message.length, message.data);
     };
 
-    WGPUUncapturedErrorCallback errorCallback = [](WGPUDevice const* device,
-                                                   WGPUErrorType type,
-                                                   WGPUStringView message,
-                                                   void* userdata1,
-                                                   void* userdata2)
+    auto onAdapterRequestEndedCallback = [](WGPURequestAdapterStatus status,
+                                            WGPUAdapter adapter,
+                                            WGPUStringView message,
+                                            void* userdata1,
+                                            void* userdata2)
+    {
+      auto* requestData = static_cast<AdapterRequestData*>(userdata1);
+      if (status == WGPURequestAdapterStatus_Success)
+      {
+        requestData->adapter = adapter;
+        RN_LOG("Adapter request successful");
+      }
+      else
+      {
+        std::string errorMessage(message.data, message.length);
+        RN_LOG_ERR("Failed to request adapter: {}", errorMessage.c_str());
+      }
+      requestData->requestEnded = true;
+    };
+
+    static const char* enabledTogglesArray[] = {
+        "chromium_disable_uniformity_analysis",
+        "allow_unsafe_apis"};
+
+    WGPUDawnTogglesDescriptor dawnInstanceToggleDescriptor;
+    ZERO_INIT(dawnInstanceToggleDescriptor);
+    dawnInstanceToggleDescriptor.chain.sType = WGPUSType_DawnTogglesDescriptor;
+    dawnInstanceToggleDescriptor.enabledToggles = enabledTogglesArray;
+    dawnInstanceToggleDescriptor.enabledToggleCount = 2;
+    dawnInstanceToggleDescriptor.disabledToggleCount = 0;
+
+    WGPUInstanceDescriptor* gpuInstanceDescriptor = ZERO_ALLOC(WGPUInstanceDescriptor);
+    gpuInstanceDescriptor->nextInChain = &dawnInstanceToggleDescriptor.chain;
+    gpuInstanceDescriptor->requiredFeatureCount = 0;
+    gpuInstanceDescriptor->requiredLimits = nullptr;
+    gpuInstanceDescriptor->requiredFeatures = nullptr;
+
+    DawnProcTable procs = dawn::native::GetProcs();
+    dawnProcSetProcs(&procs);
+
+    RN_LOG({"0"});
+    WGPUSurfaceDescriptor surfaceDescription{};
+    const auto wnd = wgpu::glfw::SetupWindowAndGetSurfaceDescriptor(static_cast<GLFWwindow*>(nativeWindowPtr));
+    surfaceDescription.nextInChain = reinterpret_cast<WGPUChainedStruct*>(wnd.get());
+
+    m_GpuInstance = wgpuCreateInstance(gpuInstanceDescriptor);
+    m_Window = static_cast<GLFWwindow*>(nativeWindowPtr);
+
+    if (m_GpuInstance == nullptr)
+    {
+      RN_LOG_ERR("GPU Instance couldn't initialized");
+      return false;
+    }
+
+    m_Surface = wgpuInstanceCreateSurface(m_GpuInstance, &surfaceDescription);
+
+    AdapterRequestData requestData{};
+    ZERO_INIT(requestData);
+
+    WGPURequestAdapterCallbackInfo adapterCallbackInfo;
+    ZERO_INIT(adapterCallbackInfo);
+    adapterCallbackInfo.mode = WGPUCallbackMode_AllowProcessEvents,
+    adapterCallbackInfo.callback = onAdapterRequestEndedCallback,
+    adapterCallbackInfo.userdata1 = &requestData;
+
+    WGPURequestAdapterOptions requestAdapterOpts;
+    ZERO_INIT(requestAdapterOpts);
+    requestAdapterOpts.compatibleSurface = m_Surface;
+    requestAdapterOpts.powerPreference = WGPUPowerPreference_HighPerformance;
+
+    wgpuInstanceRequestAdapter(m_GpuInstance, &requestAdapterOpts, adapterCallbackInfo);
+
+    while (!requestData.requestEnded)
+    {
+      wgpuInstanceProcessEvents(m_GpuInstance);
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    WGPUAdapter adapter = requestData.adapter;
+
+    WGPULimits* requiredLimits = ZERO_ALLOC(WGPULimits);
+    requiredLimits->minUniformBufferOffsetAlignment = 256;
+    requiredLimits->minStorageBufferOffsetAlignment = 256;
+    requiredLimits->maxComputeInvocationsPerWorkgroup = 1024;
+
+    WGPUUncapturedErrorCallbackInfo uncapturedErrorInfo;
+    ZERO_INIT(uncapturedErrorInfo);
+
+    uncapturedErrorInfo.callback = [](WGPUDevice const* device,
+                                      WGPUErrorType type,
+                                      WGPUStringView message,
+                                      void* userdata1,
+                                      void* userdata2)
     {
       const char* errorTypeName = "";
       switch (type)
@@ -124,86 +218,6 @@ namespace Rain
               message.data);
       exit(0);
     };
-
-    auto onAdapterRequestEndedCallback = [](WGPURequestAdapterStatus status,
-                                            WGPUAdapter adapter,
-                                            WGPUStringView message,
-                                            void* userdata1,
-                                            void* userdata2)
-    {
-      auto* requestData = static_cast<AdapterRequestData*>(userdata1);
-      if (status == WGPURequestAdapterStatus_Success)
-      {
-        requestData->adapter = adapter;
-        RN_LOG("Adapter request successful");
-      }
-      else
-      {
-        std::string errorMessage(message.data, message.length);
-        RN_LOG_ERR("Failed to request adapter: {}", errorMessage.c_str());
-      }
-      requestData->requestEnded = true;
-    };
-
-#ifndef __EMSCRIPTEN__
-    static const char* enabledTogglesArray[] = {
-        "chromium_disable_uniformity_analysis",
-        "allow_unsafe_apis"};
-
-    WGPUDawnTogglesDescriptor dawnToggles;
-    ZERO_INIT(dawnToggles);
-    dawnToggles.chain.sType = WGPUSType_DawnTogglesDescriptor;
-    dawnToggles.enabledToggles = enabledTogglesArray;
-    dawnToggles.enabledToggleCount = 2;
-    dawnToggles.disabledToggleCount = 0;
-#endif
-
-    WGPUInstanceDescriptor* instanceDesc = ZERO_ALLOC(WGPUInstanceDescriptor);
-    instanceDesc->nextInChain = nullptr;
-#ifndef __EMSCRIPTEN__
-    instanceDesc->nextInChain = &dawnToggles.chain;
-#endif
-    // instanceDesc->features.timedWaitAnyEnable = 0;
-    // instanceDesc->features.timedWaitAnyMaxCount = 64;
-
-    static const WGPUInstance gpuInstance = wgpuCreateInstance(instanceDesc);
-
-    m_Window = static_cast<GLFWwindow*>(window);
-    m_Surface = glfwGetWGPUSurface(gpuInstance, m_Window);
-
-    AdapterRequestData requestData{};
-    ZERO_INIT(requestData);
-
-    WGPURequestAdapterCallbackInfo callbackInfo;
-    ZERO_INIT(callbackInfo);
-    callbackInfo.mode = WGPUCallbackMode_AllowProcessEvents,
-    callbackInfo.callback = onAdapterRequestEndedCallback,
-    callbackInfo.userdata1 = &requestData;
-
-    WGPURequestAdapterOptions adapterOpts;
-    ZERO_INIT(adapterOpts);
-    adapterOpts.compatibleSurface = m_Surface;
-    adapterOpts.powerPreference = WGPUPowerPreference_HighPerformance;
-
-    wgpuInstanceRequestAdapter(gpuInstance, &adapterOpts, callbackInfo);
-
-    while (!requestData.requestEnded)
-    {
-      wgpuInstanceProcessEvents(gpuInstance);
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-
-    WGPUAdapter adapter = requestData.adapter;
-
-    WGPULimits* requiredLimits = ZERO_ALLOC(WGPULimits);
-    requiredLimits->minUniformBufferOffsetAlignment = 256;
-    requiredLimits->minStorageBufferOffsetAlignment = 256;
-
-    requiredLimits->maxComputeInvocationsPerWorkgroup = 1024;
-
-    WGPUUncapturedErrorCallbackInfo uncapturedErrorInfo;
-    ZERO_INIT(uncapturedErrorInfo);
-    uncapturedErrorInfo.callback = errorCallback;
 
     WGPUDeviceLostCallbackInfo deviceLostInfo;
     ZERO_INIT(deviceLostInfo);
@@ -251,19 +265,21 @@ namespace Rain
 
     while (!deviceRequestData.requestEnded)
     {
-      wgpuInstanceProcessEvents(gpuInstance);
+      wgpuInstanceProcessEvents(m_GpuInstance);
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
     m_Device = deviceRequestData.device;
-
     m_Queue = wgpuDeviceGetQueue(m_Device);
+    RN_LOG({"3"});
+
     RN_CORE_ASSERT(m_Queue, "An error occurred while acquiring the queue. This might indicate unsupported browser/device.");
+    RN_CORE_ASSERT(m_Device, "An error occurred while acquiring the Device.");
 
     m_RenderContext = CreateRef<RenderContext>(adapter, m_Surface, m_Device, m_Queue);
 
-    WGPUSurfaceCapabilities capabilities;
-    wgpuSurfaceGetCapabilities(m_Surface, adapter, &capabilities);
+    WGPUSurfaceCapabilities* capabilities = new WGPUSurfaceCapabilities();
+    wgpuSurfaceGetCapabilities(m_Surface, adapter, capabilities);
 
     m_swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 
@@ -280,7 +296,6 @@ namespace Rain
     config.presentMode = WGPUPresentMode_Fifo;
     config.viewFormatCount = 1;
     config.viewFormats = &m_swapChainFormat;
-
     wgpuSurfaceConfigure(m_Surface, &config);
 
     RendererPostInit();
@@ -726,7 +741,7 @@ namespace Rain
     wgpuCommandBufferRelease(commandBuffer);
   }
 
-  WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder)
+  WGPURenderPassEncoder Render::BeginRenderPass(Ref<RenderPass> pass, const WGPUCommandEncoder& encoder)
   {
     RN_PROFILE_FUNC;
     pass->Prepare();
@@ -793,7 +808,7 @@ namespace Rain
     return renderPass;
   }
 
-  void Render::EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder)
+  void Render::EndRenderPass(Ref<RenderPass> pass, const WGPURenderPassEncoder& encoder)
   {
     RN_PROFILE_FUNC;
     wgpuRenderPassEncoderEnd(encoder);

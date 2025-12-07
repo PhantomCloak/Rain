@@ -22,17 +22,18 @@ set(ASSIMP_BUILD_OBJ_IMPORTER TRUE)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=implicit-const-int-float-conversion")
 add_subdirectory(vendor/assimp)
 
+set(TINT_BUILD_TESTS OFF)
+set(TINT_BUILD_BENCHMARKS OFF)
+set(TINT_BUILD_CMD_TOOLS   OFF)
+set(TINT_BUILD_FUZZERS OFF)
+set(TINT_BUILD_AS_OTHER_OS ON)
+set(TINT_BUILD_MSL_WRITER  OFF)
+set(TINT_ENABLE_BREAK_IN_DEBUGGER OFF)
+set(TINT_ENABLE_INSTALL ON)
+set(TINT_BUILD_WGSL_READER ON)
+
 # Dawn WebGPU
 if(EMSCRIPTEN)
-	set(TINT_BUILD_TESTS OFF)
-	set(TINT_BUILD_BENCHMARKS OFF)
-	set(TINT_BUILD_CMD_TOOLS   OFF)
-	set(TINT_BUILD_FUZZERS OFF)
-	set(TINT_BUILD_AS_OTHER_OS ON)
-	set(TINT_BUILD_MSL_WRITER  OFF)
-	set(TINT_ENABLE_BREAK_IN_DEBUGGER OFF)
-	set(TINT_ENABLE_INSTALL ON)
-	set(TINT_BUILD_WGSL_READER ON)
 
 	set(TINT_ROOT_SOURCE_DIR vendor/dawn)
 	include_directories(${TINT_ROOT_SOURCE_DIR})
@@ -117,8 +118,8 @@ else()
   dawn_wire
   dawncpp
   dawncpp_headers
-  webgpu_dawn
   libtint
+  dawn_proc
 	spdlog
 	flecs
 	TracyClient

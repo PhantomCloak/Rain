@@ -6,3 +6,4 @@ NamespaceIndentation: All
 InsertBraces: true
 InsertNewlineAtEOF: true
 SortIncludes: Never
+BreakBeforeBraces: Allman

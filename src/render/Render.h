@@ -6,19 +6,21 @@
 #include "render/Pipeline.h"
 #include "render/RenderPass.h"
 
-namespace Rain {
-  class Render {
+namespace Rain
+{
+  class Render
+  {
    public:
     static Render* Instance;
-    bool Init(void* window);
+    bool Init(void* nativeWindowPointer);
 
     Ref<RenderContext> GetRenderContext() { return m_RenderContext; }
 
     static Ref<Texture2D> GetWhiteTexture();
     static Ref<Sampler> GetDefaultSampler();
 
-    static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, WGPUCommandEncoder& encoder);
-    static void EndRenderPass(Ref<RenderPass> pass, WGPURenderPassEncoder& encoder);
+    static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, const WGPUCommandEncoder& encoder);
+    static void EndRenderPass(Ref<RenderPass> pass, const WGPURenderPassEncoder& encoder);
 
     static void RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
                            WGPURenderPipeline pipeline,
@@ -48,15 +50,16 @@ namespace Rain {
 
    private:
     void RendererPostInit();
-    // WGPURequiredLimits* GetRequiredLimits(WGPUAdapter adapter);
     WGPUTextureView GetCurrentTextureView();
 
    public:
     Ref<RenderContext> m_RenderContext;
     WGPUSurface m_Surface = nullptr;
-    GLFWwindow* m_Window = nullptr;
+    WGPUInstance m_GpuInstance = nullptr;
     WGPUDevice m_Device = nullptr;
     WGPUQueue m_Queue = nullptr;
+
+    GLFWwindow* m_Window = nullptr;
     WGPUTextureView m_SwapTexture;
     WGPULimits m_Limits;
 
