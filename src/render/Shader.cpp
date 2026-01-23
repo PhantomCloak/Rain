@@ -21,27 +21,48 @@ namespace Rain
   {
     Ref<Shader> shader = CreateRef<Shader>(name, content);
 
+#ifndef __EMSCRIPTEN__
     WGPUShaderSourceWGSL shaderCodeDesc;
     shaderCodeDesc.chain.next = nullptr;
     shaderCodeDesc.chain.sType = WGPUSType_ShaderSourceWGSL;
     shaderCodeDesc.code = RenderUtils::MakeLabel(content);
+#else
+    WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
+    shaderCodeDesc.chain.next = nullptr;
+    shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
+    shaderCodeDesc.code = RenderUtils::MakeLabel(content);
+#endif
     WGPUShaderModuleDescriptor shaderDesc;
     shaderDesc.label = RenderUtils::MakeLabel(name);
     shaderDesc.nextInChain = &shaderCodeDesc.chain;
 
-    shader->m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);
+    if (RenderContext::IsReady())
+    {
+      shader->m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);
+    }
     return shader;
   }
 
   void Shader::Reload(std::string& content)
   {
+#ifndef __EMSCRIPTEN__
     WGPUShaderSourceWGSL shaderCodeDesc;
     shaderCodeDesc.chain.next = nullptr;
     shaderCodeDesc.chain.sType = WGPUSType_ShaderSourceWGSL;
     shaderCodeDesc.code = RenderUtils::MakeLabel(content);
+#else
+    WGPUShaderModuleWGSLDescriptor shaderCodeDesc;
+    shaderCodeDesc.chain.next = nullptr;
+    shaderCodeDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
+    shaderCodeDesc.code = RenderUtils::MakeLabel(content);
+#endif
     WGPUShaderModuleDescriptor shaderDesc;
     shaderDesc.label = RenderUtils::MakeLabel("PPK");
     shaderDesc.nextInChain = &shaderCodeDesc.chain;
-    m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);
+
+    if (RenderContext::IsReady())
+    {
+      m_ShaderModule = wgpuDeviceCreateShaderModule(RenderContext::GetDevice(), &shaderDesc);
+    }
   }
 }  // namespace Rain

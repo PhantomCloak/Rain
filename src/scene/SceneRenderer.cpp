@@ -1,5 +1,6 @@
 #include "SceneRenderer.h"
 #include <glm/glm.hpp>
+#include <memory>
 #include "Application.h"
 // #include "backends/imgui_impl_glfw.h"
 // #include "backends/imgui_impl_wgpu.h"
@@ -7,6 +8,7 @@
 // #include "imgui.h"
 #include "io/filesystem.h"
 #include "io/keyboard.h"
+#include "render/CommandEncoder.h"
 #include "render/Framebuffer.h"
 #include "render/Render.h"
 #include "render/ResourceManager.h"
@@ -129,20 +131,17 @@ namespace Rain
 
       glm::vec3 lightDir = -lightDirection;
 
-      // Modified lightViewMatrix
       glm::mat4 lightViewMatrix = glm::lookAt(
           frustumCenter - lightDir * radius,
           frustumCenter,
           glm::vec3(0.0f, 1.0f, 0.0f));
 
-      // Modified lightOrthoMatrix
       glm::mat4 lightOrthoMatrix = glm::ortho(
           minExtents.x, maxExtents.x,
           minExtents.y, maxExtents.y,
           minExtents.z + CascadeNearPlaneOffset,
           maxExtents.z + CascadeFarPlaneOffset);
 
-      // Offset to texel space to avoid shimmering
       glm::mat4 shadowMatrix = lightOrthoMatrix * lightViewMatrix;
       float ShadowMapResolution = 4096;
 
@@ -155,7 +154,6 @@ namespace Rain
 
       lightOrthoMatrix[3] += roundOffset;
 
-      // Modified SplitDepth calculation
       cascades[i].SplitDepth = nearClip + splitDist * clipRange;
       cascades[i].ViewProj = lightOrthoMatrix * lightViewMatrix;
       cascades[i].View = lightViewMatrix;
@@ -188,6 +186,14 @@ namespace Rain
 
   void SceneRenderer::Init()
   {
+    if (const auto ptr = Render::Get())
+    {
+    }
+    else
+    {
+      return;
+    }
+
     m_TransformBuffer = GPUAllocator::GAlloc("scene_global_transform", WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex, 1024 * sizeof(TransformVertexData));
     m_SceneUniform = {};
 
@@ -222,11 +228,12 @@ namespace Rain
     cubeProps.Format = TextureFormat::RGBA16F;
 
     Ref<TextureCube> envUnfiltered = TextureCube::Create(cubeProps);
-    Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), RESOURCE_DIR "/textures/flamingo_pan_4k.hdr");
+    Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), RESOURCE_DIR "/textures/quarry_01_puresky_4k.hdr");
 
-    Render::ComputeEquirectToCubemap(envEquirect.get(), envUnfiltered.get());
+    m_Renderer = Render::Get();
+    m_Renderer->ComputeEquirectToCubemap(envEquirect.get(), envUnfiltered.get());
 
-    auto [envFiltered, envIrradiance] = Render::CreateEnvironmentMap(RESOURCE_DIR "/textures/flamingo_pan_4k.hdr");
+    auto [envFiltered, envIrradiance] = m_Renderer->CreateEnvironmentMap(RESOURCE_DIR "/textures/quarry_01_puresky_4k.hdr");
 
     FileSys::WatchFile(RESOURCE_DIR "/shaders/pbr.wgsl", [pbrShader](std::string filePath)
                        {
@@ -403,7 +410,7 @@ namespace Rain
 
     m_PpfxPipeline = RenderPipeline::Create(ppfxPipeSpec);
 
-    auto renderContext = Render::Instance->GetRenderContext();
+    // auto renderContext = m_Renderer->GetRenderContext();
 
     // IMGUI_CHECKVERSION();
     // ImGui::CreateContext();
@@ -573,23 +580,14 @@ namespace Rain
     if (Keyboard::IsKeyPressed(Key::F))
     {
       SavedCam = Cam;
-      RN_LOG("AAAAAAAAAAA");
     }
 
-    WGPUCommandEncoderDescriptor commandEncoderDesc = {};
-    ZERO_INIT(commandEncoderDesc);
-
-    commandEncoderDesc.label = RenderUtils::MakeLabel("Default");
-    commandEncoderDesc.nextInChain = nullptr;
-    Ref<RenderContext> renderContext = Render::Instance->GetRenderContext();
-
-    auto commandEncoder = wgpuDeviceCreateCommandEncoder(renderContext->GetDevice(), &commandEncoderDesc);
-
+    const auto commandEncoder = m_Renderer->CreateCommandEncoder();
     {
       RN_PROFILE_FUNCN("Skybox Pass");
-      auto skyboxPassEncoder = Render::BeginRenderPass(m_SkyboxPass, commandEncoder);
-      Render::Instance->SubmitFullscreenQuad(skyboxPassEncoder, m_SkyboxPipeline->GetPipeline());
-      Render::EndRenderPass(m_SkyboxPass, skyboxPassEncoder);
+      Ref<RenderPassEncoder> skyboxPassEncoder = m_Renderer->BeginRenderPass(m_SkyboxPass, commandEncoder);
+      m_Renderer->SubmitFullscreenQuad(skyboxPassEncoder, m_SkyboxPipeline->GetPipeline());
+      m_Renderer->EndRenderPass(m_SkyboxPass, skyboxPassEncoder);
     }
 
     {
@@ -597,57 +595,34 @@ namespace Rain
 
       for (int i = 0; i < m_NumOfCascades; i++)
       {
-        auto shadowPassEncoder = Render::BeginRenderPass(m_ShadowPass[i], commandEncoder);
+        Ref<RenderPassEncoder> shadowPassEncoder = m_Renderer->BeginRenderPass(m_ShadowPass[i], commandEncoder);
         for (auto& [mk, dc] : m_DrawList)
         {
-          Render::Instance->RenderMesh(shadowPassEncoder, m_ShadowPipeline[i]->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+          m_Renderer->RenderMesh(shadowPassEncoder, m_ShadowPipeline[i]->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
         }
-        Render::EndRenderPass(m_ShadowPass[i], shadowPassEncoder);
+        m_Renderer->EndRenderPass(m_ShadowPass[i], shadowPassEncoder);
       }
     }
 
     {
       RN_PROFILE_FUNCN("Geometry Pass");
-      auto litPassEncoder = Render::BeginRenderPass(m_LitPass, commandEncoder);
+      Ref<RenderPassEncoder> litPassEncoder = m_Renderer->BeginRenderPass(m_LitPass, commandEncoder);
       for (auto& [mk, dc] : m_DrawList)
       {
-        Render::Instance->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+        m_Renderer->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
       }
 
       // RenderDebug::Begin(&litPassEncoder, &commandEncoder);
       // RenderDebug::SetMVP(m_SceneUniform.ViewProjection);
-
       // DrawCameraFrustum(SavedCam);
       //  RenderDebug::FlushDrawList();
-
       // ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
-      Render::EndRenderPass(m_LitPass, litPassEncoder);
+
+      m_Renderer->EndRenderPass(m_LitPass, litPassEncoder);
     }
 
-    //{
-    //  RN_PROFILE_FUNCN("Post FX Pass");
-    //  auto ppfxPassEncoder = Render::BeginRenderPass(m_PpfxPass, commandEncoder);
-    //  Render::Instance->SubmitFullscreenQuad(ppfxPassEncoder, m_PpfxPipeline->GetPipeline());
-    //  ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), ppfxPassEncoder);
-    //  Render::EndRenderPass(m_PpfxPass, ppfxPassEncoder);
-    //}
-
-    {
-      RN_PROFILE_FUNCN("Submit");
-      WGPUCommandBufferDescriptor cmdBufferDescriptor = {.nextInChain = nullptr, .label = "Command Buffer"};
-      WGPUCommandBuffer commandBuffer = wgpuCommandEncoderFinish(commandEncoder, &cmdBufferDescriptor);
-      wgpuQueueSubmit(*renderContext->GetQueue(), 1, &commandBuffer);
-
-      wgpuCommandBufferRelease(commandBuffer);
-      wgpuCommandEncoderRelease(commandEncoder);
-
-      wgpuSurfacePresent(Render::Instance->m_Surface);
-
-#ifndef __EMSCRIPTEN__
-      // wgpuSwapChainPresent(Render::Instance->m_swapChain);
-      wgpuDeviceTick(renderContext->GetDevice());
-#endif
-    }
+    m_Renderer->SubmitAndFinishEncoder(commandEncoder);
+    m_Renderer->Present();
 
     m_DrawList.clear();
     m_MeshTransformMap.clear();
@@ -655,6 +630,11 @@ namespace Rain
 
   void SceneRenderer::EndScene()
   {
+    const auto renderer = Render::Get();
+    if (renderer == nullptr)
+    {
+      return;
+    }
     // ImGui::EndFrame();
     // ImGui::Render();
     PreRender();

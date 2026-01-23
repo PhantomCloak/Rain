@@ -14,7 +14,10 @@ namespace Rain {
     static bool WasLeftCursorPressed();
     static void Update();
     static bool WasRightCursorPressed();
+    static bool IsMiddleMouseHeld();
     static void CaptureMouse(bool shouldCapture);
     static bool IsMouseCaptured();
+    static float GetScrollDelta();
+    static void ResetScrollDelta();
   };
 }  // namespace Rain

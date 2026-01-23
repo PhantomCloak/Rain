@@ -7,8 +7,10 @@
 #include "core/UUID.h"
 #include "render/Sampler.h"
 
-namespace Rain {
-  enum TextureFormat {
+namespace Rain
+{
+  enum TextureFormat
+  {
     RGBA8,
     BRGBA8,
     RGBA16F,
@@ -17,12 +19,14 @@ namespace Rain {
     Undefined
   };
 
-  enum TextureType {
+  enum TextureType
+  {
     TextureDim2D,
     TextureDimCube
   };
 
-  struct TextureProps {
+  struct TextureProps
+  {
     TextureFormat Format = TextureFormat::RGBA8;
     TextureWrappingFormat SamplerWrap = TextureWrappingFormat::Repeat;
     FilterMode SamplerFilter = FilterMode::Linear;
@@ -38,7 +42,8 @@ namespace Rain {
     std::string DebugName;
   };
 
-  class Texture {
+  class Texture
+  {
     virtual TextureFormat GetFormat() const = 0;
 
     virtual uint32_t GetWidth() const = 0;
@@ -54,7 +59,8 @@ namespace Rain {
     virtual WGPUTextureView GetWriteableView(int layer = 0) = 0;
   };
 
-  class Texture2D : public Texture {
+  class Texture2D : public Texture
+  {
    public:
     UUID Id;
     std::string type;
@@ -103,7 +109,8 @@ namespace Rain {
     void Invalidate();
   };
 
-  class TextureCube : public Texture {
+  class TextureCube : public Texture
+  {
    public:
     static Ref<TextureCube> Create(const TextureProps& props);
     static Ref<TextureCube> Create(const TextureProps& props, const std::filesystem::path (&paths)[6]);

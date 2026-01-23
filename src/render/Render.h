@@ -1,5 +1,8 @@
 #pragma once
 #include <webgpu/webgpu.h>
+#if __EMSCRIPTEN__
+using WGPUStringView = const char*;
+#endif
 #include "GLFW/glfw3.h"
 #include "Material.h"
 #include "render/Mesh.h"
@@ -8,66 +11,68 @@
 
 namespace Rain
 {
+  using OnRendererReadyCallback = std::function<void()>;
+  class RenderPassEncoder;
+  class CommandEncoder;
+
   class Render
   {
    public:
-    static Render* Instance;
-    bool Init(void* nativeWindowPointer);
+    Render() = default;
+    ~Render() = default;
 
-    Ref<RenderContext> GetRenderContext() { return m_RenderContext; }
+    virtual bool Init(void* nativeWindowPointer) = 0;
+    static Render* Get() { return m_RenderInstance; }
+    static void SetRenderInstance(Render* instance) { m_RenderInstance = instance; }
 
-    static Ref<Texture2D> GetWhiteTexture();
-    static Ref<Sampler> GetDefaultSampler();
+    virtual Ref<RenderContext> GetRenderContext() = 0;
 
-    static WGPURenderPassEncoder BeginRenderPass(Ref<RenderPass> pass, const WGPUCommandEncoder& encoder);
-    static void EndRenderPass(Ref<RenderPass> pass, const WGPURenderPassEncoder& encoder);
+    virtual Ref<Texture2D> GetWhiteTexture() = 0;
+    virtual Ref<Sampler> GetDefaultSampler() = 0;
 
-    static void RenderMesh(WGPURenderPassEncoder& renderCommandBuffer,
-                           WGPURenderPipeline pipeline,
-                           Ref<MeshSource> mesh,
-                           uint32_t submeshIndex,
-                           Ref<MaterialTable> material,
-                           Ref<GPUBuffer> transformBuffer,
-                           uint32_t transformOffset,
-                           uint32_t instanceCount);
+    virtual Ref<RenderPassEncoder> BeginRenderPass(Ref<RenderPass> pass, Ref<CommandEncoder> encoder) = 0;
+    virtual void EndRenderPass(Ref<RenderPass> pass, Ref<RenderPassEncoder> encoder) = 0;
 
-    static void SubmitFullscreenQuad(WGPURenderPassEncoder& renderCommandBuffer, WGPURenderPipeline pipeline);
+    virtual void RenderMesh(Ref<RenderPassEncoder> renderCommandBuffer,
+                            WGPURenderPipeline pipeline,
+                            Ref<MeshSource> mesh,
+                            uint32_t submeshIndex,
+                            Ref<MaterialTable> material,
+                            Ref<GPUBuffer> transformBuffer,
+                            uint32_t transformOffset,
+                            uint32_t instanceCount) = 0;
 
-    WGPUTextureView GetCurrentSwapChainTexture();
-    WGPUSurface GetActiveSurface() { return m_Surface; }
+    virtual void SubmitFullscreenQuad(Ref<RenderPassEncoder> renderCommandBuffer, WGPURenderPipeline pipeline) = 0;
 
-    static void ComputeMip(Texture2D* output);
-    static void ComputeMipCube(TextureCube* output);
-    static void ComputePreFilter(TextureCube* input, TextureCube* output);
-    static void ComputeEnvironmentIrradiance(TextureCube* input, TextureCube* output);
-    static void ComputeEquirectToCubemap(Texture2D* equirectTexture, TextureCube* outputCubemap);
-    static std::pair<Ref<TextureCube>, Ref<TextureCube>> CreateEnvironmentMap(const std::string& filepath);
+    virtual GLFWwindow* GetActiveWindow() = 0;
+
+    virtual Ref<CommandEncoder> CreateCommandEncoder() = 0;
+    virtual void SubmitAndFinishEncoder(Ref<CommandEncoder> commandEncoder) = 0;
+
+    virtual void Present() = 0;
+
+    virtual void ComputeMip(Texture2D* output) = 0;
+    virtual void ComputeMipCube(TextureCube* output) = 0;
+    virtual void ComputePreFilter(TextureCube* input, TextureCube* output) = 0;
+    virtual void ComputeEnvironmentIrradiance(TextureCube* input, TextureCube* output) = 0;
+    virtual void ComputeEquirectToCubemap(Texture2D* equirectTexture, TextureCube* outputCubemap) = 0;
+    virtual std::pair<Ref<TextureCube>, Ref<TextureCube>> CreateEnvironmentMap(const std::string& filepath) = 0;
 
     static void RegisterShaderDependency(Ref<Shader> shader, Material* material);
     static void RegisterShaderDependency(Ref<Shader> shader, RenderPipeline* material);
     static void ReloadShaders();
     static void ReloadShader(Ref<Shader> shader);
 
+    virtual bool IsReady() = 0;
+    virtual void Tick() = 0;
+
+    OnRendererReadyCallback OnReady;
+
    private:
-    void RendererPostInit();
-    WGPUTextureView GetCurrentTextureView();
-
-   public:
-    Ref<RenderContext> m_RenderContext;
-    WGPUSurface m_Surface = nullptr;
-    WGPUInstance m_GpuInstance = nullptr;
-    WGPUDevice m_Device = nullptr;
-    WGPUQueue m_Queue = nullptr;
-
+    static Render* m_RenderInstance;
     GLFWwindow* m_Window = nullptr;
-    WGPUTextureView m_SwapTexture;
-    WGPULimits m_Limits;
-
-    WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_Undefined;
-    WGPUTextureFormat m_depthTextureFormat = WGPUTextureFormat_Depth24Plus;
-
-    WGPUColor m_ClearColor = WGPUColor{0, 0, 0, 1};
-
-    friend class RenderContext;
+    static void OnDeviceCallback(WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView message, void* userdata1, void* userdata2);
+    static void OnAdapterInstanceCallback(WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message, void* userdata1, void* userdata2);
+    void RendererPostInit();
   };
 }  // namespace Rain

@@ -5,7 +5,6 @@
 
 #include <webgpu/webgpu.h>
 #include <glm/glm.hpp>
-#include "TinyTimer.h"
 #include "scene/SceneRenderer.h"
 
 struct GLFWwindow;
@@ -20,8 +19,10 @@ typedef Rain::LinuxWindow AppWindow;
 typedef Rain::WebWindow AppWindow;
 #endif
 
-namespace Rain {
-  class Application : public AppWindow {
+namespace Rain
+{
+  class Application : public AppWindow
+  {
    protected:
     void OnKeyPressed(KeyCode key, KeyAction action) override;
     void OnMouseMove(double xPos, double yPos) override;
@@ -30,7 +31,8 @@ namespace Rain {
 
    public:
     Application(const Rain::WindowProps& props)
-        : AppWindow(props) {
+        : AppWindow(props)
+    {
       m_Instance = this;
     }
 
@@ -39,14 +41,13 @@ namespace Rain {
     void OnUpdate() override;
     void OnStart() override;
     void fetchTimestamps();
-    TinyTimer::PerformanceCounter m_perf;
     static Application* Get();
 
     glm::vec2 GetWindowSize();
 
    private:
     Ref<SceneRenderer> m_Renderer;
-    Scene* m_Scene;
+    std::unique_ptr<Scene> m_Scene;
     static Application* m_Instance;
 
    private:

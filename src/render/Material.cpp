@@ -20,18 +20,19 @@ namespace Rain
       {
         continue;
       }
+
       if (decl.Type == RenderPassResourceType::PT_Texture)
       {
-        m_BindManager->Set(decl.Name, Render::GetWhiteTexture());
+        m_BindManager->Set(decl.Name, Render::Get()->GetWhiteTexture());
       }
       if (decl.Type == RenderPassResourceType::PT_Sampler)
       {
-        m_BindManager->Set(decl.Name, Render::GetDefaultSampler());
+        m_BindManager->Set(decl.Name, Render::Get()->GetDefaultSampler());
       }
     }
 
     int size = 0;
-    for (const auto& [_, member] : m_Shader->GetReflectionInfo().UniformTypes[MATERIAL_UNIFORM_KEY])
+    for (const auto& [_, member] : m_Shader->GetReflectionInfo().ShaderTypes[MATERIAL_UNIFORM_KEY])
     {
       size += member.Size;
     }
@@ -100,6 +101,6 @@ namespace Rain
 
   const ShaderTypeDecl& Material::FindShaderUniformDecl(const std::string& name)
   {
-    return m_Shader->GetReflectionInfo().UniformTypes[MATERIAL_UNIFORM_KEY][name];
+    return m_Shader->GetReflectionInfo().ShaderTypes[MATERIAL_UNIFORM_KEY][name];
   }
 }  // namespace Rain

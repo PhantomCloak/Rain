@@ -1,4 +1,5 @@
 // #include "imgui.h"
+#include "render/RenderWGPU.h"
 #include "scene/Entity.h"
 #include "scene/Scene.h"
 #define RN_DEBUG
@@ -12,7 +13,6 @@
 #include "core/SysInfo.h"
 #include "io/cursor.h"
 #include "io/keyboard.h"
-#include "render/GPUAllocator.h"
 #include "render/Render.h"
 #include "render/ResourceManager.h"
 
@@ -24,7 +24,7 @@
 
 namespace Rain
 {
-  std::unique_ptr<Render> render;
+  std::unique_ptr<Render> m_Render;
   Application* Application::m_Instance;
 
   // This place still heavily under WIP
@@ -38,30 +38,40 @@ namespace Rain
     RN_LOG("Total Cores: {}", SysInfo::CoreCount());
     RN_LOG("Total Memory (RAM): {}", SysInfo::TotalMemory());
 
-    render = std::make_unique<Render>();
-    render->Init(GetNativeWindow());
+    m_Render = std::make_unique<RenderWGPU>();
 
-    GPUAllocator::Init();
+    const auto InitializeScene = [this]()
+    {
+      RN_LOG("Render API is ready!");
+      Rain::ResourceManager::LoadTexture("T_Default", RESOURCE_DIR "/textures/placeholder.jpeg");
 
-    Rain::ResourceManager::LoadTexture("T_Default", RESOURCE_DIR "/textures/placeholder.jpeg");
+      m_Renderer = CreateRef<SceneRenderer>();
+      m_Renderer->Init();
 
-    m_Renderer = CreateRef<SceneRenderer>();
-    m_Renderer->Init();
+      m_Scene = std::make_unique<Scene>("Test Scene");
+      m_Scene->Init();
 
-    m_Scene = new Scene("Test Scene");
-    m_Scene->Init();
+      if (m_Render)
+      {
+        Cursor::Setup(m_Render->GetActiveWindow());
+        Keyboard::Setup(m_Render->GetActiveWindow());
+      }
+      Cursor::CaptureMouse(true);
+    };
 
-    Cursor::Setup(render->m_Window);
-    Keyboard::Setup(render->m_Window);
-    Cursor::CaptureMouse(true);
+    if (m_Render)
+    {
+      m_Render->OnReady = InitializeScene;
+      m_Render->Init(GetNativeWindow());
+    }
+    else
+    {
+      InitializeScene();
+    }
   }
 
   void Application::OnResize(int height, int width)
   {
-    // render->m_swapChainDesc.height = height;
-    // render->m_swapChainDesc.width = width;
-    // render->m_swapChain = render->BuildSwapChain(render->m_swapChainDesc, render->m_device, render->m_surface);
-
     m_Renderer->SetViewportSize(height, width);
   }
 
@@ -71,8 +81,20 @@ namespace Rain
     FrameMark;
 #endif
     glfwPollEvents();
-    m_Scene->OnUpdate();
-    m_Scene->OnRender(m_Renderer);
+
+    if (m_Scene != nullptr)
+    {
+      m_Scene->OnUpdate();
+      if (m_Renderer != nullptr && m_Render->IsReady())
+      {
+        m_Scene->OnRender(m_Renderer);
+      }
+    }
+
+    if (m_Render != nullptr)
+    {
+      m_Render->Tick();
+    }
   }
 
   void Application::OnMouseClick(Rain::MouseCode button)
@@ -99,7 +121,12 @@ namespace Rain
 
   bool Application::isRunning()
   {
-    return !glfwWindowShouldClose(render->m_Window);
+    if (const auto ptr = m_Render->GetActiveWindow())
+    {
+      return !glfwWindowShouldClose(ptr);
+    }
+
+    return true;
   }
 
   Application* Application::Get()

@@ -3,9 +3,12 @@
 #include "core/Ref.h"
 #include "webgpu/webgpu.h"
 
-namespace Rain {
-  class RenderContext {
+namespace Rain
+{
+  class RenderContext
+  {
    public:
+    static bool IsReady() { return m_Instance != nullptr; }
     static WGPUSurface& GetSurface() { return *Instance().m_Surface; }
     static WGPUAdapter& GetAdapter() { return *Instance().m_Adapter; }
     static WGPUDevice& GetDevice() { return *Instance().m_Device; }

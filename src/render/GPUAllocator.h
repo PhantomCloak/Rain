@@ -4,13 +4,18 @@
 #include <string>
 #include "render/RenderContext.h"
 
-namespace Rain {
+#ifndef __EMSCRIPTEN__
+using WGPUBufferUsageFlags = WGPUBufferUsage;
+#endif
+
+namespace Rain
+{
   class GPUBuffer;
-  class GPUAllocator {
+  class GPUAllocator
+  {
    public:
-    static void Init();
-    static Ref<GPUBuffer> GAlloc(std::string label, WGPUBufferUsage usage, int size);
-    static Ref<GPUBuffer> GAlloc(WGPUBufferUsage usage, int size);
+    static Ref<GPUBuffer> GAlloc(std::string label, WGPUBufferUsageFlags usage, int size);
+    static Ref<GPUBuffer> GAlloc(WGPUBufferUsageFlags usage, int size);
 
     static int allocatedBufferCount;
     static int allocatedBufferTotalSize;
@@ -19,11 +24,11 @@ namespace Rain {
     static void GSet(Ref<GPUBuffer> buffer, void* data, int size);
 
    private:
-    static Ref<RenderContext> m_Context;
     friend GPUBuffer;
   };
 
-  class GPUBuffer {
+  class GPUBuffer
+  {
    public:
     WGPUBuffer Buffer;
     int Size;

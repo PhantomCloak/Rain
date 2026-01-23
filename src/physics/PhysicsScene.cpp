@@ -1,6 +1,8 @@
 #include "PhysicsScene.h"
 #include <Jolt/Physics/Collision/GroupFilterTable.h>
+#ifdef JPH_DEBUG_RENDERER
 #include <Jolt/Renderer/DebugRenderer.h>
+#endif
 #include "PhysicUtils.h"
 #include "Physics/Body/BodyCreationSettings.h"
 #include "Physics/Body/BodyLockMulti.h"
@@ -48,7 +50,10 @@ namespace Rain
     m_PhysicsSystem->SetGravity(PhysicsUtils::ToJoltVector(gravity));
     m_Instance = this;
 
+#ifndef __EMSCRIPTEN__
     RenderDebug::Init();
+#endif
+
     //// Create turret
     // JPH::RVec3 turret_position = body_position + JPH::Vec3(0, half_vehicle_height + half_turret_height, 0);
     // JPH::BodyCreationSettings turret_body_setings(new JPH::BoxShape(JPH::Vec3(half_turret_width, half_turret_height, half_turret_length)), turret_position, JPH::Quat::sIdentity(), JPH::EMotionType::Dynamic, Layers::MOVING);
@@ -178,50 +183,50 @@ namespace Rain
     // veh->Update(this);
 
     return;
-    m_PhysicsSystem->DrawBodies(JPH::BodyManager::DrawSettings(), JPH::DebugRenderer::sInstance);
+    // m_PhysicsSystem->DrawBodies(JPH::BodyManager::DrawSettings(), JPH::DebugRenderer::sInstance);
 
-    PreUpdate(dt);
-    SynchronizePendingBodyTransforms();
-    m_PhysicsSystem->Update(dt, 1, m_TempAllocator, m_JobSystem);
+    // PreUpdate(dt);
+    // SynchronizePendingBodyTransforms();
+    // m_PhysicsSystem->Update(dt, 1, m_TempAllocator, m_JobSystem);
 
-    const auto& bodyLockInterface = m_PhysicsSystem->GetBodyLockInterface();
-    JPH::BodyIDVector activeBodies;
-    m_PhysicsSystem->GetActiveBodies(JPH::EBodyType::RigidBody, activeBodies);
-    JPH::BodyLockMultiWrite activeBodiesLock(bodyLockInterface, activeBodies.data(), static_cast<int32_t>(activeBodies.size()));
+    // const auto& bodyLockInterface = m_PhysicsSystem->GetBodyLockInterface();
+    // JPH::BodyIDVector activeBodies;
+    // m_PhysicsSystem->GetActiveBodies(JPH::EBodyType::RigidBody, activeBodies);
+    // JPH::BodyLockMultiWrite activeBodiesLock(bodyLockInterface, activeBodies.data(), static_cast<int32_t>(activeBodies.size()));
 
-    for (int32_t i = 0; i < activeBodies.size(); i++)
-    {
-      JPH::Body* body = activeBodiesLock.GetBody(i);
-      // The position of kinematic rigid bodies is synced _before_ the physics simulation by setting its velocity such that
-      // the simulation will move it to the game world position.  This gives a better collision response than synching the
-      // position here.
-      if (body == nullptr || body->IsKinematic())
-      {
-        continue;
-      }
+    // for (int32_t i = 0; i < activeBodies.size(); i++)
+    //{
+    //   JPH::Body* body = activeBodiesLock.GetBody(i);
+    //   // The position of kinematic rigid bodies is synced _before_ the physics simulation by setting its velocity such that
+    //   // the simulation will move it to the game world position.  This gives a better collision response than synching the
+    //   // position here.
+    //   if (body == nullptr || body->IsKinematic())
+    //   {
+    //     continue;
+    //   }
 
-      // Apply air resistance
-      // body->ApplyBuoyancyImpulse(s_AirPlane, 0.075f, 0.15f, 0.01f, JPH::Vec3::sZero(), m_JoltSystem->GetGravity(), m_FixedTimeStep);
+    //  // Apply air resistance
+    //  // body->ApplyBuoyancyImpulse(s_AirPlane, 0.075f, 0.15f, 0.01f, JPH::Vec3::sZero(), m_JoltSystem->GetGravity(), m_FixedTimeStep);
 
-      // Synchronize the transform
-      Entity entity = Scene::Instance->TryGetEntityWithUUID(body->GetUserData());
+    //  // Synchronize the transform
+    //  Entity entity = Scene::Instance->TryGetEntityWithUUID(body->GetUserData());
 
-      if (!entity)
-      {
-        continue;
-      }
+    //  if (!entity)
+    //  {
+    //    continue;
+    //  }
 
-      auto rigidBody = m_RigidBodies.at(entity.GetUUID());
+    //  auto rigidBody = m_RigidBodies.at(entity.GetUUID());
 
-      TransformComponent& transformComponent = entity.GetComponent<TransformComponent>();
-      glm::vec3 scale = transformComponent.Scale;
-      transformComponent.Translation = PhysicsUtils::FromJoltVector(body->GetPosition());
+    //  TransformComponent& transformComponent = entity.GetComponent<TransformComponent>();
+    //  glm::vec3 scale = transformComponent.Scale;
+    //  transformComponent.Translation = PhysicsUtils::FromJoltVector(body->GetPosition());
 
-      transformComponent.SetRotation(PhysicsUtils::FromJoltQuat(body->GetRotation()));
+    //  transformComponent.SetRotation(PhysicsUtils::FromJoltQuat(body->GetRotation()));
 
-      Scene::Instance->ConvertToLocalSpace(entity);
-      transformComponent.Scale = scale;
-    }
+    //  Scene::Instance->ConvertToLocalSpace(entity);
+    //  transformComponent.Scale = scale;
+    //}
   }
 
   Ref<PhysicsBody> PhysicsScene::CreateBody(Entity entity)

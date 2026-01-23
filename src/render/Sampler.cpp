@@ -2,11 +2,14 @@
 #include "render/RenderContext.h"
 #include "render/RenderUtils.h"
 
-namespace Rain {
-  Ref<Sampler> Sampler::Create(SamplerProps props) {
+namespace Rain
+{
+  Ref<Sampler> Sampler::Create(SamplerProps props)
+  {
     WGPUSamplerDescriptor samplerDesc = {};
 
-    if (!props.Name.empty()) {
+    if (!props.Name.empty())
+    {
       samplerDesc.label = RenderUtils::MakeLabel(props.Name);
     }
 
@@ -14,7 +17,8 @@ namespace Rain {
     samplerDesc.addressModeV = RenderTypeUtils::ToRenderType(props.WrapFormat);
     samplerDesc.addressModeW = RenderTypeUtils::ToRenderType(props.WrapFormat);
 
-    switch (props.MagFilterFormat) {
+    switch (props.MagFilterFormat)
+    {
       case Nearest:
         samplerDesc.magFilter = WGPUFilterMode_Nearest;
         break;
@@ -23,7 +27,8 @@ namespace Rain {
         break;
     }
 
-    switch (props.MinFilterFormat) {
+    switch (props.MinFilterFormat)
+    {
       case Nearest:
         samplerDesc.minFilter = WGPUFilterMode_Nearest;
         break;
@@ -32,7 +37,8 @@ namespace Rain {
         break;
     }
 
-    switch (props.MipFilterFormat) {
+    switch (props.MipFilterFormat)
+    {
       case Nearest:
         samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Nearest;
         break;
@@ -44,7 +50,8 @@ namespace Rain {
     samplerDesc.lodMinClamp = props.LodMinClamp;
     samplerDesc.lodMaxClamp = props.LodMaxClamp;
 
-    switch (props.Compare) {
+    switch (props.Compare)
+    {
       case CompareUndefined:
         samplerDesc.compare = WGPUCompareFunction_Undefined;
         break;
@@ -54,13 +61,17 @@ namespace Rain {
     }
     samplerDesc.maxAnisotropy = props.Ans;
 
-    auto nativeSampler = CreateRef<WGPUSampler>(wgpuDeviceCreateSampler(RenderContext::GetDevice(), &samplerDesc));
-    auto sampler = CreateRef<Sampler>(nativeSampler);
+    if (RenderContext::IsReady())
+    {
+      auto nativeSampler = CreateRef<WGPUSampler>(wgpuDeviceCreateSampler(RenderContext::GetDevice(), &samplerDesc));
+      return CreateRef<Sampler>(nativeSampler);
+    }
 
-    return sampler;
+    return CreateRef<Sampler>();
   }
 
-  void Sampler::Release() {
+  void Sampler::Release()
+  {
     wgpuSamplerRelease(*m_Sampler);  // TODO better do
   }
 }  // namespace Rain

@@ -1,9 +1,12 @@
 #include "RenderUtils.h"
 
-namespace Rain {
+namespace Rain
+{
   void LayoutUtils::SetVisibility(WGPUBindGroupLayoutEntry& entry,
-                                  GroupLayoutVisibility visibility) {
-    switch (visibility) {
+                                  GroupLayoutVisibility visibility)
+  {
+    switch (visibility)
+    {
       case GroupLayoutVisibility::Vertex:
         entry.visibility = WGPUShaderStage_Vertex;
         break;
@@ -17,24 +20,30 @@ namespace Rain {
   }
 
   // For std::string if needed
-#ifndef EMSCRIPTTEN
-  WGPUStringView RenderUtils::MakeLabel(const std::string& str) {
+#ifndef __EMSCRIPTEN__
+  WGPUStringView RenderUtils::MakeLabel(const std::string& str)
+  {
     return {str.c_str(), str.size()};
   }
-  WGPUStringView RenderUtils::MakeLabel(const char* str) {
+  WGPUStringView RenderUtils::MakeLabel(const char* str)
+  {
     return {str, strlen(str)};
   }
 #else
-  const char* RenderUtils::MakeLabel(const std::string& str) {
+  const char* RenderUtils::MakeLabel(const std::string& str)
+  {
     return str.c_str();
   }
-  const char* RenderUtils::MakeLabel(const char* str) {
+  const char* RenderUtils::MakeLabel(const char* str)
+  {
     return str;
   }
 #endif
 
-  void LayoutUtils::SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type) {
-    switch (type) {
+  void LayoutUtils::SetType(WGPUBindGroupLayoutEntry& entry, GroupLayoutType type)
+  {
+    switch (type)
+    {
       case GroupLayoutType::Uniform:
         entry.buffer.type = WGPUBufferBindingType_Uniform;
         break;
@@ -69,12 +78,14 @@ namespace Rain {
     }
   }
 
-  std::vector<WGPUBindGroupLayoutEntry> LayoutUtils::ParseGroupLayout(GroupLayout layout) {
+  std::vector<WGPUBindGroupLayoutEntry> LayoutUtils::ParseGroupLayout(GroupLayout layout)
+  {
     std::vector<WGPUBindGroupLayoutEntry> groups;
     int groupsMemberCtx = 0;
 
     // We may need to account for buffer.minBindingSize
-    for (auto layoutItem : layout) {
+    for (auto layoutItem : layout)
+    {
       WGPUBindGroupLayoutEntry entry = {};
 
       entry.binding = groupsMemberCtx++;
@@ -87,7 +98,8 @@ namespace Rain {
     return groups;
   }
 
-  WGPUBindGroupLayout LayoutUtils::CreateBindGroup(std::string label, WGPUDevice device, GroupLayout layout) {
+  WGPUBindGroupLayout LayoutUtils::CreateBindGroup(std::string label, WGPUDevice device, GroupLayout layout)
+  {
     std::vector<WGPUBindGroupLayoutEntry> entries = ParseGroupLayout(layout);
 
     // TODO(memory): We need to introduce custom allocator in the future
@@ -100,25 +112,31 @@ namespace Rain {
     return wgpuDeviceCreateBindGroupLayout(device, descriptor);
   }
 
-  uint32_t LayoutUtils::CeilToNextMultiple(uint32_t value, uint32_t step) {
+  uint32_t LayoutUtils::CeilToNextMultiple(uint32_t value, uint32_t step)
+  {
     uint32_t divide_and_ceil = value / step + (value % step == 0 ? 0 : 1);
     return step * divide_and_ceil;
   }
 
-  TextureFormat RenderTypeUtils::FromRenderType(WGPUTextureFormat format) {
+  TextureFormat RenderTypeUtils::FromRenderType(WGPUTextureFormat format)
+  {
     RN_ASSERT(false, "Haven't implemented yet");
   }
 
-  TextureWrappingFormat RenderTypeUtils::FromRenderType(WGPUAddressMode format) {
+  TextureWrappingFormat RenderTypeUtils::FromRenderType(WGPUAddressMode format)
+  {
     RN_ASSERT(false, "Haven't implemented yet");
   }
 
-  FilterMode RenderTypeUtils::FromRenderType(WGPUFilterMode format) {
+  FilterMode RenderTypeUtils::FromRenderType(WGPUFilterMode format)
+  {
     RN_ASSERT(false, "Haven't implemented yet");
   }
 
-  WGPUTextureFormat RenderTypeUtils::ToRenderType(TextureFormat format) {
-    switch (format) {
+  WGPUTextureFormat RenderTypeUtils::ToRenderType(TextureFormat format)
+  {
+    switch (format)
+    {
       case RGBA8:
         return WGPUTextureFormat_RGBA8Unorm;
       case BRGBA8:
@@ -136,8 +154,10 @@ namespace Rain {
     };
   }
 
-  WGPUAddressMode RenderTypeUtils::ToRenderType(TextureWrappingFormat format) {
-    switch (format) {
+  WGPUAddressMode RenderTypeUtils::ToRenderType(TextureWrappingFormat format)
+  {
+    switch (format)
+    {
       case ClampToEdges:
         return WGPUAddressMode_ClampToEdge;
       case Repeat:
@@ -147,8 +167,10 @@ namespace Rain {
         RN_ASSERT(false, "Format conversion for TextureWrappingFormat not exist.")
     }
   }
-  WGPUFilterMode RenderTypeUtils::ToRenderType(FilterMode format) {
-    switch (format) {
+  WGPUFilterMode RenderTypeUtils::ToRenderType(FilterMode format)
+  {
+    switch (format)
+    {
       case Nearest:
         return WGPUFilterMode_Nearest;
       case Linear:
@@ -158,12 +180,15 @@ namespace Rain {
     }
   }
 
-  uint32_t RenderUtils::CalculateMipCount(uint32_t width, uint32_t height) {
+  uint32_t RenderUtils::CalculateMipCount(uint32_t width, uint32_t height)
+  {
     return (uint32_t)(floor((float)(log2(glm::max(width, height))))) + 1;
   }
 
-  const char* RenderUtils::GetAdapterTypeString(WGPUAdapterType adapterType) {
-    switch (adapterType) {
+  const char* RenderUtils::GetAdapterTypeString(WGPUAdapterType adapterType)
+  {
+    switch (adapterType)
+    {
       case WGPUAdapterType_DiscreteGPU:
         return "Discrete GPU";
       case WGPUAdapterType_IntegratedGPU:
@@ -177,8 +202,10 @@ namespace Rain {
     }
   }
 
-  const char* RenderUtils::GetBackendTypeString(WGPUBackendType backendType) {
-    switch (backendType) {
+  const char* RenderUtils::GetBackendTypeString(WGPUBackendType backendType)
+  {
+    switch (backendType)
+    {
       case WGPUBackendType_Null:
         return "Null";
       case WGPUBackendType_WebGPU:
@@ -200,8 +227,10 @@ namespace Rain {
     }
   }
 
-  uint32_t TextureUtils::GetBytesPerPixel(TextureFormat format) {
-    switch (format) {
+  uint32_t TextureUtils::GetBytesPerPixel(TextureFormat format)
+  {
+    switch (format)
+    {
       case TextureFormat::RGBA8:
         return 4;
       case TextureFormat::RGBA16F:

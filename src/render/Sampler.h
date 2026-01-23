@@ -4,23 +4,28 @@
 #include "core/Ref.h"
 #include "webgpu/webgpu.h"
 
-namespace Rain {
-  enum TextureWrappingFormat {
+namespace Rain
+{
+  enum TextureWrappingFormat
+  {
     ClampToEdges,
     Repeat
   };
 
-  enum FilterMode {
+  enum FilterMode
+  {
     Nearest,
     Linear
   };
 
-  enum CompareMode {
+  enum CompareMode
+  {
     CompareUndefined,
     Less
   };
 
-  struct SamplerProps {
+  struct SamplerProps
+  {
     std::string Name;
     TextureWrappingFormat WrapFormat;
     FilterMode MagFilterFormat;
@@ -32,11 +37,15 @@ namespace Rain {
     float Ans = 1.0f;
   };
 
-  class Sampler {
+  class Sampler
+  {
    public:
+    Sampler() {};
+
     Ref<WGPUSampler> GetNativeSampler() { return m_Sampler; }
     static Ref<Sampler> Create(SamplerProps props);
-    static SamplerProps GetDefaultProps(std::string name = "", float lodMinClamp = 0.0f, float lodMaxClamp = 80.0f) {
+    static SamplerProps GetDefaultProps(std::string name = "", float lodMinClamp = 0.0f, float lodMaxClamp = 80.0f)
+    {
       return SamplerProps{
           .Name = name,
           .WrapFormat = TextureWrappingFormat::Repeat,

@@ -59,9 +59,9 @@ namespace Rain
 
   struct ShaderReflectionInfo
   {
-    std::map<int, std::vector<ResourceDeclaration>> ResourceDeclarations;
+    std::map<int, std::vector<ResourceDeclaration>> ShaderVariables;
+    std::map<std::string, std::map<std::string, ShaderTypeDecl>> ShaderTypes;  // <StructName, <StructMemberName, Info>>
     std::map<int, WGPUBindGroupLayout> LayoutDescriptors;
-    std::map<std::string, std::map<std::string, ShaderTypeDecl>> UniformTypes;
   };
 
   class Shader

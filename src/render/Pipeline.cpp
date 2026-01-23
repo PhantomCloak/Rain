@@ -4,9 +4,12 @@
 
 // In some environments (such as Emscriptten) underlying implementation details of the WebGPU API might require HEAP pointers
 
-namespace Rain {
-  WGPUVertexFormat ConvertWGPUVertexFormat(ShaderDataType type) {
-    switch (type) {
+namespace Rain
+{
+  WGPUVertexFormat ConvertWGPUVertexFormat(ShaderDataType type)
+  {
+    switch (type)
+    {
       case ShaderDataType::Float:
         return WGPUVertexFormat_Float32;
       case ShaderDataType::Float2:
@@ -38,12 +41,14 @@ namespace Rain {
   }
 
   RenderPipeline::RenderPipeline(const RenderPipelineSpec& props)
-      : m_PipelineSpec(props) {
+      : m_PipelineSpec(props)
+  {
     Invalidate();
     Render::RegisterShaderDependency(props.Shader, this);
   }
 
-  void RenderPipeline::Invalidate() {
+  void RenderPipeline::Invalidate()
+  {
     // if (m_Pipeline != nullptr) {
     //   wgpuRenderPipelineRelease(m_Pipeline);
     // }
@@ -59,7 +64,8 @@ namespace Rain {
     const auto& vertexLayout = m_PipelineSpec.VertexLayout;
     const auto& instanceLayout = m_PipelineSpec.InstanceLayout;
 
-    for (const auto& element : vertexLayout) {
+    for (const auto& element : vertexLayout)
+    {
       vertexAttributes.push_back({.format = ConvertWGPUVertexFormat(element.Type),
                                   .offset = element.Offset,
                                   .shaderLocation = element.Location});
@@ -72,8 +78,10 @@ namespace Rain {
     vblVertex.stepMode = WGPUVertexStepMode_Vertex;
 
     vertexLayouts.push_back(vblVertex);
-    if (instanceLayout.GetElementCount()) {
-      for (const auto& element : instanceLayout) {
+    if (instanceLayout.GetElementCount())
+    {
+      for (const auto& element : instanceLayout)
+      {
         instanceAttributes.push_back({.format = ConvertWGPUVertexFormat(element.Type),
                                       .offset = element.Offset,
                                       .shaderLocation = element.Location});
@@ -98,11 +106,14 @@ namespace Rain {
     pipelineDesc->primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
     pipelineDesc->primitive.frontFace = WGPUFrontFace_CCW;
     pipelineDesc->primitive.nextInChain = nullptr;
+#ifndef __EMSCRIPTEN__
     pipelineDesc->primitive.unclippedDepth = true;
+#endif
 
     std::vector<WGPUConstantEntry>* constants = new std::vector<WGPUConstantEntry>();
 
-    for (const auto& [key, value] : m_PipelineSpec.Overrides) {
+    for (const auto& [key, value] : m_PipelineSpec.Overrides)
+    {
       WGPUConstantEntry constant;
       constant.key = RenderUtils::MakeLabel(key);
       constant.value = static_cast<double>(value);
@@ -113,11 +124,16 @@ namespace Rain {
     pipelineDesc->vertex.constants = constants->size() > 0 ? constants->data() : NULL;
 
     WGPUCullMode mode;
-    if (m_PipelineSpec.CullingMode == PipelineCullingMode::BACK) {
+    if (m_PipelineSpec.CullingMode == PipelineCullingMode::BACK)
+    {
       mode = WGPUCullMode_Back;
-    } else if (m_PipelineSpec.CullingMode == PipelineCullingMode::FRONT) {
+    }
+    else if (m_PipelineSpec.CullingMode == PipelineCullingMode::FRONT)
+    {
       mode = WGPUCullMode_Front;
-    } else {
+    }
+    else
+    {
       mode = WGPUCullMode_None;
     }
 
@@ -130,7 +146,8 @@ namespace Rain {
     fragmentState->constants = NULL;
     fragmentState->nextInChain = nullptr;
 
-    if (m_PipelineSpec.TargetFramebuffer->HasColorAttachment()) {
+    if (m_PipelineSpec.TargetFramebuffer->HasColorAttachment())
+    {
       WGPUBlendState* blendState = ZERO_ALLOC(WGPUBlendState);
       blendState->color.srcFactor = WGPUBlendFactor_SrcAlpha;
       blendState->color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
@@ -150,7 +167,8 @@ namespace Rain {
 
     fragmentState->targetCount = m_PipelineSpec.TargetFramebuffer->HasColorAttachment() ? 1 : 0;
 
-    if (m_PipelineSpec.TargetFramebuffer->HasDepthAttachment()) {
+    if (m_PipelineSpec.TargetFramebuffer->HasDepthAttachment())
+    {
       WGPUDepthStencilState* depthStencilState = ZERO_ALLOC(WGPUDepthStencilState);
       depthStencilState->format = WGPUTextureFormat_Depth24Plus;
       depthStencilState->stencilReadMask = 0xFFFFFFFF;
@@ -171,14 +189,20 @@ namespace Rain {
       depthStencilState->stencilBack.passOp = WGPUStencilOperation_Keep;
 
       depthStencilState->depthCompare = WGPUCompareFunction_Less;
+#ifndef __EMSCRIPTEN__
       depthStencilState->depthWriteEnabled = WGPUOptionalBool_True;
+#else
+      depthStencilState->depthWriteEnabled = true;
+#endif
 
       depthStencilState->stencilReadMask = 0xFFFFFFFF;
       depthStencilState->stencilWriteMask = 0xFFFFFFFF;
       depthStencilState->nextInChain = nullptr;
 
       pipelineDesc->depthStencil = depthStencilState;
-    } else {
+    }
+    else
+    {
       pipelineDesc->depthStencil = nullptr;
     }
 
@@ -188,30 +212,39 @@ namespace Rain {
     pipelineDesc->multisample.alphaToCoverageEnabled = false;
     pipelineDesc->multisample.nextInChain = nullptr;
 
-    if (m_PipelineSpec.DebugName == "RP_Composite" || m_PipelineSpec.DebugName == "RP_Skybox") {
+    if (m_PipelineSpec.DebugName == "RP_Composite" || m_PipelineSpec.DebugName == "RP_Skybox")
+    {
       pipelineDesc->multisample.count = 4;
+#ifndef __EMSCRIPTEN__
       pipelineDesc->primitive.unclippedDepth = true;
+#endif
     }
 
-    auto device = RenderContext::GetDevice();
+    if (RenderContext::IsReady())
+    {
+      auto device = RenderContext::GetDevice();
 
-    std::vector<WGPUBindGroupLayout> bindGroupLayouts;
-    for (const auto& [_, layout] : m_PipelineSpec.Shader->GetReflectionInfo().LayoutDescriptors) {
-      bindGroupLayouts.push_back(layout);
+      std::vector<WGPUBindGroupLayout> bindGroupLayouts;
+      for (const auto& [_, layout] : m_PipelineSpec.Shader->GetReflectionInfo().LayoutDescriptors)
+      {
+        bindGroupLayouts.push_back(layout);
+      }
+      WGPUPipelineLayoutDescriptor* layoutDesc = ZERO_ALLOC(WGPUPipelineLayoutDescriptor);
+      layoutDesc->bindGroupLayoutCount = bindGroupLayouts.size();
+      layoutDesc->bindGroupLayouts = bindGroupLayouts.data();
+      layoutDesc->nextInChain = nullptr;
+
+#ifndef __EMSCRIPTEN__
+      layoutDesc->immediateSize = 0;
+#endif
+      layoutDesc->label = RenderUtils::MakeLabel(m_PipelineSpec.DebugName);
+
+      WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, layoutDesc);
+      pipelineDesc->layout = pipelineLayout;
+      pipelineDesc->nextInChain = nullptr;
+
+      RN_LOG("CREATE: {}", m_PipelineSpec.DebugName);
+      m_Pipeline = wgpuDeviceCreateRenderPipeline(device, pipelineDesc);
     }
-    WGPUPipelineLayoutDescriptor* layoutDesc = ZERO_ALLOC(WGPUPipelineLayoutDescriptor);
-    layoutDesc->bindGroupLayoutCount = bindGroupLayouts.size();
-    layoutDesc->bindGroupLayouts = bindGroupLayouts.data();
-    layoutDesc->nextInChain = nullptr;
-    layoutDesc->immediateSize = 0;
-    // layoutDesc->immediateDataRangeByteSize = 0;
-    layoutDesc->label = RenderUtils::MakeLabel(m_PipelineSpec.DebugName);
-
-    WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, layoutDesc);
-    pipelineDesc->layout = pipelineLayout;
-    pipelineDesc->nextInChain = nullptr;
-
-    RN_LOG("CREATE: {}", m_PipelineSpec.DebugName);
-    m_Pipeline = wgpuDeviceCreateRenderPipeline(device, pipelineDesc);
   }
 }  // namespace Rain

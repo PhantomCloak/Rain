@@ -10,6 +10,9 @@ namespace Rain {
   }
 
   bool Keyboard::IsKeyPressed(int keyCode) {
+        if (NativeWndPtr == nullptr) {
+      return false;
+    }
     return glfwGetKey((GLFWwindow*)NativeWndPtr, keyCode);
   }
 
@@ -18,6 +21,9 @@ namespace Rain {
   }
 
   bool Keyboard::IsKeyPressing(int keyCode) {
+    if (NativeWndPtr == nullptr) {
+      return false;
+    }
     return glfwGetKey((GLFWwindow*)NativeWndPtr, keyCode);
   }
 

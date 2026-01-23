@@ -7,14 +7,11 @@
 #include "glm/gtc/type_ptr.hpp"
 // #include "imgui.h"
 #include "io/cursor.h"
-#include "io/keyboard.h"
-#include "physics/Physics.h"
 #include "render/ResourceManager.h"
 
 // #include "ImGuizmo.h"
 
 // Jolt includes
-
 namespace Rain
 {
   Scene* Scene::Instance = nullptr;
@@ -36,43 +33,59 @@ namespace Rain
   Entity entityCamera;
   Entity helment;
 
+  // Orbit camera state
+  static glm::vec3 orbitTarget = glm::vec3(0.0f);  // Focus point (center of model)
+  static float orbitDistance = 30.0f;              // Distance from target
+  static float orbitTheta = 0.0f;                  // Horizontal angle (radians)
+  static float orbitPhi = glm::radians(30.0f);     // Vertical angle (radians), 0 = horizontal
+  static glm::vec2 lastMousePos = glm::vec2(0.0f);
+  static bool isDragging = false;
+
+  // Updates camera position based on orbit parameters
+  void UpdateOrbitCamera(Entity& camera)
+  {
+    // Spherical to Cartesian conversion
+    // x = r * cos(phi) * sin(theta)
+    // y = r * sin(phi)
+    // z = r * cos(phi) * cos(theta)
+    float x = orbitDistance * cos(orbitPhi) * sin(orbitTheta);
+    float y = orbitDistance * sin(orbitPhi);
+    float z = orbitDistance * cos(orbitPhi) * cos(orbitTheta);
+
+    glm::vec3 cameraPos = orbitTarget + glm::vec3(x, y, z);
+    camera.Transform().Translation = cameraPos;
+
+    // Look at target using glm::lookAt to get the view matrix, then extract rotation
+    glm::mat4 viewMatrix = glm::lookAt(cameraPos, orbitTarget, glm::vec3(0, 1, 0));
+    glm::mat4 rotationMatrix = glm::inverse(viewMatrix);
+    camera.Transform().Rotation = glm::quat_cast(rotationMatrix);
+  }
+
   void Scene::Init()
   {
     Instance = this;
 
     auto camera = CreateEntity("MainCamera");
-    camera.Transform().Translation = glm::vec3(0.5f, 10, 0);
-    camera.Transform().SetRotationEuler(glm::vec3(-90.0f, 0, 0));
     camera.AddComponent<CameraComponent>();
 
-    auto boxModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
-    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/Helment/untitled.gltf");
-
-    helment = CreateEntity("Box");
-    Entity floorEntity = CreateEntity("Box2");
+    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
     Entity galata = CreateEntity("bump");
-    Entity tankEntity = CreateEntity("Tank");
 
-    galata.Transform().Translation = glm::vec3(0, 10, 0);
+    galata.Transform().Translation = glm::vec3(0, 0, 0);
     galata.Transform().Scale = glm::vec3(5.0f);
 
-    floorEntity.Transform().Translation = glm::vec3(0, 0, 0);
-    floorEntity.Transform().Scale = glm::vec3(100, 1.0f, 100);
+    // Set orbit target to match the model position
+    orbitTarget = galata.Transform().Translation;
 
-    // floorEntity.AddComponent<BoxColliderComponent>(glm::vec3(0), glm::vec3(100, 1, 100));
-    // floorEntity.AddComponent<RigidBodyComponent>();
-
-    // BuildMeshEntityHierarchy(floorEntity, boxModel);
     BuildMeshEntityHierarchy(galata, bochii);
+
+    // Initialize camera position from orbit parameters
+    UpdateOrbitCamera(camera);
 
     Entity light = CreateEntity("DirectionalLight");
     light.GetComponent<TransformComponent>().SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
     light.AddComponent<DirectionalLightComponent>();
     entityIdDir = light.GetUUID();
-
-    // Physics::Instance = new Physics();
-    // m_PhysicsScene = Physics::Instance->CreateScene(glm::vec3(0.0, -9.8f, 0.0));
-    // m_PhysicsScene->CreateBody(floorEntity);
   }
 
   Entity Scene::CreateChildEntity(Entity parent, std::string name)
@@ -144,22 +157,22 @@ namespace Rain
   {
     ScanKeyPress();
 
-    if (Cursor::WasLeftCursorPressed())
-    {
-      SceneQueryHit hit;
-      auto camera = GetMainCameraEntity();
-      auto [origin, direction] = CastRay(camera, Cursor::GetCursorPosition().x, Cursor::GetCursorPosition().y);
-      RayCastInfo info;
-      info.Origin = origin;
-      info.Direction = direction;
-      info.MaxDistance = 1000;
+    // if (Cursor::WasLeftCursorPressed())
+    //{
+    //   SceneQueryHit hit;
+    //   auto camera = GetMainCameraEntity();
+    //   auto [origin, direction] = CastRay(camera, Cursor::GetCursorPosition().x, Cursor::GetCursorPosition().y);
+    //   RayCastInfo info;
+    //   info.Origin = origin;
+    //   info.Direction = direction;
+    //   info.MaxDistance = 1000;
 
-      if (m_PhysicsScene->CastRay(&info, hit))
-      {
-        RN_LOG("Success Entity {}", hit.HitEntity);
-        Select = hit.HitEntity;
-      }
-    }
+    //  if (m_PhysicsScene->CastRay(&info, hit))
+    //  {
+    //    RN_LOG("Success Entity {}", hit.HitEntity);
+    //    Select = hit.HitEntity;
+    //  }
+    //}
 
     m_PhysicsScene->Update(1.0f / 60.0);
     Cursor::Update();
@@ -218,11 +231,15 @@ namespace Rain
 
   Entity Scene::GetMainCameraEntity()
   {
-    flecs::entity e = m_World.query_builder<CameraComponent>().build().first();
-    if (e)
+    if (m_World)
     {
-      return Entity(e, this);
+      flecs::entity e = m_World.query_builder<CameraComponent>().build().first();
+      if (e)
+      {
+        return Entity(e, this);
+      }
     }
+
     return {};
   }
 
@@ -316,108 +333,62 @@ namespace Rain
 
   void Scene::ScanKeyPress()
   {
-    float velocity = 0.55f;
+    Entity camera = GetMainCameraEntity();
+    if (!camera)
+    {
+      return;
+    }
+
+    // Scroll wheel zoom only
+    float scroll = Cursor::GetScrollDelta();
+    if (scroll != 0.0f)
+    {
+      orbitDistance -= scroll * 1.0f;
+      orbitDistance = glm::clamp(orbitDistance, 1.0f, 100.0f);
+      Cursor::ResetScrollDelta();
+      UpdateOrbitCamera(camera);
+    }
+  }
+
+  void Scene::OnMouseMove(double xPos, double yPos)
+  {
+    glm::vec2 currentMousePos = glm::vec2(xPos, yPos);
 
     Entity camera = GetMainCameraEntity();
-    TransformComponent& transform = camera.Transform();
+    if (!camera)
+    {
+      return;
+    }
 
-    glm::mat4 rotationMatrix = glm::mat4_cast(transform.Rotation);
-    glm::vec3 front = -glm::vec3(rotationMatrix[2]);  // Forward (negative Z)
-    glm::vec3 right = glm::vec3(rotationMatrix[0]);   // Right (positive X)
-    glm::vec3 up = glm::vec3(rotationMatrix[1]);      // Up (positive Y)
+    // Left mouse button held - orbit rotation
+    if (Cursor::HasLeftCursorClicked())
+    {
+      if (!isDragging)
+      {
+        isDragging = true;
+        lastMousePos = currentMousePos;
+        return;
+      }
 
-    if (Keyboard::IsKeyPressing(Rain::Key::W))
-    {
-      transform.Translation += front * velocity;
-    }
-    else if (Keyboard::IsKeyPressing(Rain::Key::S))
-    {
-      transform.Translation -= front * velocity;
-    }
-    else if (Keyboard::IsKeyPressing(Rain::Key::A))
-    {
-      transform.Translation -= right * velocity;
-    }
-    else if (Keyboard::IsKeyPressing(Rain::Key::D))
-    {
-      transform.Translation += right * velocity;
-    }
-    else if (Keyboard::IsKeyPressing(Rain::Key::Space))
-    {
-      transform.Translation += up * velocity;
-    }
-    else if (Keyboard::IsKeyPressing(Rain::Key::LeftShift))
-    {
-      transform.Translation -= up * velocity;
-    }
-    else if (Keyboard::IsKeyPressing(Rain::Key::Left))
-    {
-      transform.Translation.x += 0.5;
-    }
-    else if (Keyboard::IsKeyPressing(Rain::Key::Right))
-    {
-      transform.Translation.x += -0.5;
-    }
-    else if (Keyboard::IsKeyPressing(Rain::Key::Up))
-    {
-      transform.Translation.z += 0.5;
-    }
-    else if (Keyboard::IsKeyPressing(Rain::Key::Down))
-    {
-      transform.Translation.z += -0.5;
-    }
-    else if (Keyboard::IsKeyPressing(Rain::Key::K))
-    {
-      transform.Translation.y += 0.5;
-    }
-    else if (Keyboard::IsKeyPressing(Rain::Key::J))
-    {
-      transform.Translation.y -= 0.5;
+      glm::vec2 delta = currentMousePos - lastMousePos;
+      lastMousePos = currentMousePos;
+
+      float sensitivity = 0.005f;
+
+      // Horizontal drag rotates around Y axis (theta)
+      orbitTheta += delta.x * sensitivity;
+
+      // Vertical drag changes elevation (phi)
+      orbitPhi += delta.y * sensitivity;
+
+      // Clamp phi to avoid flipping (keep between -89 and 89 degrees)
+      orbitPhi = glm::clamp(orbitPhi, glm::radians(-89.0f), glm::radians(89.0f));
+
+      UpdateOrbitCamera(camera);
     }
     else
     {
-      return;
+      isDragging = false;
     }
-  }
-  void Scene::OnMouseMove(double xPos, double yPos)
-  {
-    static glm::vec2 prevCursorPos = Cursor::GetCursorPosition();
-    static bool firstMouse = true;
-    static float yaw = -90.0f;  // Start facing forward
-    static float pitch = 0.0f;
-
-    if (!Cursor::IsMouseCaptured())
-    {
-      firstMouse = true;
-      return;
-    }
-
-    glm::vec2 cursorPos = glm::vec2(xPos, yPos);
-
-    if (firstMouse)
-    {
-      prevCursorPos = cursorPos;
-      firstMouse = false;
-      return;
-    }
-
-    glm::vec2 delta = cursorPos - prevCursorPos;
-    prevCursorPos = cursorPos;
-
-    float sensitivity = 0.1f;
-    delta *= sensitivity;
-
-    yaw -= delta.x;
-    pitch += delta.y;
-
-    pitch = glm::clamp(pitch, -89.0f, 89.0f);
-
-    Entity cam = GetMainCameraEntity();
-    auto& transform = cam.Transform();
-
-    glm::quat yawQuat = glm::angleAxis(glm::radians(yaw), glm::vec3(0, 1, 0));
-    glm::quat pitchQuat = glm::angleAxis(glm::radians(pitch), glm::vec3(1, 0, 0));
-
-    transform.Rotation = yawQuat * pitchQuat;
   }
 }  // namespace Rain

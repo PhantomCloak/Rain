@@ -2,41 +2,52 @@
 #include "Scene.h"
 #include "render/Pipeline.h"
 #include "render/PipelineCompute.h"
+#include "render/Render.h"
 #include "render/Render2D.h"
 #include "render/RenderPass.h"
 
-namespace Rain {
-  struct MeshKey {
+namespace Rain
+{
+  struct MeshKey
+  {
     UUID MeshHandle;
     UUID MaterialHandle;
     uint32_t SubmeshIndex;
 
     MeshKey(UUID meshHandle, UUID materialHandle, uint32_t submeshIndex)
-        : MeshHandle(meshHandle), MaterialHandle(materialHandle), SubmeshIndex(submeshIndex) {
+        : MeshHandle(meshHandle), MaterialHandle(materialHandle), SubmeshIndex(submeshIndex)
+    {
     }
 
-    bool operator<(const MeshKey& other) const {
-      if (MeshHandle < other.MeshHandle) {
+    bool operator<(const MeshKey& other) const
+    {
+      if (MeshHandle < other.MeshHandle)
+      {
         return true;
       }
 
-      if (MeshHandle > other.MeshHandle) {
+      if (MeshHandle > other.MeshHandle)
+      {
         return false;
       }
 
-      if (SubmeshIndex < other.SubmeshIndex) {
+      if (SubmeshIndex < other.SubmeshIndex)
+      {
         return true;
       }
 
-      if (SubmeshIndex > other.SubmeshIndex) {
+      if (SubmeshIndex > other.SubmeshIndex)
+      {
         return false;
       }
 
-      if (MaterialHandle < other.MaterialHandle) {
+      if (MaterialHandle < other.MaterialHandle)
+      {
         return true;
       }
 
-      if (MaterialHandle > other.MaterialHandle) {
+      if (MaterialHandle > other.MaterialHandle)
+      {
         return false;
       }
 
@@ -44,7 +55,8 @@ namespace Rain {
     }
   };
 
-  struct DrawCommand {
+  struct DrawCommand
+  {
     Ref<MeshSource> Mesh;
     uint32_t SubmeshIndex;
     Ref<MaterialTable> Materials;
@@ -54,27 +66,32 @@ namespace Rain {
     bool IsRigged = false;
   };
 
-  struct TransformVertexData {
+  struct TransformVertexData
+  {
     glm::vec4 MRow[3];
   };
 
-  struct TransformMapData {
+  struct TransformMapData
+  {
     std::vector<TransformVertexData> Transforms;
     uint32_t TransformOffset = 0;
   };
 
-  struct SceneCamera {
+  struct SceneCamera
+  {
     glm::mat4 ViewMatrix;
     glm::mat4 Projection;
     float Near;
     float Far;
   };
 
-  struct CameraData {
+  struct CameraData
+  {
     glm::mat4 InverseViewProjectionMatrix;
   };
 
-  struct SceneUniform {
+  struct SceneUniform
+  {
     glm::mat4x4 ViewProjection;
     glm::mat4x4 View;
     glm::vec3 CameraPosition;
@@ -83,12 +100,22 @@ namespace Rain {
     float _pad1;
   };
 
-  struct ShadowUniform {
+  struct ShadowUniform
+  {
     glm::mat4 ShadowViews[4];
     glm::vec4 CascadeDistances;
   };
 
-  class SceneRenderer {
+  struct Block
+  {
+  };
+
+  struct Chunk
+  {
+  };
+
+  class SceneRenderer
+  {
    public:
     SceneRenderer() { instance = this; };
 
@@ -106,7 +133,8 @@ namespace Rain {
     void FlushDrawList();
 
    private:
-    Scene* m_Scene;
+    Scene* m_Scene = nullptr;
+    Render* m_Renderer = nullptr;
 
     CameraData m_CameraData;
     Ref<GPUBuffer> m_CameraUniformBuffer;
@@ -133,6 +161,7 @@ namespace Rain {
 
     Ref<RenderPass> m_ShadowPass[4];
     Ref<RenderPass> m_LitPass;
+    Ref<RenderPass> m_VoxelPass;
     Ref<RenderPass> m_PpfxPass;
     Ref<RenderPass> m_SkyboxPass;
 

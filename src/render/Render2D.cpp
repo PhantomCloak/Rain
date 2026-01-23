@@ -3,20 +3,24 @@
 #include "render/RenderUtils.h"
 #include "render/ShaderManager.h"
 
-namespace Rain {
+namespace Rain
+{
   std::unique_ptr<RenderDebug> RenderDebug::Instance;
 
-  void RenderDebug::Begin(WGPURenderPassEncoder* pass, WGPUCommandEncoder* encoder) {
+  void RenderDebug::Begin(WGPURenderPassEncoder* pass, WGPUCommandEncoder* encoder)
+  {
     Instance->m_TargetEncoder = encoder;
     Instance->m_TargetPass = pass;
   }
 
-  void RenderDebug::Init() {
+  void RenderDebug::Init()
+  {
     Instance = std::make_unique<RenderDebug>();
     Instance->InitializeResources();
   }
 
-  void RenderDebug::InitializeResources() {
+  void RenderDebug::InitializeResources()
+  {
     const char* LINE_SHADER = R"(
 		struct Uniforms {
 		    viewProjectionMatrix: mat4x4<f32>,
@@ -106,7 +110,9 @@ namespace Rain {
     depthStencilState->stencilBack.passOp = WGPUStencilOperation_Keep;
 
     depthStencilState->depthCompare = WGPUCompareFunction_Less;
+#ifndef __EMSCRIPTEN__
     depthStencilState->depthWriteEnabled = WGPUOptionalBool_True;
+#endif
 
     depthStencilState->stencilReadMask = 0xFFFFFFFF;
     depthStencilState->stencilWriteMask = 0xFFFFFFFF;
@@ -169,25 +175,31 @@ namespace Rain {
     wgpuPipelineLayoutRelease(pipelineLayout);
   }
 
-  void RenderDebug::Shutdown() {
+  void RenderDebug::Shutdown()
+  {
   }
 
-  void RenderDebug::DrawCircle(const glm::vec3& p0, const glm::vec3& rotation, float radius, const glm::vec4& color) {
+  void RenderDebug::DrawCircle(const glm::vec3& p0, const glm::vec3& rotation, float radius, const glm::vec4& color)
+  {
   }
 
-  void RenderDebug::DrawLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color) {
+  void RenderDebug::DrawLine(const glm::vec3& p0, const glm::vec3& p1, const glm::vec4& color)
+  {
     Instance->m_QueuedLines.push_back({p0, p1, color});
   }
 
-  void RenderDebug::FlushDrawList() {
-    if (Instance->m_QueuedLines.empty()) {
+  void RenderDebug::FlushDrawList()
+  {
+    if (Instance->m_QueuedLines.empty())
+    {
       return;
     }
 
     size_t totalVertices = Instance->m_QueuedLines.size() * 2;
     size_t vertexDataSize = totalVertices * sizeof(LineVertex);
 
-    if (!Instance->m_LineVertexBuffer || Instance->m_LineVertexBuffer->Size < vertexDataSize) {
+    if (!Instance->m_LineVertexBuffer || Instance->m_LineVertexBuffer->Size < vertexDataSize)
+    {
       size_t bufferSize = std::max(vertexDataSize, sizeof(LineVertex) * MAX_LINES_PER_BATCH * 2);
       Instance->m_LineVertexBuffer = GPUAllocator::GAlloc("Line Vertices",
                                                           WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
@@ -197,7 +209,8 @@ namespace Rain {
     std::vector<LineVertex> vertices;
     vertices.reserve(totalVertices);
 
-    for (const auto& line : Instance->m_QueuedLines) {
+    for (const auto& line : Instance->m_QueuedLines)
+    {
       vertices.push_back({line.p0, line.color});
       vertices.push_back({line.p1, line.color});
     }
@@ -216,7 +229,8 @@ namespace Rain {
     Instance->m_QueuedLines.clear();
   }
 
-  void RenderDebug::DrawLine(JPH::RVec3Arg inFrom, JPH::RVec3Arg inTo, JPH::ColorArg inColor) {
+  void RenderDebug::DrawLine(JPH::RVec3Arg inFrom, JPH::RVec3Arg inTo, JPH::ColorArg inColor)
+  {
     glm::vec3 from = PhysicsUtils::FromJoltVector(inFrom);
     glm::vec3 to = PhysicsUtils::FromJoltVector(inTo);
     glm::vec4 color = glm::vec4(inColor.r, inColor.g, inColor.b, 1.0f);
@@ -224,13 +238,15 @@ namespace Rain {
     DrawLine(from, to, color);
   }
 
-  void RenderDebug::DrawText3D(JPH::RVec3Arg inPosition, const JPH::string_view& inString, JPH::ColorArg inColor, float inHeight) {
+  void RenderDebug::DrawText3D(JPH::RVec3Arg inPosition, const JPH::string_view& inString, JPH::ColorArg inColor, float inHeight)
+  {
     // TODO: Implement 3D text rendering if needed
     // For now, this is a stub to make the class non-abstract
     // You can leave this empty or add basic text rendering later
   }
 
-  void RenderDebug::DrawTriangle(JPH::RVec3Arg inV1, JPH::RVec3Arg inV2, JPH::RVec3Arg inV3, JPH::ColorArg inColor, ECastShadow inCastShadow) {
+  void RenderDebug::DrawTriangle(JPH::RVec3Arg inV1, JPH::RVec3Arg inV2, JPH::RVec3Arg inV3, JPH::ColorArg inColor, ECastShadow inCastShadow)
+  {
     glm::vec3 v1 = PhysicsUtils::FromJoltVector(inV1);
     glm::vec3 v2 = PhysicsUtils::FromJoltVector(inV2);
     glm::vec3 v3 = PhysicsUtils::FromJoltVector(inV3);
