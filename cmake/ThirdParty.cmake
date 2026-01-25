@@ -33,6 +33,8 @@ if(EMSCRIPTEN)
   set(CMAKE_USE_PTHREADS_INIT 1 CACHE BOOL "" FORCE)
   set(THREADS_PREFER_PTHREAD_FLAG ON CACHE BOOL "" FORCE)
   add_subdirectory(vendor/assimp)
+  # Fix: Draco generates draco_features.h in build dir, add it to include paths
+  target_include_directories(assimp PRIVATE "${CMAKE_BINARY_DIR}")
 else()
   add_compile_definitions(DAWN_DEBUG_BREAK_ON_ERROR) # TODO: Inspect target?
 
@@ -46,6 +48,8 @@ else()
   set(TINT_ENABLE_INSTALL ON)
   set(TINT_BUILD_WGSL_READER ON)
   add_subdirectory(vendor/assimp)
+  # Fix: Draco generates draco_features.h in build dir, add it to include paths
+  target_include_directories(assimp PRIVATE "${CMAKE_BINARY_DIR}")
   add_subdirectory(vendor/dawn)
 
   add_library(TracyClient STATIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/TracyClient.cpp)
