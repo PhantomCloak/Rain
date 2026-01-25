@@ -28,6 +28,7 @@ jobs:
 
       - name: Configure CMake
         run: |
+          export EMSCRIPTEN=$EMSDK/upstream/emscripten
           cmake --preset emscripten-release \
             -DCMAKE_TOOLCHAIN_FILE=$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
 
