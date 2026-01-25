@@ -21,7 +21,7 @@ struct VertexOutput {
 	@location(6) WorldNormal: vec3f,
 	@location(7) WorldTangent: vec3f,
 	@location(8) WorldBitangent: vec3f,
-  @location(9)  ShadowCoord0: vec3f,
+   @location(9)  ShadowCoord0: vec3f,
   @location(10) ShadowCoord1: vec3f,
   @location(11) ShadowCoord2: vec3f,
   @location(12) ShadowCoord3: vec3f,
