@@ -48,6 +48,6 @@ jobs:
         with:
           personal_token: ${{ secrets.DEMO_DEPLOY_TOKEN }}
           external_repository: PhantomCloak/rain-demo
-          publish_branch: main
+          publish_branch: master
           publish_dir: ./deploy
           force_orphan: true
