@@ -41,7 +41,7 @@ int main(int argc, char** argv)
 
   // RN_LOG("Pixel Ratio: {}", emscripten_get_device_pixel_ratio());
 #endif
-  RN_LOG("W: {} H: {}", props.Width, props.Height);
+  //RN_LOG("W: {} H: {}", props.Width, props.Height);
 
   Rain::Window* app = new Application(props);
 
