@@ -15,11 +15,11 @@ jobs:
 
       - name: Checkout required submodules
         run: |
-          git submodule update --init --depth 1 vendor/assimp
-          git submodule update --init --depth 1 vendor/spdlog
-          git submodule update --init --depth 1 vendor/flecs
-          git submodule update --init --depth 1 vendor/stb
-          git submodule update --init --depth 1 vendor/JoltPhysics
+          git submodule update --init --recursive vendor/assimp
+          git submodule update --init --recursive vendor/spdlog
+          git submodule update --init --recursive vendor/flecs
+          git submodule update --init --recursive vendor/stb
+          git submodule update --init --recursive vendor/JoltPhysics
 
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v14
