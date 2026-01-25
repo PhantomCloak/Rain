@@ -7,7 +7,6 @@
 # Emscripten build artifacts
 *.wasm
 *.js
-*.html
 *.data
 *.wast
 *.asm.js

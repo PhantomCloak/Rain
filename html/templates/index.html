@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Font Awesome -->
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+        }
+
+        canvas {
+            max-width: 100%;
+            max-height: 100%;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 800;
+        }
+
+        #no-webgpu {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #fca311;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: #fff;
+            z-index: 1001;
+        }
+
+        #err-fatal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ef233c;
+            display: none;
+            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: #fff;
+            z-index: 1000;
+        }
+
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #8cb369;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            font-size: 48px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .social-icons {
+            margin-top: 50px;
+        }
+
+        .social-icons a {
+            margin: 0 10px;
+            color: white;
+            transition: color 0.1s;
+        }
+
+        .social-icons a:hover {
+            color: gray;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="overlay">Loading...</div> <!-- Overlay element -->
+    <div id="no-webgpu">WebGPU not supported on this browser :(<br>Please try with chromium based one.</div>
+    <div id="err-fatal">
+        An error occurred while loading the demo. <br> Would you like to check my YouTube instead?
+        <div class="social-icons">
+            <a href="https://www.youtube.com/channel/UCUYAVgI0IrC9zgxK7z8JMRQ" target="_blank"><i
+                    class="fab fa-youtube"></i></a>
+            <a href="https://github.com/PhantomCloak" target="_blank"><i class="fab fa-github"></i></a>
+            <a href="https://www.linkedin.com/in/unalozyurt/" target="_blank"><i class="fab fa-linkedin"></i></a>
+        </div>
+    </div> <!-- Overlay element -->
+    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+    <script type="text/javascript">
+
+        var Module = {
+            canvas: (function () { return document.getElementById('canvas'); })(),
+            onRuntimeInitialized: function () {
+                document.getElementById('overlay').style.display = 'none';
+            },
+            printErr: function (err) {
+                var errorMessage = typeof err === 'string' ? err : JSON.stringify(err);
+
+                if (errorMessage.includes("https://emscripten.org/docs/porting/pthreads.html#blocking-on-the-main-browser-thread")) {
+                    return;
+                }
+
+                console.log("module error: " + err);
+                //document.getElementById('err-fatal').style.display = 'flex';
+            },
+            onAbort: function () { document.getElementById('err-fatal').style.display = 'flex'; }
+        };
+
+        window.onerror = (event) => {
+            //document.getElementById('err-fatal').style.display = 'flex';
+        };
+
+        if (!navigator.gpu) {
+            document.getElementById('no-webgpu').style.display = 'flex';
+        }
+    </script>
+
+    <script src="ReEngine.js"></script>
+</body>
+
+</html>
