@@ -1,0 +1,52 @@
+name: Build and Deploy Web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout required submodules
+        run: |
+          git submodule update --init --depth 1 vendor/assimp
+          git submodule update --init --depth 1 vendor/spdlog
+          git submodule update --init --depth 1 vendor/flecs
+          git submodule update --init --depth 1 vendor/stb
+          git submodule update --init --depth 1 vendor/JoltPhysics
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.51
+
+      - name: Configure CMake
+        run: |
+          cmake --preset emscripten-release \
+            -DCMAKE_TOOLCHAIN_FILE=$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+
+      - name: Build
+        run: cmake --build build/emscripten-release --parallel
+
+      - name: Prepare deployment files
+        run: |
+          mkdir -p deploy
+          cp build/emscripten-release/ReEngine.html deploy/index.html
+          cp build/emscripten-release/ReEngine.js deploy/
+          cp build/emscripten-release/ReEngine.wasm deploy/
+          cp -r Resources deploy/
+
+      - name: Deploy to rain-demo
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.DEMO_DEPLOY_TOKEN }}
+          external_repository: PhantomCloak/rain-demo
+          publish_branch: main
+          publish_dir: ./deploy
+          force_orphan: true
