@@ -40,6 +40,7 @@ jobs:
           mkdir -p deploy
           cp html/templates/index.html deploy/index.html
           cp build/emscripten-release/ReEngine.js deploy/
+          cp build/emscripten-release/ReEngine.data deploy/
           cp build/emscripten-release/ReEngine.wasm deploy/
           cp -r Resources deploy/
           echo "phantomcloak.me" > deploy/CNAME
