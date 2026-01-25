@@ -5,7 +5,9 @@
 #include "SceneRenderer.h"
 #include "debug/Profiler.h"
 #include "glm/gtc/type_ptr.hpp"
-// #include "imgui.h"
+#ifndef __EMSCRIPTEN__
+#include "imgui.h"
+#endif
 #include "io/cursor.h"
 #include "render/ResourceManager.h"
 
@@ -24,9 +26,9 @@ namespace Rain
     return CreateChildEntity({}, name);
   }
 
-  float rotX = 140.0;
-  float rotY = 0.0;
-  float rotZ = 40.0;
+  float lightX = 0.0;
+  float lightY = 90.0;
+  float lightZ = 0.0;
 
   UUID entityIdDir = 0.0;
   UUID Select = 0;
@@ -68,11 +70,12 @@ namespace Rain
     auto camera = CreateEntity("MainCamera");
     camera.AddComponent<CameraComponent>();
 
-    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
+    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
     Entity galata = CreateEntity("bump");
 
     galata.Transform().Translation = glm::vec3(0, 0, 0);
-    galata.Transform().Scale = glm::vec3(5.0f);
+    galata.Transform().Scale = glm::vec3(15.0f);
+    galata.Transform().SetRotationEuler(glm::radians(glm::vec3(90.0, 0.0, 180.0)));
 
     // Set orbit target to match the model position
     orbitTarget = galata.Transform().Translation;
@@ -83,7 +86,7 @@ namespace Rain
     UpdateOrbitCamera(camera);
 
     Entity light = CreateEntity("DirectionalLight");
-    light.GetComponent<TransformComponent>().SetRotationEuler(glm::vec3(glm::radians(rotX), glm::radians(rotY), glm::radians(rotZ)));
+    light.GetComponent<TransformComponent>().SetRotationEuler(glm::vec3(glm::radians(lightX), glm::radians(lightY), glm::radians(lightZ)));
     light.AddComponent<DirectionalLightComponent>();
     entityIdDir = light.GetUUID();
   }
@@ -157,23 +160,6 @@ namespace Rain
   {
     ScanKeyPress();
 
-    // if (Cursor::WasLeftCursorPressed())
-    //{
-    //   SceneQueryHit hit;
-    //   auto camera = GetMainCameraEntity();
-    //   auto [origin, direction] = CastRay(camera, Cursor::GetCursorPosition().x, Cursor::GetCursorPosition().y);
-    //   RayCastInfo info;
-    //   info.Origin = origin;
-    //   info.Direction = direction;
-    //   info.MaxDistance = 1000;
-
-    //  if (m_PhysicsScene->CastRay(&info, hit))
-    //  {
-    //    RN_LOG("Success Entity {}", hit.HitEntity);
-    //    Select = hit.HitEntity;
-    //  }
-    //}
-
     m_PhysicsScene->Update(1.0f / 60.0);
     Cursor::Update();
   }
@@ -231,7 +217,7 @@ namespace Rain
 
   Entity Scene::GetMainCameraEntity()
   {
-    if (m_World)
+    if (m_World != nullptr)
     {
       flecs::entity e = m_World.query_builder<CameraComponent>().build().first();
       if (e)
@@ -258,6 +244,16 @@ namespace Rain
     camera.SetPerspectiveProjectionMatrix(glm::radians(55.0f), w, h, 0.10f, far);
     renderer->BeginScene({cameraViewMatrix, camera.GetProjectionMatrix(), 10.0f, far});
 
+    static float lightX = 0.637f;
+    static float lightY = 0.514f;
+    static float lightZ = 0.0f;
+
+    // ImGui::Begin("A");
+    // ImGui::SliderFloat("Light X", &lightX, -1.0f, 1.0f);
+    // ImGui::SliderFloat("Light Y", &lightY, -1.0f, 1.0f);
+    // ImGui::SliderFloat("Light Z", &lightZ, -1.0f, 1.0f);
+    // ImGui::End();
+
     static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
     drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent)
                        {
@@ -266,11 +262,8 @@ namespace Rain
       glm::mat4 entityTransform = GetWorldSpaceTransformMatrix(e);
       renderer->SubmitMesh(meshSource, meshComponent.SubMeshId, meshComponent.Materials, entityTransform); });
 
-    static flecs::query<TransformComponent, DirectionalLightComponent> lightsQuery = m_World.query<TransformComponent, DirectionalLightComponent>();
-    lightsQuery.each([&](flecs::entity entity, TransformComponent& transform, DirectionalLightComponent& directionalLight)
-                     {
-      SceneLightInfo.LightDirection = glm::normalize(glm::mat3(transform.GetTransform()) * glm::vec3(0.0f, 0.0f, -1.0f));
-      SceneLightInfo.LightPos = glm::vec3(0.0f); });
+    SceneLightInfo.LightDirection = glm::normalize(glm::vec3(lightX, lightY, lightZ));
+    SceneLightInfo.LightPos = glm::vec3(0.0f);
 
     renderer->EndScene();
   }
@@ -352,6 +345,13 @@ namespace Rain
 
   void Scene::OnMouseMove(double xPos, double yPos)
   {
+#ifndef __EMSCRIPTEN__
+    if (ImGui::GetIO().WantCaptureMouse)
+    {
+      return;
+    }
+#endif
+
     glm::vec2 currentMousePos = glm::vec2(xPos, yPos);
 
     Entity camera = GetMainCameraEntity();

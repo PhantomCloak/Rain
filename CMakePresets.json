@@ -31,12 +31,8 @@
         "DAWN_BUILD_SAMPLES": "OFF",
         "DAWN_ENABLE_OPENGLES": "OFF",
         "DAWN_ENABLE_DESKTOP_GL": "OFF",
-        "TINT_BUILD_TINT": "OFF",
         "DEV_MODE": "ON",
-        "IMGUI_IMPL_WEBGPU_BACKEND_DAWN": "ON",
-        "PHYSX_ROOT_DIR": "${sourceDir}/vendor/PhysX/physx",
-        "PX_OUTPUT_LIB_DIR": "${sourceDir}/build/${presetName}/physx",
-        "PX_OUTPUT_BIN_DIR": "${sourceDir}/buld/${presetName}/physx"
+        "IMGUI_IMPL_WEBGPU_BACKEND_DAWN": "ON"
       }
     },
     {
@@ -122,12 +118,13 @@
       "inherits": "common",
       "description": "Build for WebAssembly with Emscripten",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_TOOLCHAIN_FILE": "/home/phantom/Developer/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
         "EMSCRIPTEN": "ON",
         "USE_GLFW": "3",
         "ASYNCIFY": "ON",
         "WASM_BIGINT": "ON",
+        "ASSIMP_BUILD_ZLIB": "ON",
         "TARGET_BUILD_PLATFORM": "emscripten",
         "ALLOW_BLOCKING_ON_MAIN_THREAD": "1"
       }
@@ -143,6 +140,7 @@
         "USE_GLFW": "3",
         "ASYNCIFY": "ON",
         "WASM_BIGINT": "ON",
+        "ASSIMP_BUILD_ZLIB": "ON",
         "TARGET_BUILD_PLATFORM": "emscripten",
         "ALLOW_BLOCKING_ON_MAIN_THREAD": "1"
       }

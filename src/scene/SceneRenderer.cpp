@@ -2,10 +2,15 @@
 #include <glm/glm.hpp>
 #include <memory>
 #include "Application.h"
-// #include "backends/imgui_impl_glfw.h"
-// #include "backends/imgui_impl_wgpu.h"
+#include "core/Log.h"
+
+#ifndef __EMSCRIPTEN__
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_wgpu.h"
+#include "imgui.h"
+#endif
+
 #include "debug/Profiler.h"
-// #include "imgui.h"
 #include "io/filesystem.h"
 #include "io/keyboard.h"
 #include "render/CommandEncoder.h"
@@ -213,7 +218,6 @@ namespace Rain
       {5, ShaderDataType::Float4, "a_MRow0", 0},
       {6, ShaderDataType::Float4, "a_MRow1", 16},
       {7, ShaderDataType::Float4, "a_MRow2", 32}}};
-
     // clang-format on
 
     auto pbrShader = ShaderManager::LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/pbr.wgsl");
@@ -228,20 +232,20 @@ namespace Rain
     cubeProps.Format = TextureFormat::RGBA16F;
 
     Ref<TextureCube> envUnfiltered = TextureCube::Create(cubeProps);
-    Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), RESOURCE_DIR "/textures/quarry_01_puresky_4k.hdr");
+    Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), RESOURCE_DIR "/textures/evening_road_01_puresky_4k.hdr");
 
     m_Renderer = Render::Get();
     m_Renderer->ComputeEquirectToCubemap(envEquirect.get(), envUnfiltered.get());
 
-    auto [envFiltered, envIrradiance] = m_Renderer->CreateEnvironmentMap(RESOURCE_DIR "/textures/quarry_01_puresky_4k.hdr");
+    auto [envFiltered, envIrradiance] = m_Renderer->CreateEnvironmentMap(RESOURCE_DIR "/textures/evening_road_01_puresky_4k.hdr");
 
     FileSys::WatchFile(RESOURCE_DIR "/shaders/pbr.wgsl", [pbrShader](std::string filePath)
                        {
-                         std::string b = FileSys::ReadFile(filePath);
-                         pbrShader->Reload(b);
+                         std::string content = FileSys::ReadFile(filePath);
+                         pbrShader->Reload(content);
                          Render::ReloadShader(pbrShader);
-                         // callbacks()
-                       });
+
+                         RN_LOG("Shader {} reloaded", filePath); });
 
     glm::vec2 screenSize = Application::Get()->GetWindowSize();
     uint32_t screenWidth = static_cast<uint32_t>(screenSize.x);
@@ -412,25 +416,27 @@ namespace Rain
 
     // auto renderContext = m_Renderer->GetRenderContext();
 
-    // IMGUI_CHECKVERSION();
-    // ImGui::CreateContext();
-    // auto& io = ImGui::GetIO();
-    // ImGuiStyle& style = ImGui::GetStyle();
-    // style.ScaleAllSizes(2.0f);  // Scale everything by 2x
-    // io.FontGlobalScale = 2.0f;
-    // ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
+#ifndef __EMSCRIPTEN__
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    auto& io = ImGui::GetIO();
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.ScaleAllSizes(2.0f);  // Scale everything by 2x
+    io.FontGlobalScale = 2.0f;
+    ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
 
-    // ImGui_ImplWGPU_InitInfo initInfo;
-    // initInfo.Device = RenderContext::GetDevice();
-    //// initInfo.RenderTargetFormat = render->m_swapChainFormat;
-    // initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
-    // initInfo.PipelineMultisampleState = {
-    //     .nextInChain = nullptr,
-    //     .count = 4,
-    //     .mask = ~0u,
-    //     .alphaToCoverageEnabled = false};
-    // initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
-    // ImGui_ImplWGPU_Init(&initInfo);
+    ImGui_ImplWGPU_InitInfo initInfo;
+    initInfo.Device = RenderContext::GetDevice();
+    // initInfo.RenderTargetFormat = render->m_swapChainFormat;
+    initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
+    initInfo.PipelineMultisampleState = {
+        .nextInChain = nullptr,
+        .count = 4,
+        .mask = ~0u,
+        .alphaToCoverageEnabled = false};
+    initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
+    ImGui_ImplWGPU_Init(&initInfo);
+#endif
   }
 
   void SceneRenderer::PreRender()
@@ -565,9 +571,12 @@ namespace Rain
     }
 
     // JPH::DebugRenderer::sInstance = m_Renderer;
-    // ImGui_ImplWGPU_NewFrame();
-    // ImGui_ImplGlfw_NewFrame();
-    // ImGui::NewFrame();
+#ifndef __EMSCRIPTEN__
+    ImGui_ImplWGPU_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+#endif
+
     if (SavedCam.Far != 400.0f)
     {
       SavedCam = camera;
@@ -616,7 +625,10 @@ namespace Rain
       // RenderDebug::SetMVP(m_SceneUniform.ViewProjection);
       // DrawCameraFrustum(SavedCam);
       //  RenderDebug::FlushDrawList();
-      // ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), litPassEncoder);
+
+#ifndef __EMSCRIPTEN__
+      ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), std::static_pointer_cast<RenderPassEncoderWGPU>(litPassEncoder)->GetNativeEncoder());
+#endif
 
       m_Renderer->EndRenderPass(m_LitPass, litPassEncoder);
     }
@@ -635,8 +647,12 @@ namespace Rain
     {
       return;
     }
-    // ImGui::EndFrame();
-    // ImGui::Render();
+
+#ifndef __EMSCRIPTEN__
+    ImGui::EndFrame();
+    ImGui::Render();
+#endif
+
     PreRender();
     FlushDrawList();
   }

@@ -108,7 +108,10 @@ namespace Rain
 
   void Application::OnMouseMove(double xPos, double yPos)
   {
-    m_Scene->OnMouseMove(xPos, yPos);
+    if (m_Scene)
+    {
+      m_Scene->OnMouseMove(xPos, yPos);
+    }
   }
 
   void Application::OnKeyPressed(KeyCode key, KeyAction action)

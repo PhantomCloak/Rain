@@ -31,11 +31,18 @@ int main(int argc, char** argv)
   // }
 
   // CommandLine::AddParam("--render", "noapi");
-#if EMSCRIPTTEN
-  // TODO add render noapi
-#endif
 
   Rain::WindowProps props("Bouncing Balls", resX, resY);
+#if EMSCRIPTTEN
+  double canvasWidth, canvasHeight;
+  emscripten_get_element_css_size("#canvas", &canvasWidth, &canvasHeight);
+  props.Width = canvasWidth * emscripten_get_device_pixel_ratio();
+  props.Height = canvasHeight * emscripten_get_device_pixel_ratio();
+
+  // RN_LOG("Pixel Ratio: {}", emscripten_get_device_pixel_ratio());
+#endif
+  RN_LOG("W: {} H: {}", props.Width, props.Height);
+
   Rain::Window* app = new Application(props);
 
   app->OnStart();

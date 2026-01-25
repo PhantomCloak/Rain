@@ -321,6 +321,8 @@ namespace Rain
     const uint32_t cubemapSize = 2048;
     const uint32_t irradianceMapSize = 32;
 
+    RN_LOG("Creating environment map. Size {} Sample {}", cubemapSize, irradianceMapSize);
+
     TextureProps cubeProps = {};
     cubeProps.Width = cubemapSize;
     cubeProps.Height = cubemapSize;
