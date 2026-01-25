@@ -9,19 +9,13 @@
 	url = https://github.com/assimp/assimp.git
 [submodule "vendor/flecs"]
 	path = vendor/flecs
-	url = git@github.com:SanderMertens/flecs.git
+	url = https://github.com/SanderMertens/flecs.git
 [submodule "vendor/tracy"]
 	path = vendor/tracy
-	url = git@github.com:wolfpld/tracy.git
+	url = https://github.com/wolfpld/tracy.git
 [submodule "vendor/stb"]
 	path = vendor/stb
 	url = https://github.com/nothings/stb
-[submodule "vendor/PhysX"]
-	path = vendor/PhysX
-	url = git@github.com:NVIDIA-Omniverse/PhysX.git
-[submodule "vendor/astc-encoder"]
-	path = vendor/astc-encoder
-	url = git@github.com:ARM-software/astc-encoder.git
 [submodule "vendor/ImGuizmo"]
 	path = vendor/ImGuizmo
 	url = https://github.com/CedricGuillemet/ImGuizmo.git
