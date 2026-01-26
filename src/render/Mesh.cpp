@@ -6,8 +6,53 @@
 #include "io/filesystem.h"
 #include "render/ShaderManager.h"
 
-namespace Rain {
-  glm::mat4 convertToGLM(const aiMatrix4x4& from) {
+namespace Rain
+{
+  TextureWrappingFormat ConvertAssimpWrapMode(aiTextureMapMode mode)
+  {
+    switch (mode)
+    {
+      case aiTextureMapMode_Wrap:
+        return TextureWrappingFormat::Repeat;
+      case aiTextureMapMode_Clamp:
+        return TextureWrappingFormat::ClampToEdges;
+      case aiTextureMapMode_Mirror:
+        return TextureWrappingFormat::Repeat;
+      case aiTextureMapMode_Decal:
+        return TextureWrappingFormat::ClampToEdges;
+      default:
+        return TextureWrappingFormat::Repeat;
+    }
+  }
+
+  TextureProps GetTexturePropsFromAssimp(aiMaterial* aiMat, aiTextureType texType, int texIndex = 0)
+  {
+    TextureProps props = {};
+    props.CreateSampler = true;
+    props.GenerateMips = true;
+    props.SamplerFilter = FilterMode::Linear;
+    props.SamplerWrap = TextureWrappingFormat::Repeat;
+
+    aiTextureMapMode wrapU = aiTextureMapMode_Wrap;
+    aiTextureMapMode wrapV = aiTextureMapMode_Wrap;
+
+    if (aiMat->Get(AI_MATKEY_MAPPINGMODE_U(texType, texIndex), wrapU) == AI_SUCCESS)
+    {
+      props.SamplerWrap = ConvertAssimpWrapMode(wrapU);
+    }
+    if (aiMat->Get(AI_MATKEY_MAPPINGMODE_V(texType, texIndex), wrapV) == AI_SUCCESS)
+    {
+      if (ConvertAssimpWrapMode(wrapV) == TextureWrappingFormat::ClampToEdges)
+      {
+        props.SamplerWrap = TextureWrappingFormat::ClampToEdges;
+      }
+    }
+
+    return props;
+  }
+
+  glm::mat4 convertToGLM(const aiMatrix4x4& from)
+  {
     glm::mat4 to;
 
     to[0][0] = from.a1;
@@ -30,14 +75,16 @@ namespace Rain {
     return to;
   }
 
-  MeshSource::MeshSource(std::string path) {
+  MeshSource::MeshSource(std::string path)
+  {
     RN_ASSERT(FileSys::IsFileExist(path), "MeshSource: The file does not exist at the specified path.");
 
     Assimp::Importer import;
     const aiScene* scene = import.ReadFile(path,
                                            aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices);
 
-    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
+    {
       std::cout << "ERROR::ASSIMP::" << import.GetErrorString() << std::endl;
       return;
     }
@@ -50,11 +97,13 @@ namespace Rain {
     int verticesCount = 0;
     int indexCount = 0;
 
-    for (int i = 0; i < scene->mNumMeshes; i++) {
+    for (int i = 0; i < scene->mNumMeshes; i++)
+    {
       aiMesh* mesh = scene->mMeshes[i];
       verticesCount += mesh->mNumVertices;
 
-      for (int j = 0; j < mesh->mNumFaces; j++) {
+      for (int j = 0; j < mesh->mNumFaces; j++)
+      {
         indexCount += mesh->mFaces[j].mNumIndices;
       }
     }
@@ -69,16 +118,19 @@ namespace Rain {
     aiColor3D colorEmpty = {0, 0, 0};
     // m_Materials.resize(scene->mNumMaterials);
 
-    for (int i = 0; i < scene->mNumMaterials; i++) {
+    for (int i = 0; i < scene->mNumMaterials; i++)
+    {
       aiMaterial* aiMat = scene->mMaterials[i];
       ai_real metallicFactor = 0.5f;
       ai_real roughnessFactor = 0.5f;
 
-      if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor) != AI_SUCCESS) {
+      if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor) != AI_SUCCESS)
+      {
         metallicFactor = 0.5f;  // Fallback if not specified
       }
 
-      if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) != AI_SUCCESS) {
+      if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) != AI_SUCCESS)
+      {
         roughnessFactor = 0.5f;  // Fallback if not specified
       }
 
@@ -90,9 +142,11 @@ namespace Rain {
       material->Set("Roughness", roughnessFactor);
       material->Set("Ao", 0.5f);
 
-      for (int j = 0; j < aiMat->GetTextureCount(aiTextureType_DIFFUSE); j++) {
+      for (int j = 0; j < aiMat->GetTextureCount(aiTextureType_DIFFUSE); j++)
+      {
         aiString texturePath;
-        if (aiMat->GetTexture(aiTextureType_DIFFUSE, j, &texturePath) != aiReturn_SUCCESS) {
+        if (aiMat->GetTexture(aiTextureType_DIFFUSE, j, &texturePath) != aiReturn_SUCCESS)
+        {
           std::cout << "An error occured while loading texture" << std::endl;
           continue;
         }
@@ -101,19 +155,25 @@ namespace Rain {
         RN_LOG("Texture Name: {}", textureName);
 
         Ref<Texture2D> matTexture;
-        if (Rain::ResourceManager::IsTextureExist(textureName)) {
+        if (Rain::ResourceManager::IsTextureExist(textureName))
+        {
           matTexture = Rain::ResourceManager::GetTexture(textureName);
-        } else {
-          matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
+        }
+        else
+        {
+          TextureProps texProps = GetTexturePropsFromAssimp(aiMat, aiTextureType_DIFFUSE, j);
+          matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str(), texProps);
         }
 
         material->Set("u_AlbedoTex", matTexture);
         material->Set("u_TextureSampler", matTexture->Sampler);
       }
 
-      if (aiMat->GetTextureCount(aiTextureType_NORMALS) > 0) {
+      if (aiMat->GetTextureCount(aiTextureType_NORMALS) > 0)
+      {
         aiString texturePath;
-        if (aiMat->GetTexture(aiTextureType_NORMALS, 0, &texturePath) != aiReturn_SUCCESS) {
+        if (aiMat->GetTexture(aiTextureType_NORMALS, 0, &texturePath) != aiReturn_SUCCESS)
+        {
           std::cout << "An error occured while loading texture" << std::endl;
           continue;
         }
@@ -121,21 +181,29 @@ namespace Rain {
         std::string textureName = FileSys::GetFileName(texturePath.C_Str());
 
         Ref<Texture2D> matTexture;
-        if (Rain::ResourceManager::IsTextureExist(textureName)) {
+        if (Rain::ResourceManager::IsTextureExist(textureName))
+        {
           matTexture = Rain::ResourceManager::GetTexture(textureName);
-        } else {
-          matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
+        }
+        else
+        {
+          TextureProps texProps = GetTexturePropsFromAssimp(aiMat, aiTextureType_NORMALS, 0);
+          matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str(), texProps);
         }
 
         material->Set("u_NormalTex", matTexture);
         material->Set("UseNormalMap", true);
-      } else {
+      }
+      else
+      {
         material->Set("UseNormalMap", false);
       }
 
-      if (aiMat->GetTextureCount(aiTextureType_METALNESS) > 0) {
+      if (aiMat->GetTextureCount(aiTextureType_METALNESS) > 0)
+      {
         aiString texturePath;
-        if (aiMat->GetTexture(aiTextureType_METALNESS, 0, &texturePath) != aiReturn_SUCCESS) {
+        if (aiMat->GetTexture(aiTextureType_METALNESS, 0, &texturePath) != aiReturn_SUCCESS)
+        {
           std::cout << "An error occured while loading texture" << std::endl;
           continue;
         }
@@ -143,10 +211,14 @@ namespace Rain {
         std::string textureName = FileSys::GetFileName(texturePath.C_Str());
 
         Ref<Texture2D> matTexture;
-        if (Rain::ResourceManager::IsTextureExist(textureName)) {
+        if (Rain::ResourceManager::IsTextureExist(textureName))
+        {
           matTexture = Rain::ResourceManager::GetTexture(textureName);
-        } else {
-          matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str());
+        }
+        else
+        {
+          TextureProps texProps = GetTexturePropsFromAssimp(aiMat, aiTextureType_METALNESS, 0);
+          matTexture = Rain::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str(), texProps);
         }
         material->Set("u_MetallicTex", matTexture);
       }
@@ -157,13 +229,15 @@ namespace Rain {
 
     m_SubMeshes.resize(scene->mNumMeshes);
 
-    for (int i = 0; i < scene->mNumMeshes; i++) {
+    for (int i = 0; i < scene->mNumMeshes; i++)
+    {
       aiMesh* mesh = scene->mMeshes[i];
 
       std::vector<VertexAttribute> vertices;
       std::vector<unsigned int> indices;
 
-      for (int j = 0; j < mesh->mNumVertices; j++) {
+      for (int j = 0; j < mesh->mNumVertices; j++)
+      {
         VertexAttribute vertex;
         glm::vec3 vector;
         vector.x = mesh->mVertices[j].x;
@@ -171,14 +245,16 @@ namespace Rain {
         vector.z = mesh->mVertices[j].z;
         vertex.Position = vector;
 
-        if (mesh->HasNormals()) {
+        if (mesh->HasNormals())
+        {
           vector.x = mesh->mNormals[j].x;
           vector.y = mesh->mNormals[j].y;
           vector.z = mesh->mNormals[j].z;
           vertex.Normal = vector;
         }
 
-        if (mesh->HasTangentsAndBitangents()) {
+        if (mesh->HasTangentsAndBitangents())
+        {
           vector.x = mesh->mTangents[j].x;
           vector.y = mesh->mTangents[j].y;
           vector.z = mesh->mTangents[j].z;
@@ -190,20 +266,25 @@ namespace Rain {
           vertex.Bitangent = vector;
         }
 
-        if (mesh->mTextureCoords[0]) {
+        if (mesh->mTextureCoords[0])
+        {
           glm::vec2 vec;
           vec.x = mesh->mTextureCoords[0][j].x;
           vec.y = mesh->mTextureCoords[0][j].y;
           vertex.TexCoords = vec;
-        } else {
+        }
+        else
+        {
           vertex.TexCoords = glm::vec2(0.0f, 0.0f);
         }
         vertices.push_back(vertex);
       }
 
-      for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
+      for (unsigned int i = 0; i < mesh->mNumFaces; i++)
+      {
         aiFace face = mesh->mFaces[i];
-        for (unsigned int j = 0; j < face.mNumIndices; j++) {
+        for (unsigned int j = 0; j < face.mNumIndices; j++)
+        {
           indices.push_back(face.mIndices[j]);
         }
       }
@@ -230,21 +311,25 @@ namespace Rain {
 
     int s = 0;
     int i = 0;
-    for (auto& m : m_SubMeshes) {
+    for (auto& m : m_SubMeshes)
+    {
       s += m.VertexCount;
       i += m.IndexCount;
     }
 
     TraverseNode(scene->mRootNode, scene);
   }
-  void DecomposeTransform(const glm::mat4& transform, glm::vec3& outPosition, glm::quat& outRotation, glm::vec3& outScale) {
+  void DecomposeTransform(const glm::mat4& transform, glm::vec3& outPosition, glm::quat& outRotation, glm::vec3& outScale)
+  {
     glm::vec3 skew;
     glm::vec4 perspective;
     glm::decompose(transform, outScale, outRotation, outPosition, skew, perspective);
   }
 
-  void MeshSource::TraverseNode(aiNode* node, const aiScene* scene) {
-    if (node->mNumMeshes > 0) {
+  void MeshSource::TraverseNode(aiNode* node, const aiScene* scene)
+  {
+    if (node->mNumMeshes > 0)
+    {
       Ref<MeshNode> meshNode = CreateRef<MeshNode>();
       meshNode->Parent = m_Nodes.size() == 0 ? meshNode->Parent : m_Nodes.size() - 1;
       meshNode->Name = std::string(node->mName.C_Str());
@@ -258,7 +343,8 @@ namespace Rain {
       m_Nodes.push_back(meshNode);
     }
 
-    for (int i = 0; i < node->mNumChildren; i++) {
+    for (int i = 0; i < node->mNumChildren; i++)
+    {
       TraverseNode(node->mChildren[i], scene);
     }
   }

@@ -156,19 +156,27 @@ namespace Rain {
 
   // TOOD: check if file exist or not
   std::shared_ptr<Texture2D> Rain::ResourceManager::LoadTexture(std::string id, std::string path) {
+    TextureProps defaultProps = {};
+    defaultProps.DebugName = id;
+    defaultProps.CreateSampler = true;
+    defaultProps.GenerateMips = true;
+    return LoadTexture(id, path, defaultProps);
+  }
+
+  std::shared_ptr<Texture2D> Rain::ResourceManager::LoadTexture(std::string id, std::string path, const TextureProps& props) {
     RN_PROFILE_FUNC;
 
-    TextureProps textureProp = {};
+    TextureProps textureProp = props;
     textureProp.DebugName = id;
     textureProp.CreateSampler = true;
-    textureProp.GenerateMips = true;
 
     auto p = std::filesystem::path(path);
     auto texture = Texture2D::Create(textureProp, p);
 
     _loadedTextures[id] = texture;
 
-    RN_LOG("Texture {} loaded from {}", id, path);
+    RN_LOG("Texture {} loaded from {} (wrap={}, filter={})", id, path,
+           static_cast<int>(textureProp.SamplerWrap), static_cast<int>(textureProp.SamplerFilter));
     return texture;
   }
 
