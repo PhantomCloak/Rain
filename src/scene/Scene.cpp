@@ -34,10 +34,10 @@ namespace Rain
   Entity helment;
 
   // Orbit camera state
-  static glm::vec3 orbitTarget = glm::vec3(0.0f, 1.0f, 0.0);  // Focus point (center of model)
-  static float orbitDistance = 30.0f;                         // Distance from target
-  static float orbitTheta = 0.0f;                             // Horizontal angle (radians)
-  static float orbitPhi = glm::radians(30.0f);                // Vertical angle (radians), 0 = horizontal
+  static glm::vec3 orbitTarget = glm::vec3(0.0f, 20.0f, 0.0);  // Focus point (center of model)
+  static float orbitDistance = 30.0f;                          // Distance from target
+  static float orbitTheta = 0.0f;                              // Horizontal angle (radians)
+  static float orbitPhi = glm::radians(30.0f);                 // Vertical angle (radians), 0 = horizontal
   static glm::vec2 lastMousePos = glm::vec2(0.0f);
   static bool isDragging = false;
 
@@ -69,12 +69,12 @@ namespace Rain
     camera.AddComponent<CameraComponent>();
 
     // auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
-    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test/untitled.gltf");
+    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test/untitled2.gltf");
     Entity galata = CreateEntity("bump");
 
     galata.Transform().Translation = glm::vec3(0, -0.0, 0);
-    galata.Transform().Scale = glm::vec3(1);
-    // galata.Transform().SetRotationEuler(glm::radians(glm::vec3(90.0, 0.0, 180.0)));
+    galata.Transform().Scale = glm::vec3(0.2f);
+    galata.Transform().SetRotationEuler(glm::radians(glm::vec3(-90.0, 0.0, 180.0)));
 
     // Set orbit target to match the model position
     // orbitTarget = galata.Transform().Translation;

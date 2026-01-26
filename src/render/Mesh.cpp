@@ -121,18 +121,18 @@ namespace Rain
     for (int i = 0; i < scene->mNumMaterials; i++)
     {
       aiMaterial* aiMat = scene->mMaterials[i];
-      ai_real metallicFactor = 0.5f;
-      ai_real roughnessFactor = 0.5f;
+      ai_real metallicFactor = 0.0f;
+      ai_real roughnessFactor = 0.8f;
 
-      if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor) != AI_SUCCESS)
-      {
-        metallicFactor = 0.5f;  // Fallback if not specified
-      }
+      // if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor) != AI_SUCCESS)
+      //{
+      // metallicFactor = 0.5f;  // Fallback if not specified
+      //}
 
-      if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) != AI_SUCCESS)
-      {
-        roughnessFactor = 0.5f;  // Fallback if not specified
-      }
+      // if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) != AI_SUCCESS)
+      //{
+      // roughnessFactor = 0.5f;  // Fallback if not specified
+      //}
 
       std::string aiMatName(aiMat->GetName().C_Str());
       static auto defaultShader = ShaderManager::GetShader("SH_DefaultBasicBatch");
