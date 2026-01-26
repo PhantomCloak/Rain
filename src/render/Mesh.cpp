@@ -441,10 +441,18 @@ namespace Rain
       }
     }
 
-    // Compute final bone matrices
+    // Sort bones so parents come before children, then compute matrices
+    m_Skeleton->SortBones();
     m_Skeleton->ComputeBoneMatrices();
 
     RN_LOG("Loaded skeleton with {} bones", m_Skeleton->Bones.size());
+
+    // Debug: print bone hierarchy
+    for (size_t i = 0; i < m_Skeleton->Bones.size(); i++)
+    {
+      const auto& bone = m_Skeleton->Bones[i];
+      RN_LOG("Bone[{}]: {} (parent: {})", i, bone.Name, bone.ParentIndex);
+    }
 
     // Create skeletal vertex buffer with bone indices and weights
     std::vector<SkeletalVertexAttribute> skeletalVertices;
