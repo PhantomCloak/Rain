@@ -3,6 +3,7 @@
 #include <iostream>
 #include "ResourceManager.h"
 #include "core/KeyCode.h"
+#include "core/Log.h"
 #include "io/filesystem.h"
 #include "render/ShaderManager.h"
 
@@ -116,7 +117,6 @@ namespace Rain
     m_IndexBuffer = GPUAllocator::GAlloc("i_buffer_" + fileName, WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index, (indexCount * sizeof(unsigned int) + 3) & ~3);
 
     aiColor3D colorEmpty = {0, 0, 0};
-    // m_Materials.resize(scene->mNumMaterials);
 
     for (int i = 0; i < scene->mNumMaterials; i++)
     {
@@ -318,6 +318,9 @@ namespace Rain
     }
 
     TraverseNode(scene->mRootNode, scene);
+
+    // Extract bone data if present
+    ExtractBones(scene);
   }
   void DecomposeTransform(const glm::mat4& transform, glm::vec3& outPosition, glm::quat& outRotation, glm::vec3& outScale)
   {
@@ -347,5 +350,204 @@ namespace Rain
     {
       TraverseNode(node->mChildren[i], scene);
     }
+  }
+
+  // Helper to find bone node in scene hierarchy and extract transforms
+  static void FindBoneNodes(aiNode* node, Skeleton* skeleton, aiNode* parent, std::unordered_map<std::string, aiNode*>& boneNodes)
+  {
+    std::string nodeName(node->mName.C_Str());
+
+    // Check if this node is a bone
+    if (skeleton->BoneNameToIndex.find(nodeName) != skeleton->BoneNameToIndex.end())
+    {
+      boneNodes[nodeName] = node;
+    }
+
+    // Recurse into children
+    for (uint32_t i = 0; i < node->mNumChildren; i++)
+    {
+      FindBoneNodes(node->mChildren[i], skeleton, node, boneNodes);
+    }
+  }
+
+  void MeshSource::ExtractBones(const aiScene* scene)
+  {
+    // Check if any mesh has bones
+    bool hasBones = false;
+    uint32_t totalVertices = 0;
+
+    for (uint32_t i = 0; i < scene->mNumMeshes; i++)
+    {
+      aiMesh* mesh = scene->mMeshes[i];
+      totalVertices += mesh->mNumVertices;
+      if (mesh->mNumBones > 0)
+      {
+        hasBones = true;
+      }
+    }
+
+    if (!hasBones)
+    {
+      return;
+    }
+
+    // Create skeleton
+    m_Skeleton = CreateRef<Skeleton>();
+
+    // First pass: collect all unique bones with inverse bind matrices
+    for (uint32_t meshIdx = 0; meshIdx < scene->mNumMeshes; meshIdx++)
+    {
+      aiMesh* mesh = scene->mMeshes[meshIdx];
+
+      for (uint32_t boneIdx = 0; boneIdx < mesh->mNumBones; boneIdx++)
+      {
+        aiBone* bone = mesh->mBones[boneIdx];
+        std::string boneName(bone->mName.C_Str());
+
+        if (m_Skeleton->BoneNameToIndex.find(boneName) == m_Skeleton->BoneNameToIndex.end())
+        {
+          uint32_t index = static_cast<uint32_t>(m_Skeleton->Bones.size());
+          m_Skeleton->BoneNameToIndex[boneName] = index;
+
+          Bone newBone;
+          newBone.Name = boneName;
+          newBone.ParentIndex = -1;
+          newBone.InverseBindMatrix = convertToGLM(bone->mOffsetMatrix);
+
+          m_Skeleton->Bones.push_back(newBone);
+        }
+      }
+    }
+
+    // Second pass: find bone nodes in scene hierarchy and extract transforms
+    std::unordered_map<std::string, aiNode*> boneNodes;
+    FindBoneNodes(scene->mRootNode, m_Skeleton.get(), nullptr, boneNodes);
+
+    // Extract local transforms and resolve parent indices
+    for (auto& bone : m_Skeleton->Bones)
+    {
+      auto it = boneNodes.find(bone.Name);
+      if (it != boneNodes.end())
+      {
+        aiNode* node = it->second;
+        bone.LocalTransform = convertToGLM(node->mTransformation);
+
+        // Find parent bone
+        if (node->mParent)
+        {
+          std::string parentName(node->mParent->mName.C_Str());
+          bone.ParentIndex = m_Skeleton->GetBoneIndex(parentName);
+        }
+      }
+    }
+
+    // Compute final bone matrices
+    m_Skeleton->ComputeBoneMatrices();
+
+    RN_LOG("Loaded skeleton with {} bones", m_Skeleton->Bones.size());
+
+    // Create skeletal vertex buffer with bone indices and weights
+    std::vector<SkeletalVertexAttribute> skeletalVertices;
+    skeletalVertices.reserve(totalVertices);
+
+    uint32_t vertexOffset = 0;
+
+    for (uint32_t meshIdx = 0; meshIdx < scene->mNumMeshes; meshIdx++)
+    {
+      aiMesh* mesh = scene->mMeshes[meshIdx];
+
+      // Initialize all vertices for this mesh
+      std::vector<SkeletalVertexAttribute> meshVertices(mesh->mNumVertices);
+
+      for (uint32_t j = 0; j < mesh->mNumVertices; j++)
+      {
+        SkeletalVertexAttribute& vertex = meshVertices[j];
+
+        vertex.Position = glm::vec3(mesh->mVertices[j].x, mesh->mVertices[j].y, mesh->mVertices[j].z);
+
+        if (mesh->HasNormals())
+        {
+          vertex.Normal = glm::vec3(mesh->mNormals[j].x, mesh->mNormals[j].y, mesh->mNormals[j].z);
+        }
+
+        if (mesh->HasTangentsAndBitangents())
+        {
+          vertex.Tangent = glm::vec3(mesh->mTangents[j].x, mesh->mTangents[j].y, mesh->mTangents[j].z);
+          vertex.Bitangent = glm::vec3(mesh->mBitangents[j].x, mesh->mBitangents[j].y, mesh->mBitangents[j].z);
+        }
+
+        if (mesh->mTextureCoords[0])
+        {
+          vertex.TexCoords = glm::vec2(mesh->mTextureCoords[0][j].x, mesh->mTextureCoords[0][j].y);
+        }
+
+        // Initialize bone data to identity (bone 0 with weight 1)
+        vertex.BoneIndices = glm::uvec4(0, 0, 0, 0);
+        vertex.BoneWeights = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+      }
+
+      // Process bone weights
+      for (uint32_t boneIdx = 0; boneIdx < mesh->mNumBones; boneIdx++)
+      {
+        aiBone* bone = mesh->mBones[boneIdx];
+        std::string boneName(bone->mName.C_Str());
+        int32_t boneIndex = m_Skeleton->GetBoneIndex(boneName);
+
+        if (boneIndex < 0)
+        {
+          continue;
+        }
+
+        for (uint32_t weightIdx = 0; weightIdx < bone->mNumWeights; weightIdx++)
+        {
+          aiVertexWeight& weight = bone->mWeights[weightIdx];
+          uint32_t vertexId = weight.mVertexId;
+          float boneWeight = weight.mWeight;
+
+          SkeletalVertexAttribute& vertex = meshVertices[vertexId];
+
+          // Find first empty slot for bone weight
+          for (int slot = 0; slot < 4; slot++)
+          {
+            if (vertex.BoneWeights[slot] == 0.0f)
+            {
+              vertex.BoneIndices[slot] = boneIndex;
+              vertex.BoneWeights[slot] = boneWeight;
+              break;
+            }
+          }
+        }
+      }
+
+      // Normalize weights and ensure at least one bone affects each vertex
+      for (auto& vertex : meshVertices)
+      {
+        float totalWeight = vertex.BoneWeights.x + vertex.BoneWeights.y + vertex.BoneWeights.z + vertex.BoneWeights.w;
+
+        if (totalWeight > 0.0f)
+        {
+          vertex.BoneWeights /= totalWeight;
+        }
+        else
+        {
+          // No bones affect this vertex - use identity
+          vertex.BoneIndices = glm::uvec4(0, 0, 0, 0);
+          vertex.BoneWeights = glm::vec4(1.0f, 0.0f, 0.0f, 0.0f);
+        }
+      }
+
+      skeletalVertices.insert(skeletalVertices.end(), meshVertices.begin(), meshVertices.end());
+      vertexOffset += mesh->mNumVertices;
+    }
+
+    // Create skeletal vertex buffer
+    std::string fileName = FileSys::GetFileName(m_Path);
+    m_SkeletalVertexBuffer = GPUAllocator::GAlloc(
+        "skeletal_v_buffer_" + fileName,
+        WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
+        (skeletalVertices.size() * sizeof(SkeletalVertexAttribute) + 3) & ~3);
+    m_SkeletalVertexBuffer->SetData(skeletalVertices.data(), skeletalVertices.size() * sizeof(SkeletalVertexAttribute));
+
+    RN_LOG("Created skeletal vertex buffer with {} vertices", skeletalVertices.size());
   }
 }  // namespace Rain

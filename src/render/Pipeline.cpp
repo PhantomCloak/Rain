@@ -212,7 +212,7 @@ namespace Rain
     pipelineDesc->multisample.alphaToCoverageEnabled = false;
     pipelineDesc->multisample.nextInChain = nullptr;
 
-    if (m_PipelineSpec.DebugName == "RP_Composite" || m_PipelineSpec.DebugName == "RP_Skybox")
+    if (m_PipelineSpec.DebugName == "RP_Composite" || m_PipelineSpec.DebugName == "RP_Skybox" || m_PipelineSpec.DebugName == "RP_Skeletal")
     {
       pipelineDesc->multisample.count = 4;
 #ifndef __EMSCRIPTEN__

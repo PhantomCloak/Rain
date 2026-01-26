@@ -20,10 +20,14 @@ namespace Rain
         return RenderPassResourceType::PT_Sampler;
       case StorageBindingType:
         return RenderPassResourceType::PT_Storage;
+      case StorageBufferBindingType:
+        return RenderPassResourceType::PT_Storage;
+      default:
         break;
     }
 
     RN_ASSERT("Unkown type conversation");
+    return RenderPassResourceType::PT_Uniform;
   }
 
   bool IsInputValid(const RenderPassInput& input)
@@ -36,6 +40,8 @@ namespace Rain
         return input.TextureInput != NULL && input.TextureInput->GetReadableView() != NULL;
       case PT_Sampler:
         return input.SamplerInput != NULL && input.SamplerInput->GetNativeSampler() != NULL;
+      case PT_Storage:
+        return input.UniformIntput != NULL && input.UniformIntput->Buffer != NULL;
       default:
         return false;
     }
@@ -67,7 +73,8 @@ namespace Rain
 
     if (decl != nullptr)
     {
-      m_Inputs[decl->Group][decl->Location].Type = RenderPassResourceType::PT_Uniform;
+      // Use the declared type (PT_Uniform or PT_Storage) from the shader
+      m_Inputs[decl->Group][decl->Location].Type = decl->Type;
       m_Inputs[decl->Group][decl->Location].UniformIntput = uniform;
     }
     else
@@ -223,8 +230,13 @@ namespace Rain
               m_InvalidatedInputs[index][location] = input;
             }
             break;
-          case PT_DynamicUniform:
           case PT_Storage:
+            if (storedEntry.buffer != input.UniformIntput->Buffer)
+            {
+              m_InvalidatedInputs[index][location] = input;
+            }
+            break;
+          case PT_DynamicUniform:
             break;
         }
       }
@@ -253,8 +265,11 @@ namespace Rain
           case PT_Sampler:
             storedEntry.sampler = *input.SamplerInput->GetNativeSampler();
             break;
-          case PT_DynamicUniform:
           case PT_Storage:
+            storedEntry.buffer = input.UniformIntput->Buffer;
+            storedEntry.size = input.UniformIntput->Size;
+            break;
+          case PT_DynamicUniform:
             break;
         }
       }

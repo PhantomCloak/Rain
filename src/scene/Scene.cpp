@@ -5,9 +5,7 @@
 #include "SceneRenderer.h"
 #include "debug/Profiler.h"
 #include "glm/gtc/type_ptr.hpp"
-#ifndef __EMSCRIPTEN__
 #include "imgui.h"
-#endif
 #include "io/cursor.h"
 #include "render/ResourceManager.h"
 
@@ -70,12 +68,13 @@ namespace Rain
     auto camera = CreateEntity("MainCamera");
     camera.AddComponent<CameraComponent>();
 
-    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
+    // auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
+    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test/untitled.gltf");
     Entity galata = CreateEntity("bump");
 
-    galata.Transform().Translation = glm::vec3(0, 0, 0);
-    galata.Transform().Scale = glm::vec3(15.0f);
-    galata.Transform().SetRotationEuler(glm::radians(glm::vec3(90.0, 0.0, 180.0)));
+    galata.Transform().Translation = glm::vec3(0, -0.45f, 0);
+    galata.Transform().Scale = glm::vec3(1);
+    // galata.Transform().SetRotationEuler(glm::radians(glm::vec3(90.0, 0.0, 180.0)));
 
     // Set orbit target to match the model position
     orbitTarget = galata.Transform().Translation;
@@ -248,11 +247,11 @@ namespace Rain
     static float lightY = 0.514f;
     static float lightZ = 0.0f;
 
-    // ImGui::Begin("A");
-    // ImGui::SliderFloat("Light X", &lightX, -1.0f, 1.0f);
-    // ImGui::SliderFloat("Light Y", &lightY, -1.0f, 1.0f);
-    // ImGui::SliderFloat("Light Z", &lightZ, -1.0f, 1.0f);
-    // ImGui::End();
+    ImGui::Begin("A");
+    ImGui::SliderFloat("Light X", &lightX, -1.0f, 1.0f);
+    ImGui::SliderFloat("Light Y", &lightY, -1.0f, 1.0f);
+    ImGui::SliderFloat("Light Z", &lightZ, -1.0f, 1.0f);
+    ImGui::End();
 
     static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
     drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent)
@@ -345,12 +344,10 @@ namespace Rain
 
   void Scene::OnMouseMove(double xPos, double yPos)
   {
-#ifndef __EMSCRIPTEN__
     if (ImGui::GetIO().WantCaptureMouse)
     {
       return;
     }
-#endif
 
     glm::vec2 currentMousePos = glm::vec2(xPos, yPos);
 

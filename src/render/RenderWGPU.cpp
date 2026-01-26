@@ -622,6 +622,43 @@ namespace Rain
     wgpuRenderPassEncoderDrawIndexed(nativeRenderPassEncoder, subMesh.IndexCount, instanceCount, subMesh.BaseIndex, subMesh.BaseVertex, 0);
   }
 
+  void RenderWGPU::RenderSkeletalMesh(Ref<RenderPassEncoder> renderCommandBuffer,
+                                      WGPURenderPipeline pipeline,
+                                      Ref<MeshSource> mesh,
+                                      uint32_t submeshIndex,
+                                      Ref<GPUBuffer> transformBuffer,
+                                      uint32_t instanceCount)
+  {
+    const auto ptr = std::static_pointer_cast<RenderPassEncoderWGPU>(renderCommandBuffer);
+    RN_ASSERT(ptr != nullptr);
+
+    const auto nativeRenderPassEncoder = ptr->GetNativeEncoder();
+
+    wgpuRenderPassEncoderSetPipeline(nativeRenderPassEncoder, pipeline);
+
+    // Use skeletal vertex buffer instead of regular vertex buffer
+    wgpuRenderPassEncoderSetVertexBuffer(nativeRenderPassEncoder,
+                                         0,
+                                         mesh->GetSkeletalVertexBuffer()->Buffer,
+                                         0,
+                                         mesh->GetSkeletalVertexBuffer()->Size);
+
+    wgpuRenderPassEncoderSetIndexBuffer(nativeRenderPassEncoder,
+                                        mesh->GetIndexBuffer()->Buffer,
+                                        WGPUIndexFormat_Uint32,
+                                        0,
+                                        mesh->GetIndexBuffer()->Size);
+
+    wgpuRenderPassEncoderSetVertexBuffer(nativeRenderPassEncoder,
+                                         1,
+                                         transformBuffer->Buffer,
+                                         0,
+                                         transformBuffer->Size);
+
+    const auto& subMesh = mesh->m_SubMeshes[submeshIndex];
+    wgpuRenderPassEncoderDrawIndexed(nativeRenderPassEncoder, subMesh.IndexCount, instanceCount, subMesh.BaseIndex, subMesh.BaseVertex, 0);
+  }
+
   void RenderWGPU::SubmitFullscreenQuad(Ref<RenderPassEncoder> renderCommandBuffer, WGPURenderPipeline pipeline)
   {
     const auto ptr = std::static_pointer_cast<RenderPassEncoderWGPU>(renderCommandBuffer);

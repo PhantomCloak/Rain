@@ -259,9 +259,13 @@ namespace Rain
       {
         return BindingType::TextureDepthBindingType;
       }
-      if (typeName.find("texture_storage") != std::string::npos || isStorage)
+      if (typeName.find("texture_storage") != std::string::npos)
       {
-        return BindingType::StorageBindingType;
+        return BindingType::StorageBindingType;  // Storage textures
+      }
+      if (isStorage)
+      {
+        return BindingType::StorageBufferBindingType;  // Storage buffers (var<storage>)
       }
       if (typeName.find("texture") != std::string::npos)
       {
@@ -628,6 +632,14 @@ namespace Rain
             groupEntry.storageTexture.format = entry.ImageFormat;
             groupEntry.storageTexture.viewDimension = entry.ViewDimension;
             groupEntry.visibility = WGPUShaderStage_Compute;
+            break;
+
+          case StorageBufferBindingType:
+            groupEntry.buffer.type = WGPUBufferBindingType_ReadOnlyStorage;
+            groupEntry.buffer.hasDynamicOffset = false;
+            groupEntry.buffer.nextInChain = nullptr;
+            groupEntry.buffer.minBindingSize = 0;
+            groupEntry.visibility = WGPUShaderStage_Fragment | WGPUShaderStage_Vertex | WGPUShaderStage_Compute;
             break;
 
           default:

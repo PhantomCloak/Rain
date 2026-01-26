@@ -4,11 +4,9 @@
 #include "Application.h"
 #include "core/Log.h"
 
-#ifndef __EMSCRIPTEN__
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_wgpu.h"
 #include "imgui.h"
-#endif
 
 #include "debug/Profiler.h"
 #include "io/filesystem.h"
@@ -169,6 +167,13 @@ namespace Rain
 
   void SceneRenderer::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform)
   {
+    // Route skeletal meshes to the skeletal draw list
+    if (meshSource->HasSkeleton())
+    {
+      SubmitSkeletalMesh(meshSource, submeshIndex, materialTable, transform);
+      return;
+    }
+
     const auto& submesh = meshSource->m_SubMeshes[submeshIndex];
     const auto materialHandle = materialTable->HasMaterial(submesh.MaterialIndex) ? materialTable->GetMaterial(submesh.MaterialIndex) : meshSource->Materials->GetMaterial(submesh.MaterialIndex);
 
@@ -186,6 +191,16 @@ namespace Rain
     drawCommand.SubmeshIndex = submeshIndex;
     drawCommand.Materials = materialTable;
     drawCommand.InstanceCount++;
+  }
+
+  void SceneRenderer::SubmitSkeletalMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform)
+  {
+    SkeletalDrawCommand cmd;
+    cmd.Mesh = meshSource;
+    cmd.SubmeshIndex = submeshIndex;
+    cmd.Materials = materialTable;
+    cmd.Transform = transform;
+    m_SkeletalDrawList.push_back(cmd);
   }
   std::vector<std::function<void(std::string fileName)>> callbacks;
 
@@ -397,6 +412,61 @@ namespace Rain
     m_LitPass->Set("u_BDRFLut", bdrfLut);
     m_LitPass->Bake();
 
+    // Skeletal Mesh Pipeline
+    auto skeletalShader = ShaderManager::LoadShader("SH_Skeletal", RESOURCE_DIR "/shaders/skeletal_simple.wgsl");
+
+    // clang-format off
+    VertexBufferLayout skeletalVertexLayout = {112, {
+        {0, ShaderDataType::Float3, "position", 0},
+        {1, ShaderDataType::Float3, "normal", 16},
+        {2, ShaderDataType::Float2, "uv", 32},
+        {3, ShaderDataType::Float3, "tangent", 48},
+        {4, ShaderDataType::Float3, "bitangent", 64},
+        {5, ShaderDataType::Int4, "boneIndices", 80},
+        {6, ShaderDataType::Float4, "boneWeights", 96}}};
+
+    VertexBufferLayout skeletalInstanceLayout = {48, {
+        {7, ShaderDataType::Float4, "a_MRow0", 0},
+        {8, ShaderDataType::Float4, "a_MRow1", 16},
+        {9, ShaderDataType::Float4, "a_MRow2", 32}}};
+    // clang-format on
+
+    // Create bone matrices storage buffer (128 bones * 64 bytes per matrix)
+    m_BoneMatricesBuffer = GPUAllocator::GAlloc("bone_matrices", WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage, 128 * sizeof(glm::mat4));
+
+    // Initialize with identity matrices
+    std::vector<glm::mat4> identityBones(128, glm::mat4(1.0f));
+    m_BoneMatricesBuffer->SetData(identityBones.data(), 128 * sizeof(glm::mat4));
+
+    FramebufferSpec skeletalFboSpec;
+    skeletalFboSpec.ColorFormat = TextureFormat::BRGBA8,
+    skeletalFboSpec.DepthFormat = TextureFormat::Depth24Plus;
+    skeletalFboSpec.DebugName = "FB_Skeletal";
+    skeletalFboSpec.Multisample = 4;
+    skeletalFboSpec.ExistingColorAttachment = m_CompositeFramebuffer->GetAttachment(0);
+    skeletalFboSpec.ExistingDepth = m_CompositeFramebuffer->GetDepthAttachment();
+
+    RenderPipelineSpec skeletalPipeSpec = {
+        .VertexLayout = skeletalVertexLayout,
+        .InstanceLayout = skeletalInstanceLayout,
+        .CullingMode = PipelineCullingMode::NONE,
+        .Shader = skeletalShader,
+        .TargetFramebuffer = Framebuffer::Create(skeletalFboSpec),
+        .DebugName = "RP_Skeletal"};
+
+    m_SkeletalPipeline = RenderPipeline::Create(skeletalPipeSpec);
+
+    RenderPassSpec skeletalPassSpec = {
+        .Pipeline = m_SkeletalPipeline,
+        .DebugName = "SkeletalPass"};
+
+    m_SkeletalPass = RenderPass::Create(skeletalPassSpec);
+    m_SkeletalPass->Set("u_Scene", m_SceneUniformBuffer);
+    m_SkeletalPass->Set("u_BoneMatrices", m_BoneMatricesBuffer);
+    m_SkeletalPass->Bake();
+
+    RN_LOG("Skeletal pipeline initialized");
+
     // PPFX
     FramebufferSpec ppfxFboSpec;
     ppfxFboSpec.SwapChainTarget = true;
@@ -416,7 +486,6 @@ namespace Rain
 
     // auto renderContext = m_Renderer->GetRenderContext();
 
-#ifndef __EMSCRIPTEN__
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     auto& io = ImGui::GetIO();
@@ -436,7 +505,6 @@ namespace Rain
         .alphaToCoverageEnabled = false};
     initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
     ImGui_ImplWGPU_Init(&initInfo);
-#endif
   }
 
   void SceneRenderer::PreRender()
@@ -571,11 +639,9 @@ namespace Rain
     }
 
     // JPH::DebugRenderer::sInstance = m_Renderer;
-#ifndef __EMSCRIPTEN__
     ImGui_ImplWGPU_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-#endif
 
     if (SavedCam.Far != 400.0f)
     {
@@ -613,6 +679,15 @@ namespace Rain
       }
     }
 
+    // Skeletal Mesh Pass
+    if (!m_SkeletalDrawList.empty())
+    {
+      RN_PROFILE_FUNCN("Skeletal Pass");
+      Ref<RenderPassEncoder> skeletalPassEncoder = m_Renderer->BeginRenderPass(m_SkeletalPass, commandEncoder);
+      RenderSkeletalMeshes(skeletalPassEncoder);
+      m_Renderer->EndRenderPass(m_SkeletalPass, skeletalPassEncoder);
+    }
+
     {
       RN_PROFILE_FUNCN("Geometry Pass");
       Ref<RenderPassEncoder> litPassEncoder = m_Renderer->BeginRenderPass(m_LitPass, commandEncoder);
@@ -626,9 +701,7 @@ namespace Rain
       // DrawCameraFrustum(SavedCam);
       //  RenderDebug::FlushDrawList();
 
-#ifndef __EMSCRIPTEN__
       ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), std::static_pointer_cast<RenderPassEncoderWGPU>(litPassEncoder)->GetNativeEncoder());
-#endif
 
       m_Renderer->EndRenderPass(m_LitPass, litPassEncoder);
     }
@@ -638,6 +711,44 @@ namespace Rain
 
     m_DrawList.clear();
     m_MeshTransformMap.clear();
+    m_SkeletalDrawList.clear();
+  }
+
+  void SceneRenderer::RenderSkeletalMeshes(Ref<RenderPassEncoder> passEncoder)
+  {
+    if (m_SkeletalDrawList.empty())
+    {
+      return;
+    }
+
+    for (auto& cmd : m_SkeletalDrawList)
+    {
+      if (!cmd.Mesh->HasSkeleton())
+      {
+        continue;
+      }
+
+      auto skeleton = cmd.Mesh->GetSkeleton();
+
+      // Use precomputed bone matrices from model (WorldTransform * InverseBindMatrix)
+      std::vector<glm::mat4> boneMatrices(128, glm::mat4(1.0f));
+      for (size_t i = 0; i < skeleton->BoneMatrices.size() && i < 128; i++)
+      {
+        boneMatrices[i] = skeleton->BoneMatrices[i];
+      }
+      m_BoneMatricesBuffer->SetData(boneMatrices.data(), 128 * sizeof(glm::mat4));
+
+      // Create instance data for this draw
+      TransformVertexData transformData;
+      transformData.MRow[0] = {cmd.Transform[0][0], cmd.Transform[1][0], cmd.Transform[2][0], cmd.Transform[3][0]};
+      transformData.MRow[1] = {cmd.Transform[0][1], cmd.Transform[1][1], cmd.Transform[2][1], cmd.Transform[3][1]};
+      transformData.MRow[2] = {cmd.Transform[0][2], cmd.Transform[1][2], cmd.Transform[2][2], cmd.Transform[3][2]};
+
+      m_TransformBuffer->SetData(&transformData, sizeof(TransformVertexData));
+
+      // Use the dedicated skeletal mesh rendering method
+      m_Renderer->RenderSkeletalMesh(passEncoder, m_SkeletalPipeline->GetPipeline(), cmd.Mesh, cmd.SubmeshIndex, m_TransformBuffer, 1);
+    }
   }
 
   void SceneRenderer::EndScene()
@@ -648,10 +759,8 @@ namespace Rain
       return;
     }
 
-#ifndef __EMSCRIPTEN__
     ImGui::EndFrame();
     ImGui::Render();
-#endif
 
     PreRender();
     FlushDrawList();

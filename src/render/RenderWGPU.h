@@ -34,6 +34,13 @@ namespace Rain
                             uint32_t transformOffset,
                             uint32_t instanceCount) override;
 
+    virtual void RenderSkeletalMesh(Ref<RenderPassEncoder> renderCommandBuffer,
+                                    WGPURenderPipeline pipeline,
+                                    Ref<MeshSource> mesh,
+                                    uint32_t submeshIndex,
+                                    Ref<GPUBuffer> transformBuffer,
+                                    uint32_t instanceCount) override;
+
     virtual void SubmitFullscreenQuad(Ref<RenderPassEncoder> renderCommandBuffer, WGPURenderPipeline pipeline) override;
 
     virtual GLFWwindow* GetActiveWindow() override { return m_Window; }

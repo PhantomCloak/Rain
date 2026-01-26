@@ -12,7 +12,8 @@ namespace Rain
   {
     UniformBindingType,
     TextureBindingType,
-    StorageBindingType,
+    StorageBindingType,        // Storage textures
+    StorageBufferBindingType,  // Storage buffers (var<storage>)
     TextureDepthBindingType,
     SamplerBindingType,
     CompareSamplerBindingType,

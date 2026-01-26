@@ -63,7 +63,15 @@ namespace Rain
 
     uint32_t InstanceCount = 0;
     uint32_t InstanceOffset = 0;
-    bool IsRigged = false;
+    bool IsSkeletal = false;
+  };
+
+  struct SkeletalDrawCommand
+  {
+    Ref<MeshSource> Mesh;
+    uint32_t SubmeshIndex;
+    Ref<MaterialTable> Materials;
+    glm::mat4 Transform;
   };
 
   struct TransformVertexData
@@ -121,6 +129,7 @@ namespace Rain
 
     void Init();
     void SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform);
+    void SubmitSkeletalMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform);
     void BeginScene(const SceneCamera& camera);
     void EndScene();
     void SetScene(Scene* scene);
@@ -180,5 +189,13 @@ namespace Rain
 
     uint32_t m_ViewportWidth;
     uint32_t m_ViewportHeight;
+
+    // Skeletal rendering
+    Ref<RenderPipeline> m_SkeletalPipeline;
+    Ref<RenderPass> m_SkeletalPass;
+    Ref<GPUBuffer> m_BoneMatricesBuffer;
+    std::vector<SkeletalDrawCommand> m_SkeletalDrawList;
+
+    void RenderSkeletalMeshes(Ref<RenderPassEncoder> passEncoder);
   };
 }  // namespace Rain
