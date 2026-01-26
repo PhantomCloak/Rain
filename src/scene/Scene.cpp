@@ -5,7 +5,7 @@
 #include "SceneRenderer.h"
 #include "debug/Profiler.h"
 #include "glm/gtc/type_ptr.hpp"
-#include "imgui.h"
+// #include "imgui.h"
 #include "io/cursor.h"
 #include "render/ResourceManager.h"
 
@@ -34,10 +34,10 @@ namespace Rain
   Entity helment;
 
   // Orbit camera state
-  static glm::vec3 orbitTarget = glm::vec3(0.0f);  // Focus point (center of model)
-  static float orbitDistance = 30.0f;              // Distance from target
-  static float orbitTheta = 0.0f;                  // Horizontal angle (radians)
-  static float orbitPhi = glm::radians(30.0f);     // Vertical angle (radians), 0 = horizontal
+  static glm::vec3 orbitTarget = glm::vec3(0.0f, 1.0f, 0.0);  // Focus point (center of model)
+  static float orbitDistance = 30.0f;                         // Distance from target
+  static float orbitTheta = 0.0f;                             // Horizontal angle (radians)
+  static float orbitPhi = glm::radians(30.0f);                // Vertical angle (radians), 0 = horizontal
   static glm::vec2 lastMousePos = glm::vec2(0.0f);
   static bool isDragging = false;
 
@@ -72,12 +72,12 @@ namespace Rain
     auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test/untitled.gltf");
     Entity galata = CreateEntity("bump");
 
-    galata.Transform().Translation = glm::vec3(0, -0.45f, 0);
+    galata.Transform().Translation = glm::vec3(0, -0.0, 0);
     galata.Transform().Scale = glm::vec3(1);
     // galata.Transform().SetRotationEuler(glm::radians(glm::vec3(90.0, 0.0, 180.0)));
 
     // Set orbit target to match the model position
-    orbitTarget = galata.Transform().Translation;
+    // orbitTarget = galata.Transform().Translation;
 
     BuildMeshEntityHierarchy(galata, bochii);
 
@@ -247,11 +247,11 @@ namespace Rain
     static float lightY = 0.514f;
     static float lightZ = 0.0f;
 
-    ImGui::Begin("A");
-    ImGui::SliderFloat("Light X", &lightX, -1.0f, 1.0f);
-    ImGui::SliderFloat("Light Y", &lightY, -1.0f, 1.0f);
-    ImGui::SliderFloat("Light Z", &lightZ, -1.0f, 1.0f);
-    ImGui::End();
+    // ImGui::Begin("A");
+    // ImGui::SliderFloat("Light X", &lightX, -1.0f, 1.0f);
+    // ImGui::SliderFloat("Light Y", &lightY, -1.0f, 1.0f);
+    // ImGui::SliderFloat("Light Z", &lightZ, -1.0f, 1.0f);
+    // ImGui::End();
 
     static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
     drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent)
@@ -344,10 +344,10 @@ namespace Rain
 
   void Scene::OnMouseMove(double xPos, double yPos)
   {
-    if (ImGui::GetIO().WantCaptureMouse)
-    {
-      return;
-    }
+    // if (ImGui::GetIO().WantCaptureMouse)
+    //{
+    //   return;
+    // }
 
     glm::vec2 currentMousePos = glm::vec2(xPos, yPos);
 

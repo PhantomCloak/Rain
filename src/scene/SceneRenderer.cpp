@@ -4,9 +4,9 @@
 #include "Application.h"
 #include "core/Log.h"
 
-#include "backends/imgui_impl_glfw.h"
-#include "backends/imgui_impl_wgpu.h"
-#include "imgui.h"
+// #include "backends/imgui_impl_glfw.h"
+// #include "backends/imgui_impl_wgpu.h"
+// #include "imgui.h"
 
 #include "debug/Profiler.h"
 #include "io/filesystem.h"
@@ -463,6 +463,14 @@ namespace Rain
     m_SkeletalPass = RenderPass::Create(skeletalPassSpec);
     m_SkeletalPass->Set("u_Scene", m_SceneUniformBuffer);
     m_SkeletalPass->Set("u_BoneMatrices", m_BoneMatricesBuffer);
+    m_SkeletalPass->Set("u_ShadowMap", m_ShadowPass[0]->GetDepthOutput());
+    m_SkeletalPass->Set("u_ShadowSampler", m_ShadowSampler);
+    m_SkeletalPass->Set("u_ShadowData", m_ShadowUniformBuffer);
+    m_SkeletalPass->Set("u_radianceMap", envFiltered);
+    m_SkeletalPass->Set("u_irradianceMap", envIrradiance);
+    m_SkeletalPass->Set("u_radianceMapSampler", skyboxSampler);
+    m_SkeletalPass->Set("u_irradianceMapSampler", skyboxSampler2);
+    m_SkeletalPass->Set("u_BDRFLut", bdrfLut);
     m_SkeletalPass->Bake();
 
     RN_LOG("Skeletal pipeline initialized");
@@ -486,25 +494,25 @@ namespace Rain
 
     // auto renderContext = m_Renderer->GetRenderContext();
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    auto& io = ImGui::GetIO();
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(2.0f);  // Scale everything by 2x
-    io.FontGlobalScale = 2.0f;
-    ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
+    // IMGUI_CHECKVERSION();
+    // ImGui::CreateContext();
+    // auto& io = ImGui::GetIO();
+    // ImGuiStyle& style = ImGui::GetStyle();
+    // style.ScaleAllSizes(2.0f);  // Scale everything by 2x
+    // io.FontGlobalScale = 2.0f;
+    // ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
 
-    ImGui_ImplWGPU_InitInfo initInfo;
-    initInfo.Device = RenderContext::GetDevice();
-    // initInfo.RenderTargetFormat = render->m_swapChainFormat;
-    initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
-    initInfo.PipelineMultisampleState = {
-        .nextInChain = nullptr,
-        .count = 4,
-        .mask = ~0u,
-        .alphaToCoverageEnabled = false};
-    initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
-    ImGui_ImplWGPU_Init(&initInfo);
+    // ImGui_ImplWGPU_InitInfo initInfo;
+    // initInfo.Device = RenderContext::GetDevice();
+    //// initInfo.RenderTargetFormat = render->m_swapChainFormat;
+    // initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
+    // initInfo.PipelineMultisampleState = {
+    //     .nextInChain = nullptr,
+    //     .count = 4,
+    //     .mask = ~0u,
+    //     .alphaToCoverageEnabled = false};
+    // initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
+    // ImGui_ImplWGPU_Init(&initInfo);
   }
 
   void SceneRenderer::PreRender()
@@ -639,9 +647,9 @@ namespace Rain
     }
 
     // JPH::DebugRenderer::sInstance = m_Renderer;
-    ImGui_ImplWGPU_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
+    // ImGui_ImplWGPU_NewFrame();
+    // ImGui_ImplGlfw_NewFrame();
+    // ImGui::NewFrame();
 
     if (SavedCam.Far != 400.0f)
     {
@@ -701,7 +709,7 @@ namespace Rain
       // DrawCameraFrustum(SavedCam);
       //  RenderDebug::FlushDrawList();
 
-      ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), std::static_pointer_cast<RenderPassEncoderWGPU>(litPassEncoder)->GetNativeEncoder());
+      // ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), std::static_pointer_cast<RenderPassEncoderWGPU>(litPassEncoder)->GetNativeEncoder());
 
       m_Renderer->EndRenderPass(m_LitPass, litPassEncoder);
     }
@@ -746,8 +754,8 @@ namespace Rain
 
       m_TransformBuffer->SetData(&transformData, sizeof(TransformVertexData));
 
-      // Use the dedicated skeletal mesh rendering method
-      m_Renderer->RenderSkeletalMesh(passEncoder, m_SkeletalPipeline->GetPipeline(), cmd.Mesh, cmd.SubmeshIndex, m_TransformBuffer, 1);
+      // Use the dedicated skeletal mesh rendering method with materials
+      m_Renderer->RenderSkeletalMesh(passEncoder, m_SkeletalPipeline->GetPipeline(), cmd.Mesh, cmd.SubmeshIndex, cmd.Materials, m_TransformBuffer, 1);
     }
   }
 
@@ -759,8 +767,8 @@ namespace Rain
       return;
     }
 
-    ImGui::EndFrame();
-    ImGui::Render();
+    // ImGui::EndFrame();
+    // ImGui::Render();
 
     PreRender();
     FlushDrawList();

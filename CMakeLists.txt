@@ -14,14 +14,16 @@ file(GLOB IMGUI_SOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_wgpu.cpp")
   #"${CMAKE_CURRENT_SOURCE_DIR}/vendor/ImGuizmo/*.cpp")
 
-if(NOT EMSCRIPTEN)
-list(APPEND SOURCES ${IMGUI_SOURCES})
-endif()
+  #list(APPEND SOURCES ${IMGUI_SOURCES})
 
 if(APPLE)
   list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/osx/macos_window.mm")
 endif()
-add_definitions(-DIMGUI_IMPL_WEBGPU_BACKEND_DAWN)
+if(EMSCRIPTEN)
+  add_definitions(-DIMGUI_IMPL_WEBGPU_BACKEND_WGPU)
+else()
+  add_definitions(-DIMGUI_IMPL_WEBGPU_BACKEND_DAWN)
+endif()
 add_executable(ReEngine ${SOURCES})
 set_target_properties(ReEngine PROPERTIES
   CXX_STANDARD 20
@@ -41,7 +43,7 @@ if(NOT EMSCRIPTEN)
   target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui")
   target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/dawn/include/tint)
 else()
-  target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb)
+target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb)
 endif()
 
 if(EMSCRIPTEN)

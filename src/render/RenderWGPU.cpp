@@ -626,6 +626,7 @@ namespace Rain
                                       WGPURenderPipeline pipeline,
                                       Ref<MeshSource> mesh,
                                       uint32_t submeshIndex,
+                                      Ref<MaterialTable> materialTable,
                                       Ref<GPUBuffer> transformBuffer,
                                       uint32_t instanceCount)
   {
@@ -656,6 +657,11 @@ namespace Rain
                                          transformBuffer->Size);
 
     const auto& subMesh = mesh->m_SubMeshes[submeshIndex];
+
+    // Set material bind group (group 1)
+    auto material = materialTable->HasMaterial(subMesh.MaterialIndex) ? materialTable->GetMaterial(subMesh.MaterialIndex) : mesh->Materials->GetMaterial(subMesh.MaterialIndex);
+    wgpuRenderPassEncoderSetBindGroup(nativeRenderPassEncoder, 1, material->GetBinding(1), 0, 0);
+
     wgpuRenderPassEncoderDrawIndexed(nativeRenderPassEncoder, subMesh.IndexCount, instanceCount, subMesh.BaseIndex, subMesh.BaseVertex, 0);
   }
 

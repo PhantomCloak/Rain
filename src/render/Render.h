@@ -46,6 +46,7 @@ namespace Rain
                                     WGPURenderPipeline pipeline,
                                     Ref<MeshSource> mesh,
                                     uint32_t submeshIndex,
+                                    Ref<MaterialTable> materialTable,
                                     Ref<GPUBuffer> transformBuffer,
                                     uint32_t instanceCount) = 0;
 
