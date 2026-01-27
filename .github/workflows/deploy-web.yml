@@ -16,6 +16,7 @@ jobs:
       - name: Checkout required submodules
         run: |
           git submodule update --init --recursive vendor/assimp
+          git submodule update --init --recursive vendor/ozz-animation
           git submodule update --init --recursive vendor/spdlog
           git submodule update --init --recursive vendor/flecs
           git submodule update --init --recursive vendor/stb
