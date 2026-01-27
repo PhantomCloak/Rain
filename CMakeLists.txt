@@ -14,7 +14,7 @@ file(GLOB IMGUI_SOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_wgpu.cpp")
   #"${CMAKE_CURRENT_SOURCE_DIR}/vendor/ImGuizmo/*.cpp")
 
-  #list(APPEND SOURCES ${IMGUI_SOURCES})
+list(APPEND SOURCES ${IMGUI_SOURCES})
 
 if(APPLE)
   list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/osx/macos_window.mm")
