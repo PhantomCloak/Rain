@@ -3,6 +3,7 @@
 #include "Components.h"
 #include "Entity.h"
 #include "SceneRenderer.h"
+#include "animation/OzzAnimator.h"
 #include "debug/Profiler.h"
 #include "glm/gtc/type_ptr.hpp"
 // #include "imgui.h"
@@ -69,7 +70,7 @@ namespace Rain
     camera.AddComponent<CameraComponent>();
 
     // auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
-    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test/untitled2.gltf");
+    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test2/untitled.gltf");
     Entity galata = CreateEntity("bump");
 
     galata.Transform().Translation = glm::vec3(0, -0.0, 0);
@@ -158,6 +159,15 @@ namespace Rain
   void Scene::OnUpdate()
   {
     ScanKeyPress();
+
+    // Update all animators
+    float dt = Application::Get()->GetDeltaTime();
+    m_World.query<AnimatorComponent>().each([dt](AnimatorComponent& ac)
+                                            {
+      if (ac.Playing && ac.Animator)
+      {
+        ac.Animator->Update(dt);
+      } });
 
     m_PhysicsScene->Update(1.0f / 60.0);
     Cursor::Update();
@@ -259,7 +269,16 @@ namespace Rain
       Entity e = Entity(entity, this);
       Ref<MeshSource> meshSource = Rain::ResourceManager::GetMeshSource(meshComponent.MeshSourceId);
       glm::mat4 entityTransform = GetWorldSpaceTransformMatrix(e);
-      renderer->SubmitMesh(meshSource, meshComponent.SubMeshId, meshComponent.Materials, entityTransform); });
+
+      // Check if this entity has an animator component
+      Ref<OzzAnimator> animator = nullptr;
+      if (entity.has<AnimatorComponent>())
+      {
+      auto animComp = entity.get<AnimatorComponent>();
+      animator = animComp.Animator;
+      }
+
+      renderer->SubmitMesh(meshSource, meshComponent.SubMeshId, meshComponent.Materials, entityTransform, animator); });
 
     SceneLightInfo.LightDirection = glm::normalize(glm::vec3(lightX, lightY, lightZ));
     SceneLightInfo.LightPos = glm::vec3(0.0f);
@@ -270,6 +289,25 @@ namespace Rain
   void Scene::BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh)
   {
     const std::vector<Ref<MeshNode>> nodes = mesh->GetNodes();
+
+    // Create animator if mesh has ozz animations
+    Ref<OzzAnimator> animator = nullptr;
+    if (mesh->HasOzzSkeleton() && mesh->GetOzzAnimationCount() > 0)
+    {
+      animator = CreateRef<OzzAnimator>();
+      if (animator->Initialize(mesh->GetOzzSkeleton()))
+      {
+        animator->SetAnimation(mesh->GetOzzAnimation(0));
+        animator->SetPlaying(true);
+        animator->SetLooping(true);
+        RN_LOG("Created OzzAnimator for mesh with {} animations", mesh->GetOzzAnimationCount());
+      }
+      else
+      {
+        RN_LOG_ERR("Failed to initialize OzzAnimator");
+        animator = nullptr;
+      }
+    }
 
     for (const Ref<MeshNode> node : mesh->GetNodes())
     {
@@ -284,6 +322,14 @@ namespace Rain
       nodeEntity.AddComponent<TransformComponent>();
 
       nodeEntity.Transform().SetTransform(node->LocalTransform);
+
+      // Attach animator to all mesh entities so animation works for all submeshes
+      if (animator)
+      {
+        AnimatorComponent& animComp = nodeEntity.AddComponent<AnimatorComponent>();
+        animComp.Animator = animator;
+        animComp.Playing = true;
+      }
     }
   }
 

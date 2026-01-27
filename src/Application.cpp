@@ -80,6 +80,10 @@ namespace Rain
 #ifndef __EMSCRIPTEN__
     FrameMark;
 #endif
+    float currentTime = static_cast<float>(glfwGetTime());
+    m_DeltaTime = currentTime - m_LastFrameTime;
+    m_LastFrameTime = currentTime;
+
     glfwPollEvents();
 
     if (m_Scene != nullptr)

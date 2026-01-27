@@ -2,6 +2,7 @@
 #include <glm/gtx/matrix_decompose.hpp>
 #include <iostream>
 #include "ResourceManager.h"
+#include "animation/OzzConverter.h"
 #include "core/KeyCode.h"
 #include "core/Log.h"
 #include "io/filesystem.h"
@@ -557,5 +558,32 @@ namespace Rain
     m_SkeletalVertexBuffer->SetData(skeletalVertices.data(), skeletalVertices.size() * sizeof(SkeletalVertexAttribute));
 
     RN_LOG("Created skeletal vertex buffer with {} vertices", skeletalVertices.size());
+
+    // Convert to ozz-animation format if animations are present
+    if (scene->mNumAnimations > 0)
+    {
+      m_OzzSkeleton = OzzConverter::ConvertSkeleton(scene, *m_Skeleton);
+      if (m_OzzSkeleton)
+      {
+        for (uint32_t i = 0; i < scene->mNumAnimations; ++i)
+        {
+          auto ozzAnim = OzzConverter::ConvertAnimation(scene->mAnimations[i], *m_OzzSkeleton);
+          if (ozzAnim)
+          {
+            m_OzzAnimations.push_back(ozzAnim);
+          }
+        }
+        RN_LOG("Converted {} animations to ozz format", m_OzzAnimations.size());
+      }
+    }
+  }
+
+  Ref<OzzAnimation> MeshSource::GetOzzAnimation(size_t index)
+  {
+    if (index < m_OzzAnimations.size())
+    {
+      return m_OzzAnimations[index];
+    }
+    return nullptr;
   }
 }  // namespace Rain

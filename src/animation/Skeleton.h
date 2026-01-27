@@ -12,8 +12,8 @@ namespace Rain
     std::string Name;
     int32_t ParentIndex = -1;
     glm::mat4 InverseBindMatrix = glm::mat4(1.0f);
-    glm::mat4 LocalTransform = glm::mat4(1.0f);   // Transform relative to parent
-    glm::mat4 WorldTransform = glm::mat4(1.0f);   // Computed world transform
+    glm::mat4 LocalTransform = glm::mat4(1.0f);  // Transform relative to parent
+    glm::mat4 WorldTransform = glm::mat4(1.0f);  // Computed world transform
   };
 
   struct Skeleton
@@ -33,7 +33,9 @@ namespace Rain
     void SortBones()
     {
       if (Bones.empty())
+      {
         return;
+      }
 
       std::vector<Bone> sortedBones;
       std::vector<bool> processed(Bones.size(), false);
@@ -45,7 +47,9 @@ namespace Rain
         for (size_t i = 0; i < Bones.size(); i++)
         {
           if (processed[i])
+          {
             continue;
+          }
 
           // Root bone or parent already processed
           if (Bones[i].ParentIndex < 0 || processed[Bones[i].ParentIndex])

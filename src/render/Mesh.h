@@ -2,6 +2,8 @@
 
 #include <vector>
 #include "Material.h"
+#include "animation/OzzAnimation.h"
+#include "animation/OzzSkeleton.h"
 #include "animation/Skeleton.h"
 #include "core/UUID.h"
 
@@ -87,11 +89,19 @@ namespace Rain
     bool HasSkeleton() const { return m_Skeleton != nullptr && !m_Skeleton->Bones.empty(); }
     Ref<Skeleton> GetSkeleton() { return m_Skeleton; }
 
+    bool HasOzzSkeleton() const { return m_OzzSkeleton != nullptr; }
+    Ref<OzzSkeleton> GetOzzSkeleton() { return m_OzzSkeleton; }
+    Ref<OzzAnimation> GetOzzAnimation(size_t index);
+    size_t GetOzzAnimationCount() const { return m_OzzAnimations.size(); }
+
    private:
     Ref<GPUBuffer> m_VertexBuffer;
     Ref<GPUBuffer> m_IndexBuffer;
     Ref<GPUBuffer> m_SkeletalVertexBuffer;
     Ref<Skeleton> m_Skeleton;
+
+    Ref<OzzSkeleton> m_OzzSkeleton;
+    std::vector<Ref<OzzAnimation>> m_OzzAnimations;
 
     void TraverseNode(aiNode* node, const aiScene* scene);
     void ExtractBones(const aiScene* scene);

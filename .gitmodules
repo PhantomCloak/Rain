@@ -25,3 +25,6 @@
 [submodule "vendor/JoltPhysics"]
 	path = vendor/JoltPhysics
 	url = https://github.com/jrouwe/JoltPhysics.git
+[submodule "vendor/ozz-animation"]
+	path = vendor/ozz-animation
+	url = https://github.com/guillaumeblanc/ozz-animation.git

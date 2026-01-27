@@ -65,6 +65,12 @@ set(JPH_DEBUG_RENDERER ON CACHE BOOL "Enable debug renderer" FORCE)
 set(CPP_RTTI_ENABLED ON CACHE BOOL "Enable RTTI for Jolt" FORCE)
 add_subdirectory(vendor/JoltPhysics/Build)
 
+# ozz-animation - disable samples/howtos/tests to avoid GLFW collision with Dawn
+set(ozz_build_samples OFF CACHE BOOL "" FORCE)
+set(ozz_build_howtos OFF CACHE BOOL "" FORCE)
+set(ozz_build_tests OFF CACHE BOOL "" FORCE)
+add_subdirectory(vendor/ozz-animation)
+target_include_directories(ReEngine PRIVATE vendor/ozz-animation/include)
 add_subdirectory(vendor/spdlog)
 add_subdirectory(vendor/flecs)
 target_include_directories(ReEngine PRIVATE vendor/JoltPhysics vendor/JoltPhysics/Jolt)
@@ -96,7 +102,7 @@ target_include_directories(ReEngine PRIVATE vendor/JoltPhysics vendor/JoltPhysic
 
 # Linking
 if(EMSCRIPTEN)
-	target_link_libraries(ReEngine PRIVATE assimp flecs spdlog)
+	target_link_libraries(ReEngine PRIVATE assimp flecs spdlog ozz_base ozz_animation ozz_animation_offline)
 else()
   target_link_libraries(ReEngine PRIVATE dawn_common
   dawn_glfw
@@ -113,6 +119,9 @@ else()
   TracyClient
   glfw
   Jolt
+  ozz_base
+  ozz_animation
+  ozz_animation_offline
   assimp)
 endif()
 

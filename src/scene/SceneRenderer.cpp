@@ -165,12 +165,12 @@ namespace Rain
     }
   }
 
-  void SceneRenderer::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform)
+  void SceneRenderer::SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform, Ref<OzzAnimator> animator)
   {
     // Route skeletal meshes to the skeletal draw list
     if (meshSource->HasSkeleton())
     {
-      SubmitSkeletalMesh(meshSource, submeshIndex, materialTable, transform);
+      SubmitSkeletalMesh(meshSource, submeshIndex, materialTable, transform, animator);
       return;
     }
 
@@ -193,13 +193,14 @@ namespace Rain
     drawCommand.InstanceCount++;
   }
 
-  void SceneRenderer::SubmitSkeletalMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform)
+  void SceneRenderer::SubmitSkeletalMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform, Ref<OzzAnimator> animator)
   {
     SkeletalDrawCommand cmd;
     cmd.Mesh = meshSource;
     cmd.SubmeshIndex = submeshIndex;
     cmd.Materials = materialTable;
     cmd.Transform = transform;
+    cmd.Animator = animator;
     m_SkeletalDrawList.push_back(cmd);
   }
   std::vector<std::function<void(std::string fileName)>> callbacks;
@@ -736,14 +737,27 @@ namespace Rain
         continue;
       }
 
-      auto skeleton = cmd.Mesh->GetSkeleton();
-
-      // Use precomputed bone matrices from model (WorldTransform * InverseBindMatrix)
       std::vector<glm::mat4> boneMatrices(128, glm::mat4(1.0f));
-      for (size_t i = 0; i < skeleton->BoneMatrices.size() && i < 128; i++)
+
+      if (cmd.Animator)
       {
-        boneMatrices[i] = skeleton->BoneMatrices[i];
+        // Use ozz-animated matrices
+        const auto& animatedMatrices = cmd.Animator->GetBoneMatrices();
+        for (size_t i = 0; i < animatedMatrices.size() && i < 128; i++)
+        {
+          boneMatrices[i] = animatedMatrices[i];
+        }
       }
+      else
+      {
+        // Fallback to static skeleton (existing behavior)
+        auto skeleton = cmd.Mesh->GetSkeleton();
+        for (size_t i = 0; i < skeleton->BoneMatrices.size() && i < 128; i++)
+        {
+          boneMatrices[i] = skeleton->BoneMatrices[i];
+        }
+      }
+
       m_BoneMatricesBuffer->SetData(boneMatrices.data(), 128 * sizeof(glm::mat4));
 
       // Create instance data for this draw

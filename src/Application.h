@@ -44,11 +44,14 @@ namespace Rain
     static Application* Get();
 
     glm::vec2 GetWindowSize();
+    float GetDeltaTime() const { return m_DeltaTime; }
 
    private:
     Ref<SceneRenderer> m_Renderer;
     std::unique_ptr<Scene> m_Scene;
     static Application* m_Instance;
+    float m_DeltaTime = 0.0f;
+    float m_LastFrameTime = 0.0f;
 
    private:
     void updateDragInertia();

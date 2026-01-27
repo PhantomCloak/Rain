@@ -3,6 +3,7 @@
 #include <glm/gtx/euler_angles.hpp>
 #include <string>
 #include "Math/Math.h"
+#include "animation/OzzAnimator.h"
 #include "core/Ref.h"
 #include "core/UUID.h"
 #include "glm/ext/matrix_transform.hpp"
@@ -199,5 +200,10 @@ namespace Rain {
 
   struct DirectionalLightComponent {
     float Intensity = 0.0f;
+  };
+
+  struct AnimatorComponent {
+    Ref<OzzAnimator> Animator;
+    bool Playing = true;
   };
 }  // namespace Rain

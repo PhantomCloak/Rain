@@ -1,5 +1,6 @@
 #pragma once
 #include "Scene.h"
+#include "animation/OzzAnimator.h"
 #include "render/Pipeline.h"
 #include "render/PipelineCompute.h"
 #include "render/Render.h"
@@ -72,6 +73,7 @@ namespace Rain
     uint32_t SubmeshIndex;
     Ref<MaterialTable> Materials;
     glm::mat4 Transform;
+    Ref<OzzAnimator> Animator;
   };
 
   struct TransformVertexData
@@ -128,8 +130,8 @@ namespace Rain
     SceneRenderer() { instance = this; };
 
     void Init();
-    void SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform);
-    void SubmitSkeletalMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform);
+    void SubmitMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform, Ref<OzzAnimator> animator = nullptr);
+    void SubmitSkeletalMesh(Ref<MeshSource> meshSource, uint32_t submeshIndex, Ref<MaterialTable> materialTable, glm::mat4& transform, Ref<OzzAnimator> animator = nullptr);
     void BeginScene(const SceneCamera& camera);
     void EndScene();
     void SetScene(Scene* scene);
