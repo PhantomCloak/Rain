@@ -6,7 +6,7 @@
 #include "animation/OzzAnimator.h"
 #include "debug/Profiler.h"
 #include "glm/gtc/type_ptr.hpp"
-// #include "imgui.h"
+#include "imgui.h"
 #include "io/cursor.h"
 #include "render/ResourceManager.h"
 
@@ -257,11 +257,11 @@ namespace Rain
     static float lightY = 0.514f;
     static float lightZ = 0.0f;
 
-    // ImGui::Begin("A");
-    // ImGui::SliderFloat("Light X", &lightX, -1.0f, 1.0f);
-    // ImGui::SliderFloat("Light Y", &lightY, -1.0f, 1.0f);
-    // ImGui::SliderFloat("Light Z", &lightZ, -1.0f, 1.0f);
-    // ImGui::End();
+    ImGui::Begin("A");
+    ImGui::SliderFloat("Light X", &lightX, -1.0f, 1.0f);
+    ImGui::SliderFloat("Light Y", &lightY, -1.0f, 1.0f);
+    ImGui::SliderFloat("Light Z", &lightZ, -1.0f, 1.0f);
+    ImGui::End();
 
     static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
     drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent)
@@ -390,10 +390,10 @@ namespace Rain
 
   void Scene::OnMouseMove(double xPos, double yPos)
   {
-    // if (ImGui::GetIO().WantCaptureMouse)
-    //{
-    //   return;
-    // }
+    if (ImGui::GetIO().WantCaptureMouse)
+    {
+      return;
+    }
 
     glm::vec2 currentMousePos = glm::vec2(xPos, yPos);
 
