@@ -4,9 +4,12 @@
 #include "render/Pipeline.h"
 #include "render/Sampler.h"
 #include "render/Texture.h"
+#include "webgpu/webgpu.h"
 
-namespace Rain {
-  struct RenderPassSpec {
+namespace Rain
+{
+  struct RenderPassSpec
+  {
     Ref<RenderPipeline> Pipeline;
     std::string DebugName;
     glm::vec4 MarkerColor;
@@ -16,7 +19,8 @@ namespace Rain {
   // all synchronization goes implicitly within API, due to that all PASSES that are using the same resources
   // Ran sequental instead of parallel, careness needed
 
-  class RenderPass {
+  class RenderPass
+  {
    public:
     RenderPass(const RenderPassSpec& props);
 
@@ -37,5 +41,11 @@ namespace Rain {
 
     Ref<BindingManager> m_PassBinds;
     RenderPassSpec m_PassSpec;
+
+    void SetRenderPassEncoder(WGPURenderPassEncoder encoder) { m_Encoder = encoder; }
+    WGPURenderPassEncoder GetRenderPassEncoder() { return m_Encoder; }
+
+   private:
+    WGPURenderPassEncoder m_Encoder;
   };
 }  // namespace Rain

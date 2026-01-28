@@ -1,4 +1,7 @@
 // #include "imgui.h"
+#include "backends/imgui_impl_glfw.h"
+#include "backends/imgui_impl_wgpu.h"
+#include "core/Ref.h"
 #include "render/RenderWGPU.h"
 #include "scene/Entity.h"
 #include "scene/Scene.h"
@@ -11,10 +14,15 @@
 
 #include "core/Log.h"
 #include "core/SysInfo.h"
+#include "core/Thread.h"
 #include "io/cursor.h"
 #include "io/keyboard.h"
+#include "EditorLayer.h"
+#include "engine/ImGuiLayer.h"
 #include "render/Render.h"
 #include "render/ResourceManager.h"
+
+#include "imgui.h"
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -45,55 +53,99 @@ namespace Rain
       RN_LOG("Render API is ready!");
       Rain::ResourceManager::LoadTexture("T_Default", RESOURCE_DIR "/textures/placeholder.jpeg");
 
-      m_Renderer = CreateRef<SceneRenderer>();
-      m_Renderer->Init();
-
-      m_Scene = std::make_unique<Scene>("Test Scene");
-      m_Scene->Init();
-
       if (m_Render)
       {
         Cursor::Setup(m_Render->GetActiveWindow());
         Keyboard::Setup(m_Render->GetActiveWindow());
       }
-      Cursor::CaptureMouse(true);
+
+      // Cursor::CaptureMouse(true);  // TODO: Shouldn't be here
+
+      m_ImGuiLayer = new ImGuiLayer();
+      m_ImGuiLayer->OnAttach();
     };
 
     if (m_Render)
     {
+      m_SwapChain = CreateRef<Rain::SwapChain>();
       m_Render->OnReady = InitializeScene;
       m_Render->Init(GetNativeWindow());
+
+      while (!m_Render->IsReady())
+      {
+        m_Render->Tick();
+        Thread::Sleep(16);
+      }
     }
     else
     {
       InitializeScene();
     }
+
+    m_Layers.PushLayer(new EditorLayer());
   }
 
   void Application::OnResize(int height, int width)
   {
-    m_Renderer->SetViewportSize(height, width);
+    // m_Renderer->SetViewportSize(height, width);
   }
 
-  void Application::OnUpdate()
+  void Application::Run()
+  {
+    for (Layer* layer : m_Layers)
+    {
+      layer->OnAttach();
+    }
+
+#ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop_arg(
+        [](void* userData)
+        {
+          Application& thisClass = *reinterpret_cast<Application*>(userData);
+          thisClass.ApplicationUpdate();
+        },
+        (void*)this,
+        0, true);
+#else
+    while (!glfwWindowShouldClose(m_Window))
+    {
+      ApplicationUpdate();
+    }
+
+    for (Layer* layer : m_Layers)
+    {
+      layer->OnDeattach();
+    }
+#endif
+  }
+
+  void Application::ApplicationUpdate()
   {
 #ifndef __EMSCRIPTEN__
     FrameMark;
 #endif
+
+    glfwPollEvents();
+
     float currentTime = static_cast<float>(glfwGetTime());
     m_DeltaTime = currentTime - m_LastFrameTime;
     m_LastFrameTime = currentTime;
 
-    glfwPollEvents();
+    m_SwapChain->BeginFrame();
 
-    if (m_Scene != nullptr)
+    m_ImGuiLayer->Begin();
+    for (Layer* layer : m_Layers)
     {
-      m_Scene->OnUpdate();
-      if (m_Renderer != nullptr && m_Render->IsReady())
-      {
-        m_Scene->OnRender(m_Renderer);
-      }
+      layer->OnUpdate(m_DeltaTime);
     }
+
+    for (Layer* layer : m_Layers)
+    {
+      layer->OnRenderImGui();
+    }
+    m_ImGuiLayer->End();
+
+    m_SwapChain->Present();
 
     if (m_Render != nullptr)
     {
@@ -112,10 +164,10 @@ namespace Rain
 
   void Application::OnMouseMove(double xPos, double yPos)
   {
-    if (m_Scene)
-    {
-      m_Scene->OnMouseMove(xPos, yPos);
-    }
+    // if (m_Scene)
+    //{
+    //   m_Scene->OnMouseMove(xPos, yPos);
+    // }
   }
 
   void Application::OnKeyPressed(KeyCode key, KeyAction action)
@@ -124,16 +176,6 @@ namespace Rain
     {
       Cursor::CaptureMouse(false);
     }
-  }
-
-  bool Application::isRunning()
-  {
-    if (const auto ptr = m_Render->GetActiveWindow())
-    {
-      return !glfwWindowShouldClose(ptr);
-    }
-
-    return true;
   }
 
   Application* Application::Get()

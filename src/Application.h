@@ -1,13 +1,20 @@
 #pragma once
+#include "core/Ref.h"
+#include "render/SwapChain.h"
 #ifndef NDEBUG
 #define NDEBUG
 #endif
 
 #include <webgpu/webgpu.h>
 #include <glm/glm.hpp>
-#include "scene/SceneRenderer.h"
+#include "engine/LayerStack.h"
 
 struct GLFWwindow;
+
+namespace Rain
+{
+  class ImGuiLayer;
+}
 #if __APPLE__
 #include "platform/osx/OSXWindow.h"
 typedef Rain::OSXWindow AppWindow;
@@ -36,26 +43,22 @@ namespace Rain
       m_Instance = this;
     }
 
-    bool isRunning();
-
-    void OnUpdate() override;
-    void OnStart() override;
+    virtual void Run() override;
+    virtual void OnStart() override;
+    void ApplicationUpdate();
     void fetchTimestamps();
     static Application* Get();
 
     glm::vec2 GetWindowSize();
     float GetDeltaTime() const { return m_DeltaTime; }
+    Ref<Rain::SwapChain> GetSwapChain() { return m_SwapChain; }
 
    private:
-    Ref<SceneRenderer> m_Renderer;
-    std::unique_ptr<Scene> m_Scene;
+    Ref<Rain::SwapChain> m_SwapChain;
+    LayerStack m_Layers;
+    ImGuiLayer* m_ImGuiLayer = nullptr;
     static Application* m_Instance;
     float m_DeltaTime = 0.0f;
     float m_LastFrameTime = 0.0f;
-
-   private:
-    void updateDragInertia();
-
-    void drawImgui(WGPURenderPassEncoder renderPass);
   };
 }  // namespace Rain

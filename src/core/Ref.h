@@ -2,7 +2,8 @@
 
 #include <memory>
 
-namespace Rain {
+namespace Rain
+{
   template <typename T>
   using Ref = std::shared_ptr<T>;
 
@@ -10,7 +11,14 @@ namespace Rain {
   using Scope = std::unique_ptr<T>;
 
   template <typename T, typename... Args>
-  constexpr Ref<T> CreateRef(Args&&... args) {
+  constexpr Ref<T> CreateRef(Args&&... args)
+  {
+    return std::make_shared<T>(std::forward<Args>(args)...);
+  }
+
+  template <typename T, typename... Args>
+  static Ref<T> Create(Args&&... args)
+  {
     return std::make_shared<T>(std::forward<Args>(args)...);
   }
 
@@ -22,6 +30,5 @@ namespace Rain {
   void* ptr = std::malloc(sizeof(type));                        \
   if (!ptr)                                                     \
     return nullptr;                                             \
-  return static_cast<type*>(std::memset(ptr, 0, sizeof(type))); \
-})()
+  return static_cast<type*>(std::memset(ptr, 0, sizeof(type))); })()
 }  // namespace Rain

@@ -1,5 +1,6 @@
 #include "RenderWGPU.h"
 #include <memory>
+#include "Application.h"
 #include "Mesh.h"
 #include "ResourceManager.h"
 #include "core/Assert.h"
@@ -79,83 +80,6 @@ namespace Rain
     StartRequestInstance(nativeWindowPtr);
 
     return true;
-  }
-
-  // WGPULimits* RenderWGPU::GetRequiredLimits(WGPUAdapter adapter) {
-  //   static WGPUSupportedLimits supportedLimits = {};
-  //   supportedLimits.nextInChain = nullptr;
-
-  // #ifdef __EMSCRIPTEN__
-  //    // Specific limits required for Emscripten
-  //    supportedLimits.limits.minStorageBufferOffsetAlignment = 256;
-  //    supportedLimits.limits.minUniformBufferOffsetAlignment = 256;
-  // #else
-  //    wgpuAdapterGetLimits(adapter, &supportedLimits);
-  // #endif
-
-  //  WGPURequiredLimits* requiredLimits = (WGPURequiredLimits*)malloc(sizeof(WGPURequiredLimits));
-  //  requiredLimits->limits = supportedLimits.limits;  // Copy all supported limits
-  //  m_Limits = supportedLimits.limits;
-
-  //  // Override specific limits as needed
-  //  requiredLimits->limits.maxBufferSize = 150000 * sizeof(VertexAttribute);
-  //  requiredLimits->limits.maxVertexBufferArrayStride = sizeof(VertexAttribute);  // Ensure only one assignment
-  //  requiredLimits->limits.maxTextureDimension1D = 4096;
-  //  requiredLimits->limits.maxTextureDimension2D = 4096;
-
-  // #ifndef __EMSCRIPTEN__
-  //    requiredLimits->limits.maxTextureDimension1D = 6098;
-  //    requiredLimits->limits.maxTextureDimension2D = 6098;
-  // #endif
-  //    // Add any additional specific overrides below
-
-  //  RN_LOG("Max Texture Limit: {}", supportedLimits.limits.maxTextureDimension2D);
-  //  requiredLimits->nextInChain = nullptr;
-  //  return requiredLimits;
-  //}
-
-  WGPUTextureView RenderWGPU::GetCurrentTextureView()
-  {
-    WGPUSurfaceTexture surfaceTexture = {};
-    wgpuSurfaceGetCurrentTexture(m_Surface, &surfaceTexture);
-
-#ifndef __EMSCRIPTEN__
-    if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal)
-#else
-    if (surfaceTexture.status != 0)
-#endif
-    {
-      switch (surfaceTexture.status)
-      {
-        case WGPUSurfaceGetCurrentTextureStatus_Lost:
-          // Reconfigure surface here
-          // ConfigureSurface(m_swapChainDesc.width, m_swapChainDesc.height);
-          wgpuSurfaceGetCurrentTexture(m_Surface, &surfaceTexture);
-          break;
-#ifndef __EMSCRIPTEN__
-        case WGPUSurfaceGetCurrentTextureStatus_Error:
-          RN_CORE_ASSERT(false, "Out of memory when acquiring next swapchain texture");
-          return nullptr;
-#else
-        case WGPUSurfaceGetCurrentTextureStatus_OutOfMemory:
-          RN_CORE_ASSERT(false, "Out of memory when acquiring next swapchain texture");
-          return nullptr;
-#endif
-        default:
-          RN_CORE_ASSERT(false, "Unknown error when acquiring next swapchain texture");
-          return nullptr;
-      }
-    }
-
-    WGPUTextureViewDescriptor viewDesc = {};
-    viewDesc.format = m_swapChainFormat;
-    viewDesc.dimension = WGPUTextureViewDimension_2D;
-    viewDesc.mipLevelCount = 1;
-    viewDesc.arrayLayerCount = 1;
-    viewDesc.aspect = WGPUTextureAspect_All;
-
-    return wgpuTextureCreateView(surfaceTexture.texture, &viewDesc);
-    // Don't call wgpuSurfacePresent here, do it after rendering is complete
   }
 
   Ref<Texture2D> RenderWGPU::GetWhiteTexture()
@@ -486,7 +410,7 @@ namespace Rain
     wgpuCommandBufferRelease(commandBuffer);
   }
 
-  Ref<RenderPassEncoder> RenderWGPU::BeginRenderPass(Ref<RenderPass> pass, Ref<CommandEncoder> encoder)
+  void RenderWGPU::BeginRenderPass(Ref<RenderPass> pass, Ref<CommandBuffer> commandBuffer)
   {
     RN_PROFILE_FUNC;
     pass->Prepare();
@@ -507,7 +431,9 @@ namespace Rain
     {
       ZERO_INIT(colorAttachment);
       colorAttachment.nextInChain = nullptr;
-      colorAttachment.loadOp = WGPULoadOp_Load;
+      colorAttachment.loadOp = renderFrameBuffer->m_FrameBufferSpec.ClearColorOnLoad
+          ? WGPULoadOp_Clear
+          : WGPULoadOp_Load;
       colorAttachment.storeOp = WGPUStoreOp_Store;
       colorAttachment.clearValue = RenderWGPU::Instance->m_ClearColor;
       colorAttachment.resolveTarget = nullptr;
@@ -515,7 +441,7 @@ namespace Rain
 
       if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget)
       {
-        Instance->m_SwapTexture = GetCurrentTextureView();
+        Instance->m_SwapTexture = Application::Get()->GetSwapChain()->GetSurfaceTextureView();
         colorAttachment.resolveTarget = Instance->m_SwapTexture;
       }
 
@@ -547,10 +473,7 @@ namespace Rain
       passDesc.depthStencilAttachment = &depthAttachment;
     }
 
-    const auto ptr = std::static_pointer_cast<CommandEncoderWGPU>(encoder);
-    RN_ASSERT(ptr != nullptr);
-
-    const WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(ptr->GetNativeEncoder(), &passDesc);
+    const WGPURenderPassEncoder renderPass = wgpuCommandEncoderBeginRenderPass(commandBuffer->GetNativeEncoder(), &passDesc);
     const Ref<BindingManager> bindManager = pass->GetBindManager();
 
     for (const auto& [index, bindGroup] : bindManager->GetBindGroups())
@@ -558,20 +481,17 @@ namespace Rain
       wgpuRenderPassEncoderSetBindGroup(renderPass, index, bindGroup, 0, 0);
     }
 
-    return CreateRef<RenderPassEncoderWGPU>(renderPass);
+    pass->SetRenderPassEncoder(renderPass);
   }
 
-  void RenderWGPU::EndRenderPass(Ref<RenderPass> pass, Ref<RenderPassEncoder> encoder)
+  void RenderWGPU::EndRenderPass(Ref<RenderPass> pass)
   {
     RN_PROFILE_FUNC;
 
-    const auto ptr = std::static_pointer_cast<RenderPassEncoderWGPU>(encoder);
-    RN_ASSERT(ptr != nullptr);
+    const WGPURenderPassEncoder encoder = pass->GetRenderPassEncoder();
 
-    auto nativeEncoder = ptr->GetNativeEncoder();
-
-    wgpuRenderPassEncoderEnd(nativeEncoder);
-    wgpuRenderPassEncoderRelease(nativeEncoder);
+    wgpuRenderPassEncoderEnd(encoder);
+    wgpuRenderPassEncoderRelease(encoder);
 
     const auto renderFrameBuffer = pass->GetTargetFrameBuffer();
 
@@ -581,7 +501,7 @@ namespace Rain
     }
   }
 
-  void RenderWGPU::RenderMesh(Ref<RenderPassEncoder> renderCommandBuffer,
+  void RenderWGPU::RenderMesh(Ref<RenderPass> renderPass,
                               WGPURenderPipeline pipeline,
                               Ref<MeshSource> mesh,
                               uint32_t submeshIndex,
@@ -590,10 +510,7 @@ namespace Rain
                               uint32_t transformOffset,
                               uint32_t instanceCount)
   {
-    const auto ptr = std::static_pointer_cast<RenderPassEncoderWGPU>(renderCommandBuffer);
-    RN_ASSERT(ptr != nullptr);
-
-    const auto nativeRenderPassEncoder = ptr->GetNativeEncoder();
+    const WGPURenderPassEncoder nativeRenderPassEncoder = renderPass->GetRenderPassEncoder();
 
     wgpuRenderPassEncoderSetPipeline(nativeRenderPassEncoder, pipeline);
 
@@ -622,7 +539,7 @@ namespace Rain
     wgpuRenderPassEncoderDrawIndexed(nativeRenderPassEncoder, subMesh.IndexCount, instanceCount, subMesh.BaseIndex, subMesh.BaseVertex, 0);
   }
 
-  void RenderWGPU::RenderSkeletalMesh(Ref<RenderPassEncoder> renderCommandBuffer,
+  void RenderWGPU::RenderSkeletalMesh(Ref<RenderPass> renderPass,
                                       WGPURenderPipeline pipeline,
                                       Ref<MeshSource> mesh,
                                       uint32_t submeshIndex,
@@ -630,10 +547,7 @@ namespace Rain
                                       Ref<GPUBuffer> transformBuffer,
                                       uint32_t instanceCount)
   {
-    const auto ptr = std::static_pointer_cast<RenderPassEncoderWGPU>(renderCommandBuffer);
-    RN_ASSERT(ptr != nullptr);
-
-    const auto nativeRenderPassEncoder = ptr->GetNativeEncoder();
+    const WGPURenderPassEncoder nativeRenderPassEncoder = renderPass->GetRenderPassEncoder();
 
     wgpuRenderPassEncoderSetPipeline(nativeRenderPassEncoder, pipeline);
 
@@ -658,19 +572,15 @@ namespace Rain
 
     const auto& subMesh = mesh->m_SubMeshes[submeshIndex];
 
-    // Set material bind group (group 1)
     auto material = materialTable->HasMaterial(subMesh.MaterialIndex) ? materialTable->GetMaterial(subMesh.MaterialIndex) : mesh->Materials->GetMaterial(subMesh.MaterialIndex);
     wgpuRenderPassEncoderSetBindGroup(nativeRenderPassEncoder, 1, material->GetBinding(1), 0, 0);
 
     wgpuRenderPassEncoderDrawIndexed(nativeRenderPassEncoder, subMesh.IndexCount, instanceCount, subMesh.BaseIndex, subMesh.BaseVertex, 0);
   }
 
-  void RenderWGPU::SubmitFullscreenQuad(Ref<RenderPassEncoder> renderCommandBuffer, WGPURenderPipeline pipeline)
+  void RenderWGPU::SubmitFullscreenQuad(Ref<RenderPass> renderPass, WGPURenderPipeline pipeline)
   {
-    const auto ptr = std::static_pointer_cast<RenderPassEncoderWGPU>(renderCommandBuffer);
-    RN_ASSERT(ptr != nullptr);
-
-    const auto nativeRenderPassEncoder = ptr->GetNativeEncoder();
+    const auto nativeRenderPassEncoder = renderPass->GetRenderPassEncoder();
 
     wgpuRenderPassEncoderSetPipeline(nativeRenderPassEncoder, pipeline);
     wgpuRenderPassEncoderSetVertexBuffer(nativeRenderPassEncoder,
@@ -712,14 +622,6 @@ namespace Rain
     wgpuQueueSubmit(m_Queue, 1, &commandBuffer);
     wgpuCommandBufferRelease(commandBuffer);
     wgpuCommandEncoderRelease(nativeCommandEncoder);
-  }
-
-  void RenderWGPU::Present()
-  {
-#ifndef __EMSCRIPTEN__
-    wgpuSurfacePresent(m_Surface);
-    wgpuDeviceTick(m_Device);
-#endif
   }
 
   void RenderWGPU::ComputeEquirectToCubemap(Texture2D* equirectTexture, TextureCube* outputCubemap)
@@ -809,10 +711,6 @@ namespace Rain
     DawnProcTable procs = dawn::native::GetProcs();
     dawnProcSetProcs(&procs);
 
-    WGPUSurfaceDescriptor surfaceDescription{};
-    const auto wnd = wgpu::glfw::SetupWindowAndGetSurfaceDescriptor(static_cast<GLFWwindow*>(nativeWindowPtr));
-    surfaceDescription.nextInChain = reinterpret_cast<WGPUChainedStruct*>(wnd.get());
-
     m_DawnInstance = wgpuCreateInstance(gpuInstanceDescriptor);
     m_Window = static_cast<GLFWwindow*>(nativeWindowPtr);
 
@@ -821,7 +719,7 @@ namespace Rain
       RN_LOG_ERR("GPU Instance couldn't initialized");
     }
 
-    m_Surface = wgpuInstanceCreateSurface(m_DawnInstance, &surfaceDescription);
+    Application::Get()->GetSwapChain()->Init(m_DawnInstance, nativeWindowPtr);
 
     WGPURequestAdapterCallbackInfo adapterCallbackInfo;
     ZERO_INIT(adapterCallbackInfo);
@@ -831,7 +729,7 @@ namespace Rain
 
     WGPURequestAdapterOptions requestAdapterOpts;
     ZERO_INIT(requestAdapterOpts);
-    requestAdapterOpts.compatibleSurface = m_Surface;
+    requestAdapterOpts.compatibleSurface = Application::Get()->GetSwapChain()->GetSurface();
     requestAdapterOpts.powerPreference = WGPUPowerPreference_HighPerformance;
 
     wgpuInstanceRequestAdapter(m_DawnInstance, &requestAdapterOpts, adapterCallbackInfo);
@@ -1007,27 +905,13 @@ namespace Rain
     RN_CORE_ASSERT(m_Queue, "An error occurred while acquiring the queue. This might indicate unsupported browser/device.");
     RN_CORE_ASSERT(m_Device, "An error occurred while acquiring the Device.");
 
-    m_RenderContext = CreateRef<RenderContext>(m_Adapter, m_Surface, m_Device, m_Queue);
-
-    WGPUSurfaceCapabilities* capabilities = new WGPUSurfaceCapabilities();
-    wgpuSurfaceGetCapabilities(m_Surface, m_Adapter, capabilities);
+    m_RenderContext = CreateRef<RenderContext>(m_Adapter, m_Device, m_Queue);
 
     m_swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 
     int width, height;
     glfwGetFramebufferSize(m_Window, &width, &height);
-
-    WGPUSurfaceConfiguration config = {};
-    config.device = m_Device;
-    config.format = m_swapChainFormat;
-    config.usage = WGPUTextureUsage_RenderAttachment;
-    config.alphaMode = WGPUCompositeAlphaMode_Auto;
-    config.width = width;
-    config.height = height;
-    config.presentMode = WGPUPresentMode_Fifo;
-    config.viewFormatCount = 1;
-    config.viewFormats = &m_swapChainFormat;
-    wgpuSurfaceConfigure(m_Surface, &config);
+    Application::Get()->GetSwapChain()->Create(width, height);
 
     s_Data = new WGPURendererData();
 

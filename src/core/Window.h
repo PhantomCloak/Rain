@@ -25,7 +25,7 @@ namespace Rain
     virtual ~Window() = default;
 
     virtual void OnStart() = 0;
-    virtual void OnUpdate() = 0;
+    virtual void Run() = 0;
 
     // virtual uint32_t GetWidth() const = 0;
     // virtual uint32_t GetHeight() const = 0;

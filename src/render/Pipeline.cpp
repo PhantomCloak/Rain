@@ -212,13 +212,13 @@ namespace Rain
     pipelineDesc->multisample.alphaToCoverageEnabled = false;
     pipelineDesc->multisample.nextInChain = nullptr;
 
-    if (m_PipelineSpec.DebugName == "RP_Composite" || m_PipelineSpec.DebugName == "RP_Skybox" || m_PipelineSpec.DebugName == "RP_Skeletal")
-    {
-      pipelineDesc->multisample.count = 4;
-#ifndef __EMSCRIPTEN__
-      pipelineDesc->primitive.unclippedDepth = true;
-#endif
-    }
+    // if (m_PipelineSpec.DebugName == "RP_Composite" || m_PipelineSpec.DebugName == "RP_Skybox" || m_PipelineSpec.DebugName == "RP_Skeletal")
+    // {
+    //   pipelineDesc->multisample.count = 4;
+    // #ifndef __EMSCRIPTEN__
+    //   pipelineDesc->primitive.unclippedDepth = true;
+    // #endif
+    // }
 
     if (RenderContext::IsReady())
     {

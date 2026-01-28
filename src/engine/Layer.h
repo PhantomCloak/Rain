@@ -1,14 +1,17 @@
 #pragma once
 
-namespace Rain {
-  class Layer {
+namespace Rain
+{
+  class Layer
+  {
    public:
-    Layer();
+    Layer() {};
+    ~Layer() {};
 
-    virtual void OnUpdate() = 0;
-    virtual void OnRender() = 0;
+    virtual void OnUpdate(float dt) {};
+    virtual void OnRenderImGui() {};
 
-    virtual void OnAttach() = 0;
-    virtual void OnDeattach() = 0;
+    virtual void OnAttach() {};
+    virtual void OnDeattach() {};
   };
 }  // namespace Rain

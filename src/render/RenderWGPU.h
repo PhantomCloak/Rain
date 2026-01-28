@@ -22,10 +22,10 @@ namespace Rain
     virtual Ref<Texture2D> GetWhiteTexture() override;
     virtual Ref<Sampler> GetDefaultSampler() override;
 
-    virtual Ref<RenderPassEncoder> BeginRenderPass(Ref<RenderPass> pass, Ref<CommandEncoder> encoder) override;
-    virtual void EndRenderPass(Ref<RenderPass> pass, Ref<RenderPassEncoder> encoder) override;
+    virtual void BeginRenderPass(Ref<RenderPass> pass, Ref<CommandBuffer> commandBuffer) override;
+    virtual void EndRenderPass(Ref<RenderPass> pass) override;
 
-    virtual void RenderMesh(Ref<RenderPassEncoder> renderCommandBuffer,
+    virtual void RenderMesh(Ref<RenderPass> renderPass,
                             WGPURenderPipeline pipeline,
                             Ref<MeshSource> mesh,
                             uint32_t submeshIndex,
@@ -34,7 +34,7 @@ namespace Rain
                             uint32_t transformOffset,
                             uint32_t instanceCount) override;
 
-    virtual void RenderSkeletalMesh(Ref<RenderPassEncoder> renderCommandBuffer,
+    virtual void RenderSkeletalMesh(Ref<RenderPass> renderPass,
                                     WGPURenderPipeline pipeline,
                                     Ref<MeshSource> mesh,
                                     uint32_t submeshIndex,
@@ -42,14 +42,12 @@ namespace Rain
                                     Ref<GPUBuffer> transformBuffer,
                                     uint32_t instanceCount) override;
 
-    virtual void SubmitFullscreenQuad(Ref<RenderPassEncoder> renderCommandBuffer, WGPURenderPipeline pipeline) override;
+    virtual void SubmitFullscreenQuad(Ref<RenderPass> renderPass, WGPURenderPipeline pipeline) override;
 
     virtual GLFWwindow* GetActiveWindow() override { return m_Window; }
 
     virtual Ref<CommandEncoder> CreateCommandEncoder() override;
     virtual void SubmitAndFinishEncoder(Ref<CommandEncoder> commandEncoder) override;
-
-    virtual void Present() override;
 
     virtual void ComputeMip(Texture2D* output) override;
     virtual void ComputeMipCube(TextureCube* output) override;
@@ -58,7 +56,7 @@ namespace Rain
     virtual void ComputeEquirectToCubemap(Texture2D* equirectTexture, TextureCube* outputCubemap) override;
     virtual std::pair<Ref<TextureCube>, Ref<TextureCube>> CreateEnvironmentMap(const std::string& filepath) override;
 
-    virtual bool IsReady() override { return Instance && Instance->m_DawnInstance && Instance->m_Adapter && Instance->m_Device && Instance->m_Surface; }
+    virtual bool IsReady() override { return Instance && Instance->m_DawnInstance && Instance->m_Adapter && Instance->m_Device; }
     virtual void Tick() override;
 
    private:
@@ -77,7 +75,6 @@ namespace Rain
     static RenderWGPU* Instance;
 
     Ref<RenderContext> m_RenderContext;
-    WGPUSurface m_Surface = nullptr;
     WGPUInstance m_DawnInstance = nullptr;
     WGPUDevice m_Device = nullptr;
     WGPUAdapter m_Adapter = nullptr;

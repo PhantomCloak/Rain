@@ -79,8 +79,3 @@ void Rain::LinuxWindow::Init(const WindowProps& props) {
 
 void Rain::LinuxWindow::Shutdown() {
 }
-
-void Rain::LinuxWindow::OnUpdate() {
-  glfwPollEvents();
-  // m_Context->SwapBuffers();
-}

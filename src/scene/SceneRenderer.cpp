@@ -4,7 +4,6 @@
 #include "Application.h"
 #include "core/Log.h"
 
-#include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_wgpu.h"
 #include "imgui.h"
 
@@ -215,6 +214,7 @@ namespace Rain
       return;
     }
 
+    m_CommandBuffer = CreateRef<CommandBuffer>();
     m_TransformBuffer = GPUAllocator::GAlloc("scene_global_transform", WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex, 1024 * sizeof(TransformVertexData));
     m_SceneUniform = {};
 
@@ -283,8 +283,9 @@ namespace Rain
     compositeFboSpec.ColorFormat = TextureFormat::BRGBA8,
     compositeFboSpec.DepthFormat = TextureFormat::Depth24Plus;
     compositeFboSpec.DebugName = "FB_Composite";
-    compositeFboSpec.Multisample = 4;
-    compositeFboSpec.SwapChainTarget = true;
+    compositeFboSpec.Multisample = 1;
+    compositeFboSpec.SwapChainTarget = false;
+    compositeFboSpec.ClearColorOnLoad = false;  // Skybox pass clears first
     m_CompositeFramebuffer = Framebuffer::Create(compositeFboSpec);
 
     m_SceneUniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(SceneUniform));
@@ -298,7 +299,7 @@ namespace Rain
     skyboxFboSpec.ColorFormat = TextureFormat::BRGBA8,
     skyboxFboSpec.DepthFormat = TextureFormat::Depth24Plus;
     skyboxFboSpec.DebugName = "FB_Skybox";
-    skyboxFboSpec.Multisample = 4;
+    skyboxFboSpec.Multisample = 1;
     skyboxFboSpec.ExistingColorAttachment = m_CompositeFramebuffer->GetAttachment(0);
 
     RenderPipelineSpec skyboxPipeSpec = {
@@ -443,7 +444,8 @@ namespace Rain
     skeletalFboSpec.ColorFormat = TextureFormat::BRGBA8,
     skeletalFboSpec.DepthFormat = TextureFormat::Depth24Plus;
     skeletalFboSpec.DebugName = "FB_Skeletal";
-    skeletalFboSpec.Multisample = 4;
+    skeletalFboSpec.Multisample = 1;
+    skeletalFboSpec.ClearColorOnLoad = false;  // Don't clear - draw on top of existing content
     skeletalFboSpec.ExistingColorAttachment = m_CompositeFramebuffer->GetAttachment(0);
     skeletalFboSpec.ExistingDepth = m_CompositeFramebuffer->GetDepthAttachment();
 
@@ -494,26 +496,6 @@ namespace Rain
     m_PpfxPipeline = RenderPipeline::Create(ppfxPipeSpec);
 
     // auto renderContext = m_Renderer->GetRenderContext();
-
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    auto& io = ImGui::GetIO();
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(2.0f);  // Scale everything by 2x
-    io.FontGlobalScale = 2.0f;
-    ImGui_ImplGlfw_InitForOther((GLFWwindow*)Application::Get()->GetNativeWindow(), true);
-
-    ImGui_ImplWGPU_InitInfo initInfo;
-    initInfo.Device = RenderContext::GetDevice();
-    // initInfo.RenderTargetFormat = render->m_swapChainFormat;
-    initInfo.RenderTargetFormat = WGPUTextureFormat_BGRA8Unorm;
-    initInfo.PipelineMultisampleState = {
-        .nextInChain = nullptr,
-        .count = 4,
-        .mask = ~0u,
-        .alphaToCoverageEnabled = false};
-    initInfo.DepthStencilFormat = WGPUTextureFormat_Depth24Plus;
-    ImGui_ImplWGPU_Init(&initInfo);
   }
 
   void SceneRenderer::PreRender()
@@ -547,6 +529,11 @@ namespace Rain
     m_ViewportHeight = height;
 
     m_NeedResize = true;
+  }
+
+  Ref<Texture2D> SceneRenderer::GetLastPassImage()
+  {
+    return m_LitPass->GetOutput(0);
   }
 
   void DrawCameraFrustum(SceneCamera camera)
@@ -648,10 +635,6 @@ namespace Rain
     }
 
     // JPH::DebugRenderer::sInstance = m_Renderer;
-    ImGui_ImplWGPU_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
     if (SavedCam.Far != 400.0f)
     {
       SavedCam = camera;
@@ -666,12 +649,13 @@ namespace Rain
       SavedCam = Cam;
     }
 
-    const auto commandEncoder = m_Renderer->CreateCommandEncoder();
+    m_CommandBuffer->Begin();
+
     {
       RN_PROFILE_FUNCN("Skybox Pass");
-      Ref<RenderPassEncoder> skyboxPassEncoder = m_Renderer->BeginRenderPass(m_SkyboxPass, commandEncoder);
-      m_Renderer->SubmitFullscreenQuad(skyboxPassEncoder, m_SkyboxPipeline->GetPipeline());
-      m_Renderer->EndRenderPass(m_SkyboxPass, skyboxPassEncoder);
+      m_Renderer->BeginRenderPass(m_SkyboxPass, m_CommandBuffer);
+      m_Renderer->SubmitFullscreenQuad(m_SkyboxPass, m_SkyboxPipeline->GetPipeline());
+      m_Renderer->EndRenderPass(m_SkyboxPass);
     }
 
     {
@@ -679,30 +663,32 @@ namespace Rain
 
       for (int i = 0; i < m_NumOfCascades; i++)
       {
-        Ref<RenderPassEncoder> shadowPassEncoder = m_Renderer->BeginRenderPass(m_ShadowPass[i], commandEncoder);
+        m_Renderer->BeginRenderPass(m_ShadowPass[i], m_CommandBuffer);
         for (auto& [mk, dc] : m_DrawList)
         {
-          m_Renderer->RenderMesh(shadowPassEncoder, m_ShadowPipeline[i]->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+          m_Renderer->RenderMesh(m_ShadowPass[i], m_ShadowPipeline[i]->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
         }
-        m_Renderer->EndRenderPass(m_ShadowPass[i], shadowPassEncoder);
+        m_Renderer->EndRenderPass(m_ShadowPass[i]);
       }
     }
 
-    // Skeletal Mesh Pass
-    if (!m_SkeletalDrawList.empty())
     {
       RN_PROFILE_FUNCN("Skeletal Pass");
-      Ref<RenderPassEncoder> skeletalPassEncoder = m_Renderer->BeginRenderPass(m_SkeletalPass, commandEncoder);
-      RenderSkeletalMeshes(skeletalPassEncoder);
-      m_Renderer->EndRenderPass(m_SkeletalPass, skeletalPassEncoder);
+      if (!m_SkeletalDrawList.empty())
+      {
+        m_Renderer->BeginRenderPass(m_SkeletalPass, m_CommandBuffer);
+        RenderSkeletalMeshes(m_SkeletalPass);
+        m_Renderer->EndRenderPass(m_SkeletalPass);
+      }
     }
 
     {
       RN_PROFILE_FUNCN("Geometry Pass");
-      Ref<RenderPassEncoder> litPassEncoder = m_Renderer->BeginRenderPass(m_LitPass, commandEncoder);
+
+      m_Renderer->BeginRenderPass(m_LitPass, m_CommandBuffer);
       for (auto& [mk, dc] : m_DrawList)
       {
-        m_Renderer->RenderMesh(litPassEncoder, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+        m_Renderer->RenderMesh(m_LitPass, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
       }
 
       // RenderDebug::Begin(&litPassEncoder, &commandEncoder);
@@ -710,20 +696,20 @@ namespace Rain
       // DrawCameraFrustum(SavedCam);
       //  RenderDebug::FlushDrawList();
 
-      ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), std::static_pointer_cast<RenderPassEncoderWGPU>(litPassEncoder)->GetNativeEncoder());
+      // ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), std::static_pointer_cast<RenderPassEncoderWGPU>(litPassEncoder)->GetNativeEncoder());
 
-      m_Renderer->EndRenderPass(m_LitPass, litPassEncoder);
+      m_Renderer->EndRenderPass(m_LitPass);
     }
 
-    m_Renderer->SubmitAndFinishEncoder(commandEncoder);
-    m_Renderer->Present();
+    m_CommandBuffer->End();
+    m_CommandBuffer->Submit();
 
     m_DrawList.clear();
     m_MeshTransformMap.clear();
     m_SkeletalDrawList.clear();
   }
 
-  void SceneRenderer::RenderSkeletalMeshes(Ref<RenderPassEncoder> passEncoder)
+  void SceneRenderer::RenderSkeletalMeshes(Ref<RenderPass> renderPass)
   {
     if (m_SkeletalDrawList.empty())
     {
@@ -769,7 +755,7 @@ namespace Rain
       m_TransformBuffer->SetData(&transformData, sizeof(TransformVertexData));
 
       // Use the dedicated skeletal mesh rendering method with materials
-      m_Renderer->RenderSkeletalMesh(passEncoder, m_SkeletalPipeline->GetPipeline(), cmd.Mesh, cmd.SubmeshIndex, cmd.Materials, m_TransformBuffer, 1);
+      m_Renderer->RenderSkeletalMesh(renderPass, m_SkeletalPipeline->GetPipeline(), cmd.Mesh, cmd.SubmeshIndex, cmd.Materials, m_TransformBuffer, 1);
     }
   }
 
@@ -780,9 +766,6 @@ namespace Rain
     {
       return;
     }
-
-    ImGui::EndFrame();
-    ImGui::Render();
 
     PreRender();
     FlushDrawList();

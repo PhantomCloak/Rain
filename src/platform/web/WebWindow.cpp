@@ -2,20 +2,23 @@
 #include "core/Assert.h"
 #include "core/Log.h"
 
-static void GLFWErrorCallback(int error, const char* description) {
-  //RN_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
+static void GLFWErrorCallback(int error, const char* description)
+{
+  // RN_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
 }
 
-Rain::WebWindow::~WebWindow() {
+Rain::WebWindow::~WebWindow()
+{
   Shutdown();
 }
 
-void Rain::WebWindow::Init(const WindowProps& props) {
-  //Rain::Log::Init();
-  //RN_CORE_INFO("Creating window {0} ({1}, {2})", props.Title, props.Width, props.Height);
+void Rain::WebWindow::Init(const WindowProps& props)
+{
+  // Rain::Log::Init();
+  // RN_CORE_INFO("Creating window {0} ({1}, {2})", props.Title, props.Width, props.Height);
 
   bool success = glfwInit();
-  //RN_CORE_ASSERT(success, "Could not initialize GLFW!");
+  // RN_CORE_ASSERT(success, "Could not initialize GLFW!");
 
   glfwSetErrorCallback(GLFWErrorCallback);
 
@@ -26,16 +29,18 @@ void Rain::WebWindow::Init(const WindowProps& props) {
 
   glfwSetWindowUserPointer(m_Window, this);
 
-  glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window) {
-    // Probably should say app to close
-  });
+  glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window)
+                             {
+                               // Probably should say app to close
+                             });
 
-  glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos) {
+  glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos)
+                           {
     WebWindow* osxWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
-    osxWindow->OnMouseMove(xPos, yPos);
-  });
+    osxWindow->OnMouseMove(xPos, yPos); });
 
-  glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods) {
+  glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods)
+                     {
     WebWindow* osxWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
     switch (action) {
       case GLFW_PRESS: {
@@ -50,10 +55,10 @@ void Rain::WebWindow::Init(const WindowProps& props) {
         osxWindow->OnKeyPressed(key, Key::RN_KEY_REPEAT);
         break;
       }
-    }
-  });
+    } });
 
-  glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods) {
+  glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods)
+                             {
     WebWindow* osxWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
     switch (action) {
       case GLFW_PRESS: {
@@ -64,19 +69,14 @@ void Rain::WebWindow::Init(const WindowProps& props) {
         osxWindow->OnMouseClick(Mouse::Release);
         break;
       }
-    }
-  });
+    } });
 
-  glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, int width, int height) {
+  glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, int width, int height)
+                                 {
     WebWindow* osxWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
-    osxWindow->OnResize(height, width);
-  });
+    osxWindow->OnResize(height, width); });
 }
 
-void Rain::WebWindow::Shutdown() {
-}
-
-void Rain::WebWindow::OnUpdate() {
-  glfwPollEvents();
-  // m_Context->SwapBuffers();
+void Rain::WebWindow::Shutdown()
+{
 }

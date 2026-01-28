@@ -171,6 +171,12 @@ namespace Rain
 
     m_PhysicsScene->Update(1.0f / 60.0);
     Cursor::Update();
+
+    ImGui::Begin("A");
+    ImGui::SliderFloat("Light X", &lightX, -1.0f, 1.0f);
+    ImGui::SliderFloat("Light Y", &lightY, -1.0f, 1.0f);
+    ImGui::SliderFloat("Light Z", &lightZ, -1.0f, 1.0f);
+    ImGui::End();
   }
 
   glm::mat4 Scene::EditTransform(glm::mat4& matrix)
@@ -256,12 +262,6 @@ namespace Rain
     static float lightX = 0.637f;
     static float lightY = 0.514f;
     static float lightZ = 0.0f;
-
-    ImGui::Begin("A");
-    ImGui::SliderFloat("Light X", &lightX, -1.0f, 1.0f);
-    ImGui::SliderFloat("Light Y", &lightY, -1.0f, 1.0f);
-    ImGui::SliderFloat("Light Z", &lightZ, -1.0f, 1.0f);
-    ImGui::End();
 
     static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
     drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent)

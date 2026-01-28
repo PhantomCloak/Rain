@@ -6,8 +6,6 @@
 
 using namespace Rain;
 
-Rain::Window* AppInstance;
-
 int main(int argc, char** argv)
 {
   int resX = 1920;
@@ -46,23 +44,9 @@ int main(int argc, char** argv)
   Rain::Window* app = new Application(props);
 
   app->OnStart();
-  AppInstance = app;
+  app->Run();
 
-#ifdef __EMSCRIPTEN__
-  emscripten_set_main_loop_arg(
-      [](void* userData)
-      {
-        Application& app = *reinterpret_cast<Application*>(userData);
-        AppInstance->OnUpdate();
-      },
-      (void*)&app,
-      0, true);
-#else   // __EMSCRIPTEN__
-  while (true)
-  {
-    app->OnUpdate();
-  }
-#endif  // __EMSCRIPTEN__
+
 
   return 0;
 }

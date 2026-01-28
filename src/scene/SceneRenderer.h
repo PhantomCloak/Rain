@@ -1,6 +1,7 @@
 #pragma once
 #include "Scene.h"
 #include "animation/OzzAnimator.h"
+#include "render/CommandBuffer.h"
 #include "render/Pipeline.h"
 #include "render/PipelineCompute.h"
 #include "render/Render.h"
@@ -136,6 +137,7 @@ namespace Rain
     void EndScene();
     void SetScene(Scene* scene);
     void SetViewportSize(int height, int width);
+    Ref<Texture2D> GetLastPassImage();
 
     static SceneRenderer* instance;
 
@@ -192,12 +194,14 @@ namespace Rain
     uint32_t m_ViewportWidth;
     uint32_t m_ViewportHeight;
 
+    Ref<CommandBuffer> m_CommandBuffer;
+
     // Skeletal rendering
     Ref<RenderPipeline> m_SkeletalPipeline;
     Ref<RenderPass> m_SkeletalPass;
     Ref<GPUBuffer> m_BoneMatricesBuffer;
     std::vector<SkeletalDrawCommand> m_SkeletalDrawList;
 
-    void RenderSkeletalMeshes(Ref<RenderPassEncoder> passEncoder);
+    void RenderSkeletalMeshes(Ref<RenderPass> passEncoder);
   };
 }  // namespace Rain

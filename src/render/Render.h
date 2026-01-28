@@ -8,6 +8,7 @@ using WGPUStringView = const char*;
 #include "render/Mesh.h"
 #include "render/Pipeline.h"
 #include "render/RenderPass.h"
+#include "render/CommandBuffer.h"
 
 namespace Rain
 {
@@ -30,10 +31,10 @@ namespace Rain
     virtual Ref<Texture2D> GetWhiteTexture() = 0;
     virtual Ref<Sampler> GetDefaultSampler() = 0;
 
-    virtual Ref<RenderPassEncoder> BeginRenderPass(Ref<RenderPass> pass, Ref<CommandEncoder> encoder) = 0;
-    virtual void EndRenderPass(Ref<RenderPass> pass, Ref<RenderPassEncoder> encoder) = 0;
+    virtual void BeginRenderPass(Ref<RenderPass> pass, Ref<CommandBuffer> encoder) = 0;
+    virtual void EndRenderPass(Ref<RenderPass> pass) = 0;
 
-    virtual void RenderMesh(Ref<RenderPassEncoder> renderCommandBuffer,
+    virtual void RenderMesh(Ref<RenderPass> renderCommandBuffer,
                             WGPURenderPipeline pipeline,
                             Ref<MeshSource> mesh,
                             uint32_t submeshIndex,
@@ -42,7 +43,7 @@ namespace Rain
                             uint32_t transformOffset,
                             uint32_t instanceCount) = 0;
 
-    virtual void RenderSkeletalMesh(Ref<RenderPassEncoder> renderCommandBuffer,
+    virtual void RenderSkeletalMesh(Ref<RenderPass> renderCommandBuffer,
                                     WGPURenderPipeline pipeline,
                                     Ref<MeshSource> mesh,
                                     uint32_t submeshIndex,
@@ -50,14 +51,12 @@ namespace Rain
                                     Ref<GPUBuffer> transformBuffer,
                                     uint32_t instanceCount) = 0;
 
-    virtual void SubmitFullscreenQuad(Ref<RenderPassEncoder> renderCommandBuffer, WGPURenderPipeline pipeline) = 0;
+    virtual void SubmitFullscreenQuad(Ref<RenderPass> renderCommandBuffer, WGPURenderPipeline pipeline) = 0;
 
     virtual GLFWwindow* GetActiveWindow() = 0;
 
     virtual Ref<CommandEncoder> CreateCommandEncoder() = 0;
     virtual void SubmitAndFinishEncoder(Ref<CommandEncoder> commandEncoder) = 0;
-
-    virtual void Present() = 0;
 
     virtual void ComputeMip(Texture2D* output) = 0;
     virtual void ComputeMipCube(TextureCube* output) = 0;
