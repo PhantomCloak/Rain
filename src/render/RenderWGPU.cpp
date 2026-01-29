@@ -432,8 +432,8 @@ namespace Rain
       ZERO_INIT(colorAttachment);
       colorAttachment.nextInChain = nullptr;
       colorAttachment.loadOp = renderFrameBuffer->m_FrameBufferSpec.ClearColorOnLoad
-          ? WGPULoadOp_Clear
-          : WGPULoadOp_Load;
+                                   ? WGPULoadOp_Clear
+                                   : WGPULoadOp_Load;
       colorAttachment.storeOp = WGPUStoreOp_Store;
       colorAttachment.clearValue = RenderWGPU::Instance->m_ClearColor;
       colorAttachment.resolveTarget = nullptr;
@@ -754,19 +754,11 @@ namespace Rain
     }
 
     // Create surface from HTML canvas
-    WGPUSurfaceDescriptorFromCanvasHTMLSelector* canvasDesc = ZERO_ALLOC(WGPUSurfaceDescriptorFromCanvasHTMLSelector);
-    canvasDesc->chain.sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector;
-    canvasDesc->selector = "#canvas";
-
-    WGPUSurfaceDescriptor* surfaceDesc = ZERO_ALLOC(WGPUSurfaceDescriptor);
-    surfaceDesc->nextInChain = &canvasDesc->chain;
-
-    m_Surface = wgpuInstanceCreateSurface(m_DawnInstance, surfaceDesc);
-    //
-    m_Window = (GLFWwindow*)m_Surface;
+    const WGPUSurface surface = Application::Get()->GetSwapChain()->GetSurface();
+    m_Window = (GLFWwindow*)surface;
 
     WGPURequestAdapterOptions* requestAdapterOpts = ZERO_ALLOC(WGPURequestAdapterOptions);
-    requestAdapterOpts->compatibleSurface = m_Surface;
+    requestAdapterOpts->compatibleSurface = surface;
     requestAdapterOpts->powerPreference = WGPUPowerPreference_HighPerformance;
 
     wgpuInstanceRequestAdapter(

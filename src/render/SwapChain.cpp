@@ -2,17 +2,44 @@
 #include "SwapChain.h"
 #include "render/RenderContext.h"
 #include "webgpu/webgpu.h"
+
+#ifndef __EMSCRIPTEN__
 #include "webgpu/webgpu_glfw.h"
+#endif
 
 namespace Rain
 {
+  SwapChain::~SwapChain()
+  {
+    if (m_CurrentTexture)
+    {
+      wgpuTextureRelease(m_CurrentTexture);
+      m_CurrentTexture = nullptr;
+    }
+    if (m_Surface)
+    {
+      wgpuSurfaceUnconfigure(m_Surface);
+      wgpuSurfaceRelease(m_Surface);
+      m_Surface = nullptr;
+    }
+  }
+
   void SwapChain::Init(WGPUInstance instance, void* windowPtr)
   {
+#ifndef __EMSCRIPTEN__
     WGPUSurfaceDescriptor surfaceDescription{};
     const auto wnd = wgpu::glfw::SetupWindowAndGetSurfaceDescriptor(static_cast<GLFWwindow*>(windowPtr));
     surfaceDescription.nextInChain = reinterpret_cast<WGPUChainedStruct*>(wnd.get());
-
     m_Surface = wgpuInstanceCreateSurface(instance, &surfaceDescription);
+#else
+    WGPUSurfaceDescriptorFromCanvasHTMLSelector* canvasDesc = ZERO_ALLOC(WGPUSurfaceDescriptorFromCanvasHTMLSelector);
+    canvasDesc->chain.sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector;
+    canvasDesc->selector = "#canvas";
+
+    WGPUSurfaceDescriptor* surfaceDesc = ZERO_ALLOC(WGPUSurfaceDescriptor);
+    surfaceDesc->nextInChain = &canvasDesc->chain;
+    m_Surface = wgpuInstanceCreateSurface(instance, surfaceDesc);
+#endif
   }
 
   void SwapChain::Create(uint32_t width, uint32_t height)
@@ -42,7 +69,14 @@ namespace Rain
 
   WGPUTextureView SwapChain::GetSurfaceTextureView()
   {
-    static WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
+    static WGPUTextureFormat swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
+
+    // Release previous frame's texture
+    if (m_CurrentTexture)
+    {
+      wgpuTextureRelease(m_CurrentTexture);
+      m_CurrentTexture = nullptr;
+    }
 
     WGPUSurfaceTexture surfaceTexture = {};
     wgpuSurfaceGetCurrentTexture(m_Surface, &surfaceTexture);
@@ -75,13 +109,16 @@ namespace Rain
       }
     }
 
+    // Store texture reference so we can release it next frame
+    m_CurrentTexture = surfaceTexture.texture;
+
     WGPUTextureViewDescriptor viewDesc = {};
-    viewDesc.format = m_swapChainFormat;
+    viewDesc.format = swapChainFormat;
     viewDesc.dimension = WGPUTextureViewDimension_2D;
     viewDesc.mipLevelCount = 1;
     viewDesc.arrayLayerCount = 1;
     viewDesc.aspect = WGPUTextureAspect_All;
 
-    return wgpuTextureCreateView(surfaceTexture.texture, &viewDesc);
+    return wgpuTextureCreateView(m_CurrentTexture, &viewDesc);
   }
 }  // namespace Rain

@@ -7,6 +7,8 @@ namespace Rain
   class SwapChain
   {
    public:
+    ~SwapChain();
+
     void Init(WGPUInstance instance, void* windowPtr);
     void Create(uint32_t width, uint32_t height);
 
@@ -17,6 +19,7 @@ namespace Rain
     WGPUSurface GetSurface() { return m_Surface; }
 
    private:
-    WGPUSurface m_Surface;
+    WGPUSurface m_Surface = nullptr;
+    WGPUTexture m_CurrentTexture = nullptr;
   };
 }  // namespace Rain

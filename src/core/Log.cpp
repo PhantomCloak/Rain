@@ -3,6 +3,8 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
+#include "engine/ImGuiLogSink.h"
+
 namespace Rain {
   std::shared_ptr<spdlog::logger> Log::s_CoreLogger;
   std::shared_ptr<spdlog::logger> Log::s_ClientLogger;
@@ -11,9 +13,11 @@ namespace Rain {
     std::vector<spdlog::sink_ptr> logSinks;
     logSinks.emplace_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
     logSinks.emplace_back(std::make_shared<spdlog::sinks::basic_file_sink_mt>("Rain.log", true));
+    logSinks.emplace_back(ImGuiLogSink::GetShared());
 
     logSinks[0]->set_pattern("%^[%T] %n: %v%$");
     logSinks[1]->set_pattern("[%T] [%l] %n: %v");
+    logSinks[2]->set_pattern("[%T] [%l] %n: %v");
 
     s_CoreLogger = std::make_shared<spdlog::logger>("RAIN", begin(logSinks), end(logSinks));
     spdlog::register_logger(s_CoreLogger);

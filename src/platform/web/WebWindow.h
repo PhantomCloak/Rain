@@ -4,6 +4,7 @@
 #include "core/KeyCode.h"
 #include "core/MouseCode.h"
 #include "core/Window.h"
+#include "engine/Event.h"
 
 namespace Rain
 {
@@ -15,6 +16,7 @@ namespace Rain
     virtual void OnMouseClick(MouseCode button) {};
 
     virtual void OnResize(int height, int width) {};
+    virtual void OnEvent(Event& event) = 0;
 
    public:
     WebWindow(const WindowProps& props) { Init(props); }

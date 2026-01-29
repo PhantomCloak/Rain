@@ -9,16 +9,19 @@
 #include "render/Mesh.h"
 #include "scene/Entity.h"
 
-namespace Rain {
+namespace Rain
+{
 
   class SceneRenderer;
 
-  struct LightInfo {
+  struct LightInfo
+  {
     glm::vec3 LightDirection;
     glm::vec3 LightPos;
   };
 
-  class Scene {
+  class Scene
+  {
    public:
     Scene(std::string sceneName = "Untitled Scene");
 
@@ -45,6 +48,15 @@ namespace Rain {
     LightInfo SceneLightInfo;
     std::unique_ptr<Camera> m_SceneCamera;
     static Scene* Instance;
+
+    template <typename... Components>
+    std::vector<Entity> GetAllEntitiesWithComponent()  // Debug purposes
+    {
+      std::vector<Entity> entities;
+      m_World.query<Components...>().each([this, &entities](flecs::entity e, Components&...)
+                                          { entities.emplace_back(e, this); });
+      return entities;
+    }
 
    private:
     std::unordered_map<UUID, Entity> m_EntityMap;

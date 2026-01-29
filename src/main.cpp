@@ -1,4 +1,7 @@
+#include <memory>
+
 #include "Application.h"
+#include "debug/Profiler.h"
 #include "platform/CommandLine.h"
 #ifdef __EMSCRIPTEN__
 #include <emscripten/html5.h>
@@ -8,6 +11,8 @@ using namespace Rain;
 
 int main(int argc, char** argv)
 {
+  InitTracyMemoryProfiling();
+
   int resX = 1920 * 2;
   int resY = 1080 * 2;
 
@@ -41,10 +46,12 @@ int main(int argc, char** argv)
 #endif
   // RN_LOG("W: {} H: {}", props.Width, props.Height);
 
-  Rain::Window* app = new Application(props);
+  std::unique_ptr<Rain::Window> app = std::make_unique<Application>(props);
 
   app->OnStart();
   app->Run();
+
+  app.reset();
 
   return 0;
 }

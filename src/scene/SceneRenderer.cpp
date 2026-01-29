@@ -236,7 +236,7 @@ namespace Rain
       {7, ShaderDataType::Float4, "a_MRow2", 32}}};
     // clang-format on
 
-    auto pbrShader = ShaderManager::LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/toon.wgsl");
+    auto pbrShader = ShaderManager::LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/pbr.wgsl");
     auto shadowShader = ShaderManager::LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
     auto skyboxShader = ShaderManager::LoadShader("SH_Skybox", RESOURCE_DIR "/shaders/skybox.wgsl");
     auto ppfxShader = ShaderManager::LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
@@ -255,7 +255,7 @@ namespace Rain
 
     auto [envFiltered, envIrradiance] = m_Renderer->CreateEnvironmentMap(RESOURCE_DIR "/textures/evening_road_01_puresky_4k.hdr");
 
-    FileSys::WatchFile(RESOURCE_DIR "/shaders/toon.wgsl", [pbrShader](std::string filePath)
+    FileSys::WatchFile(RESOURCE_DIR "/shaders/pbr.wgsl", [pbrShader](std::string filePath)
                        {
                          std::string content = FileSys::ReadFile(filePath);
                          pbrShader->Reload(content);
@@ -415,8 +415,8 @@ namespace Rain
     m_LitPass->Bake();
 
     // Skeletal Mesh Pipeline
-    auto skeletalShader = ShaderManager::LoadShader("SH_Skeletal", RESOURCE_DIR "/shaders/skeletal_toon.wgsl");
-    FileSys::WatchFile(RESOURCE_DIR "/shaders/skeletal_toon.wgsl", [skeletalShader](std::string filePath)
+    auto skeletalShader = ShaderManager::LoadShader("SH_Skeletal", RESOURCE_DIR "/shaders/skeletal_simple.wgsl");
+    FileSys::WatchFile(RESOURCE_DIR "/shaders/skeletal_simple.wgsl", [skeletalShader](std::string filePath)
                        {
                          std::string content = FileSys::ReadFile(filePath);
                          skeletalShader->Reload(content);

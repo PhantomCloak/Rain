@@ -7,6 +7,14 @@ namespace Rain
   class LayerStack
   {
    public:
+    ~LayerStack()
+    {
+      for (Layer* layer : m_Layers)
+      {
+        delete layer;
+      }
+    }
+
     void PushLayer(Layer* Layer)
     {
       m_Layers.push_back(Layer);
