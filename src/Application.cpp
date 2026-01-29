@@ -153,6 +153,14 @@ namespace Rain
     }
   }
 
+  void Application::OnEvent(Event& event)
+  {
+    for (Layer* layer : m_Layers)
+    {
+      layer->OnEvent(event);
+    }
+  }
+
   void Application::OnMouseClick(Rain::MouseCode button)
   {
     // ImGuiIO& io = ImGui::GetIO();
@@ -160,14 +168,6 @@ namespace Rain
     //   return;
     // }
     //  Cursor::CaptureMouse(true);
-  }
-
-  void Application::OnMouseMove(double xPos, double yPos)
-  {
-    // if (m_Scene)
-    //{
-    //   m_Scene->OnMouseMove(xPos, yPos);
-    // }
   }
 
   void Application::OnKeyPressed(KeyCode key, KeyAction action)

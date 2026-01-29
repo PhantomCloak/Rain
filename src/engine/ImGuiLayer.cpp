@@ -14,9 +14,12 @@ namespace Rain
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     auto& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.FontGlobalScale = 1.0f;
+
     ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(2.0f);
-    io.FontGlobalScale = 2.0f;
+    style.ScaleAllSizes(1.0f);
+
     ImGui_ImplGlfw_InitForOther(static_cast<GLFWwindow*>(Application::Get()->GetNativeWindow()), true);
 
     ImGui_ImplWGPU_InitInfo initInfo;
@@ -43,6 +46,7 @@ namespace Rain
     ImGui_ImplWGPU_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    ImGui::DockSpaceOverViewport();
   }
 
   void ImGuiLayer::End()

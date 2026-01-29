@@ -8,8 +8,8 @@ using namespace Rain;
 
 int main(int argc, char** argv)
 {
-  int resX = 1920;
-  int resY = 1080;
+  int resX = 1920 * 2;
+  int resY = 1080 * 2;
 
   std::vector<std::string> strArgs;
   for (int i = 1; i < argc; i++)
@@ -39,14 +39,12 @@ int main(int argc, char** argv)
 
   // RN_LOG("Pixel Ratio: {}", emscripten_get_device_pixel_ratio());
 #endif
-  //RN_LOG("W: {} H: {}", props.Width, props.Height);
+  // RN_LOG("W: {} H: {}", props.Width, props.Height);
 
   Rain::Window* app = new Application(props);
 
   app->OnStart();
   app->Run();
-
-
 
   return 0;
 }

@@ -1,6 +1,7 @@
 #include "LinuxWindow.h"
 #include "core/Assert.h"
 #include "core/Log.h"
+#include "engine/Event.h"
 
 static void GLFWErrorCallback(int error, const char* description) {
   RN_LOG_ERR("GLFW Error ({0}): {1}", error, description);
@@ -36,7 +37,9 @@ void Rain::LinuxWindow::Init(const WindowProps& props) {
 
   glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos) {
     LinuxWindow* linuxWindow = static_cast<LinuxWindow*>(glfwGetWindowUserPointer(window));
-    linuxWindow->OnMouseMove(xPos, yPos);
+
+    MouseMoveEvent MoveEvent(xPos, yPos);
+    linuxWindow->OnEvent(MoveEvent); // Copy
   });
 
   glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods) {

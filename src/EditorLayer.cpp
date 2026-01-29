@@ -1,4 +1,5 @@
 #include "EditorLayer.h"
+#include "io/cursor.h"
 #include "imgui.h"
 
 namespace Rain
@@ -38,5 +39,15 @@ namespace Rain
     }
 
     ImGui::End();
+  }
+
+  void EditorLayer::OnEvent(Event& event)
+  {
+    if (event.GetEventType() == EventType::MouseMove)
+    {
+      MouseMoveEvent& e = static_cast<MouseMoveEvent&>(event);
+      glm::vec2 p = e.GetPosition();
+      m_Scene->OnMouseMove(p.x, p.y);
+    }
   }
 }  // namespace Rain

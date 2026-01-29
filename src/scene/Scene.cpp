@@ -36,7 +36,7 @@ namespace Rain
 
   // Orbit camera state
   static glm::vec3 orbitTarget = glm::vec3(0.0f, 20.0f, 0.0);  // Focus point (center of model)
-  static float orbitDistance = 30.0f;                          // Distance from target
+  static float orbitDistance = 40.0f;                          // Distance from target
   static float orbitTheta = 0.0f;                              // Horizontal angle (radians)
   static float orbitPhi = glm::radians(30.0f);                 // Vertical angle (radians), 0 = horizontal
   static glm::vec2 lastMousePos = glm::vec2(0.0f);
@@ -390,10 +390,10 @@ namespace Rain
 
   void Scene::OnMouseMove(double xPos, double yPos)
   {
-    if (ImGui::GetIO().WantCaptureMouse)
-    {
-      return;
-    }
+    // if (ImGui::GetIO().WantCaptureMouse)
+    //{
+    //   return;
+    // }
 
     glm::vec2 currentMousePos = glm::vec2(xPos, yPos);
 

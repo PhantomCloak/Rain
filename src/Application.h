@@ -1,5 +1,7 @@
 #pragma once
+#include <functional>
 #include "core/Ref.h"
+#include "engine/Event.h"
 #include "render/SwapChain.h"
 #ifndef NDEBUG
 #define NDEBUG
@@ -32,7 +34,7 @@ namespace Rain
   {
    protected:
     void OnKeyPressed(KeyCode key, KeyAction action) override;
-    void OnMouseMove(double xPos, double yPos) override;
+    // void OnMouseMove(double xPos, double yPos) override;
     void OnMouseClick(Rain::MouseCode button) override;
     void OnResize(int height, int width) override;
 
@@ -45,8 +47,9 @@ namespace Rain
 
     virtual void Run() override;
     virtual void OnStart() override;
+
     void ApplicationUpdate();
-    void fetchTimestamps();
+    virtual void OnEvent(Event& event) override;
     static Application* Get();
 
     glm::vec2 GetWindowSize();
