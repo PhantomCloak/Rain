@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
 
+#include "imgui.h"
+#include "ImGuizmo.h"
 #include "engine/ImGuiLogSink.h"
 #include "engine/Layer.h"
 #include "scene/Scene.h"
@@ -25,12 +27,13 @@ namespace Rain
     void RenderEntityList();
     void RenderEntityNode(Entity entity);
     void RenderPropertyPanel();
+    void RenderGizmo();
 
     Ref<Scene> m_Scene;
     Ref<SceneRenderer> m_ViewportRenderer;
 
     // Entity list state
-    Entity m_SelectedEntity;
+    UUID m_SelectedEntityId = 0;
 
     // Log viewer state
     char m_SearchBuffer[256] = {0};
@@ -42,5 +45,15 @@ namespace Rain
     bool m_ConstrainAspectRatio = true;
     float m_TargetAspectRatio = 16.0f / 9.0f;  // 1920x1080
     bool m_ViewportFocused = false;
+
+    // Gizmo state
+    ImGuizmo::OPERATION m_GizmoOperation = ImGuizmo::TRANSLATE;
+    ImGuizmo::MODE m_GizmoMode = ImGuizmo::WORLD;
+    bool m_UseSnap = true;
+    glm::vec3 m_SnapValue = {1.0f, 1.0f, 1.0f};
+
+    // Viewport bounds for gizmo
+    glm::vec2 m_ViewportBoundsMin = {0.0f, 0.0f};
+    glm::vec2 m_ViewportBoundsMax = {0.0f, 0.0f};
   };
 }  // namespace Rain

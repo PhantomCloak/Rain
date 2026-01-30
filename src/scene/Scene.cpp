@@ -34,34 +34,6 @@ namespace Rain
   Entity entityCamera;
   Entity helment;
 
-  // Orbit camera state
-  static glm::vec3 orbitTarget = glm::vec3(0.0f, 20.0f, 0.0);  // Focus point (center of model)
-  static float orbitDistance = 40.0f;                          // Distance from target
-  static float orbitTheta = 0.0f;                              // Horizontal angle (radians)
-  static float orbitPhi = glm::radians(30.0f);                 // Vertical angle (radians), 0 = horizontal
-  static glm::vec2 lastMousePos = glm::vec2(0.0f);
-  static bool isDragging = false;
-
-  // Updates camera position based on orbit parameters
-  void UpdateOrbitCamera(Entity& camera)
-  {
-    // Spherical to Cartesian conversion
-    // x = r * cos(phi) * sin(theta)
-    // y = r * sin(phi)
-    // z = r * cos(phi) * cos(theta)
-    float x = orbitDistance * cos(orbitPhi) * sin(orbitTheta);
-    float y = orbitDistance * sin(orbitPhi);
-    float z = orbitDistance * cos(orbitPhi) * cos(orbitTheta);
-
-    glm::vec3 cameraPos = orbitTarget + glm::vec3(x, y, z);
-    camera.Transform().Translation = cameraPos;
-
-    // Look at target using glm::lookAt to get the view matrix, then extract rotation
-    glm::mat4 viewMatrix = glm::lookAt(cameraPos, orbitTarget, glm::vec3(0, 1, 0));
-    glm::mat4 rotationMatrix = glm::inverse(viewMatrix);
-    camera.Transform().Rotation = glm::quat_cast(rotationMatrix);
-  }
-
   void Scene::Init()
   {
     Instance = this;
@@ -71,19 +43,20 @@ namespace Rain
 
     // auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
     auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test2/untitled.gltf");
+    auto foo = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
+
     Entity galata = CreateEntity("bump");
+    Entity box = CreateEntity("box");
 
     galata.Transform().Translation = glm::vec3(0, -0.0, 0);
     galata.Transform().Scale = glm::vec3(0.2f);
     galata.Transform().SetRotationEuler(glm::radians(glm::vec3(-90.0, 0.0, 180.0)));
 
-    // Set orbit target to match the model position
-    // orbitTarget = galata.Transform().Translation;
+    box.Transform().Translation = glm::vec3(0, -0.0, 0);
+    box.Transform().Scale = glm::vec3(1.0f);
 
     BuildMeshEntityHierarchy(galata, bochii);
-
-    // Initialize camera position from orbit parameters
-    UpdateOrbitCamera(camera);
+    BuildMeshEntityHierarchy(box, foo);
 
     Entity light = CreateEntity("DirectionalLight");
     light.GetComponent<TransformComponent>().SetRotationEuler(glm::vec3(glm::radians(lightX), glm::radians(lightY), glm::radians(lightZ)));
@@ -181,53 +154,6 @@ namespace Rain
 
   glm::mat4 Scene::EditTransform(glm::mat4& matrix)
   {
-  }
-
-  UUID RenderNode(Entity e, Scene* scene)
-  {
-    // TagComponent tag = e.GetComponent<TagComponent>();
-    // static UUID selectedNode = -1;
-    // UUID currentNode = e.GetComponent<IDComponent>().ID;
-    // int childCount = 0;
-    // RelationshipComponent r = {};
-    // bool isRempty = true;
-
-    // if (e.HasComponent<RelationshipComponent>()) {
-    //   r = e.GetComponent<RelationshipComponent>();
-    //   isRempty = true;
-    //   childCount = r.Children.size();
-    // }
-
-    // ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow;
-    // if (childCount == 0) {
-    //   flags |= ImGuiTreeNodeFlags_Leaf;
-    // }
-    // if (selectedNode == currentNode) {
-    //   flags |= ImGuiTreeNodeFlags_Selected;
-    // }
-
-    // if (ImGui::TreeNodeEx(tag.Tag.c_str(), flags)) {
-    //   if (ImGui::IsItemClicked()) {
-    //     RN_LOG("Name: {} ID: {} C: {}", tag.Tag, (uint64_t)currentNode, (uint64_t)selectedNode);
-    //     selectedNode = currentNode;
-    //   }
-
-    //  // if (r != {}) {
-    //  if (!isRempty) {
-    //    if (r.Children.size() > 0) {
-    //      ImGui::Indent(0.5f);
-    //    }
-
-    //    for (auto child : r.Children) {
-    //      Entity childEntity = scene->TryGetEntityWithUUID(child);
-    //      RenderNode(childEntity, scene);
-    //    }
-    //  }
-
-    //  ImGui::TreePop();
-    //}
-
-    // return selectedNode;
   }
 
   Entity Scene::GetMainCameraEntity()
@@ -371,67 +297,5 @@ namespace Rain
 
   void Scene::ScanKeyPress()
   {
-    Entity camera = GetMainCameraEntity();
-    if (!camera)
-    {
-      return;
-    }
-
-    // Scroll wheel zoom only
-    float scroll = Cursor::GetScrollDelta();
-    if (scroll != 0.0f)
-    {
-      orbitDistance -= scroll * 1.0f;
-      orbitDistance = glm::clamp(orbitDistance, 1.0f, 100.0f);
-      Cursor::ResetScrollDelta();
-      UpdateOrbitCamera(camera);
-    }
-  }
-
-  void Scene::OnMouseMove(double xPos, double yPos)
-  {
-    // if (ImGui::GetIO().WantCaptureMouse)
-    //{
-    //   return;
-    // }
-
-    glm::vec2 currentMousePos = glm::vec2(xPos, yPos);
-
-    Entity camera = GetMainCameraEntity();
-    if (!camera)
-    {
-      return;
-    }
-
-    // Left mouse button held - orbit rotation
-    if (Cursor::HasLeftCursorClicked())
-    {
-      if (!isDragging)
-      {
-        isDragging = true;
-        lastMousePos = currentMousePos;
-        return;
-      }
-
-      glm::vec2 delta = currentMousePos - lastMousePos;
-      lastMousePos = currentMousePos;
-
-      float sensitivity = 0.005f;
-
-      // Horizontal drag rotates around Y axis (theta)
-      orbitTheta += delta.x * sensitivity;
-
-      // Vertical drag changes elevation (phi)
-      orbitPhi += delta.y * sensitivity;
-
-      // Clamp phi to avoid flipping (keep between -89 and 89 degrees)
-      orbitPhi = glm::clamp(orbitPhi, glm::radians(-89.0f), glm::radians(89.0f));
-
-      UpdateOrbitCamera(camera);
-    }
-    else
-    {
-      isDragging = false;
-    }
   }
 }  // namespace Rain

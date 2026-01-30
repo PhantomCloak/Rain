@@ -42,7 +42,6 @@ namespace Rain
     Entity GetMainCameraEntity();
 
     std::pair<glm::vec3, glm::vec3> CastRay(Entity& cameraEntity, float mx, float my);
-    void OnMouseMove(double xPos, double yPos);
     void ScanKeyPress();
 
     LightInfo SceneLightInfo;

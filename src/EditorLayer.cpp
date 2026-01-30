@@ -3,6 +3,9 @@
 #include <cstring>
 #include <unordered_set>
 #include "imgui.h"
+#include "ImGuizmo.h"
+#include "Application.h"
+#include <glm/gtc/type_ptr.hpp>
 
 namespace Rain
 {
@@ -27,6 +30,9 @@ namespace Rain
 
   void EditorLayer::OnRenderImGui()
   {
+    // Begin new ImGuizmo frame
+    ImGuizmo::BeginFrame();
+
     if (ImGui::BeginMainMenuBar())
     {
       if (ImGui::BeginMenu("File"))
@@ -50,6 +56,27 @@ namespace Rain
       m_ViewportFocused = false;
     }
 
+    // Handle gizmo keyboard shortcuts (only when viewport is focused and not using gizmo)
+    if (m_ViewportFocused && !ImGuizmo::IsUsing())
+    {
+      if (ImGui::IsKeyPressed(ImGuiKey_W))
+      {
+        m_GizmoOperation = ImGuizmo::TRANSLATE;
+      }
+      if (ImGui::IsKeyPressed(ImGuiKey_E))
+      {
+        m_GizmoOperation = ImGuizmo::ROTATE;
+      }
+      if (ImGui::IsKeyPressed(ImGuiKey_R))
+      {
+        m_GizmoOperation = ImGuizmo::SCALE;
+      }
+      if (ImGui::IsKeyPressed(ImGuiKey_Q))
+      {
+        m_GizmoMode = (m_GizmoMode == ImGuizmo::LOCAL) ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
+      }
+    }
+
     auto texture = m_ViewportRenderer->GetLastPassImage();
     if (texture)
     {
@@ -57,6 +84,8 @@ namespace Rain
       if (textureView)
       {
         ImVec2 area = ImGui::GetContentRegionAvail();
+        ImVec2 imagePos;
+        ImVec2 imageSize;
 
         if (m_ConstrainAspectRatio)
         {
@@ -74,12 +103,27 @@ namespace Rain
           float posY = cursorPos.y + (area.y - sizeY) / 2.0f;
           ImGui::SetCursorPos(ImVec2(posX, posY));
 
+          // Calculate screen position of the image for gizmo
+          ImVec2 windowPos = ImGui::GetWindowPos();
+          imagePos = ImVec2(windowPos.x + posX, windowPos.y + posY);
+          imageSize = ImVec2(sizeX, sizeY);
+
           ImGui::Image((ImTextureID)textureView, ImVec2(sizeX, sizeY));
         }
         else
         {
+          ImVec2 windowPos = ImGui::GetWindowPos();
+          ImVec2 cursorPos = ImGui::GetCursorPos();
+          imagePos = ImVec2(windowPos.x + cursorPos.x, windowPos.y + cursorPos.y);
+          imageSize = area;
+
           ImGui::Image((ImTextureID)textureView, area);
         }
+
+        m_ViewportBoundsMin = {imagePos.x, imagePos.y};
+        m_ViewportBoundsMax = {imagePos.x + imageSize.x, imagePos.y + imageSize.y};
+
+        RenderGizmo();
       }
     }
 
@@ -96,7 +140,6 @@ namespace Rain
 
     auto entities = m_Scene->GetAllEntitiesWithComponent<TransformComponent>();
 
-    // Build a set of entities that have parents (so we skip them at root level)
     std::unordered_set<UUID> childEntities;
     for (auto& entity : entities)
     {
@@ -106,13 +149,11 @@ namespace Rain
       }
     }
 
-    // Render only root entities (those without parents in the scene)
     for (auto& entity : entities)
     {
       UUID parentId = entity.GetParentUUID();
       if (parentId == 0 || childEntities.find(entity.GetUUID()) == childEntities.end())
       {
-        // This is a root entity or its parent doesn't exist
         if (parentId == 0)
         {
           RenderEntityNode(entity);
@@ -123,7 +164,7 @@ namespace Rain
     // Click on empty space to deselect
     if (ImGui::IsMouseClicked(0) && ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered())
     {
-      m_SelectedEntity = {};
+      m_SelectedEntityId = 0;
     }
 
     ImGui::End();
@@ -137,7 +178,7 @@ namespace Rain
 
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
 
-    if (m_SelectedEntity == entity)
+    if (m_SelectedEntityId == entity.GetUUID())
     {
       flags |= ImGuiTreeNodeFlags_Selected;
     }
@@ -151,7 +192,7 @@ namespace Rain
 
     if (ImGui::IsItemClicked())
     {
-      m_SelectedEntity = entity;
+      m_SelectedEntityId = entity.GetUUID();
     }
 
     if (hasChildren && opened)
@@ -182,7 +223,8 @@ namespace Rain
   {
     ImGui::Begin("Properties");
 
-    if (!m_SelectedEntity)
+    Entity selectedEntity = m_Scene->TryGetEntityWithUUID(m_SelectedEntityId);
+    if (!selectedEntity)
     {
       ImGui::TextDisabled("No entity selected");
       ImGui::End();
@@ -192,7 +234,7 @@ namespace Rain
     const ImGuiTableFlags tableFlags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable;
 
     // IDComponent
-    if (m_SelectedEntity.HasComponent<IDComponent>())
+    if (selectedEntity.HasComponent<IDComponent>())
     {
       if (ImGui::CollapsingHeader("ID", ImGuiTreeNodeFlags_DefaultOpen))
       {
@@ -201,7 +243,7 @@ namespace Rain
           ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 100.0f);
           ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-          auto& id = m_SelectedEntity.GetComponent<IDComponent>();
+          auto& id = selectedEntity.GetComponent<IDComponent>();
           PropertyLabel("UUID");
           ImGui::Text("%llu", (unsigned long long)id.ID);
 
@@ -211,7 +253,7 @@ namespace Rain
     }
 
     // TagComponent
-    if (m_SelectedEntity.HasComponent<TagComponent>())
+    if (selectedEntity.HasComponent<TagComponent>())
     {
       if (ImGui::CollapsingHeader("Tag", ImGuiTreeNodeFlags_DefaultOpen))
       {
@@ -220,7 +262,7 @@ namespace Rain
           ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 100.0f);
           ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-          auto& tag = m_SelectedEntity.GetComponent<TagComponent>();
+          auto& tag = selectedEntity.GetComponent<TagComponent>();
           char buffer[256];
           strncpy(buffer, tag.Tag.c_str(), sizeof(buffer) - 1);
           buffer[sizeof(buffer) - 1] = '\0';
@@ -237,7 +279,7 @@ namespace Rain
     }
 
     // TransformComponent
-    if (m_SelectedEntity.HasComponent<TransformComponent>())
+    if (selectedEntity.HasComponent<TransformComponent>())
     {
       if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
       {
@@ -246,7 +288,7 @@ namespace Rain
           ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 100.0f);
           ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-          auto& transform = m_SelectedEntity.GetComponent<TransformComponent>();
+          auto& transform = selectedEntity.GetComponent<TransformComponent>();
 
           PropertyLabel("Position");
           ImGui::DragFloat3("##Position", &transform.Translation.x, 0.1f);
@@ -267,7 +309,7 @@ namespace Rain
     }
 
     // RelationshipComponent
-    if (m_SelectedEntity.HasComponent<RelationshipComponent>())
+    if (selectedEntity.HasComponent<RelationshipComponent>())
     {
       if (ImGui::CollapsingHeader("Relationship"))
       {
@@ -276,7 +318,7 @@ namespace Rain
           ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 100.0f);
           ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-          auto& relationship = m_SelectedEntity.GetComponent<RelationshipComponent>();
+          auto& relationship = selectedEntity.GetComponent<RelationshipComponent>();
 
           PropertyLabel("Parent UUID");
           ImGui::Text("%llu", (unsigned long long)relationship.ParentHandle);
@@ -290,7 +332,7 @@ namespace Rain
     }
 
     // MeshComponent
-    if (m_SelectedEntity.HasComponent<MeshComponent>())
+    if (selectedEntity.HasComponent<MeshComponent>())
     {
       if (ImGui::CollapsingHeader("Mesh", ImGuiTreeNodeFlags_DefaultOpen))
       {
@@ -299,7 +341,7 @@ namespace Rain
           ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 100.0f);
           ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-          auto& mesh = m_SelectedEntity.GetComponent<MeshComponent>();
+          auto& mesh = selectedEntity.GetComponent<MeshComponent>();
 
           PropertyLabel("Mesh Source ID");
           ImGui::Text("%llu", (unsigned long long)mesh.MeshSourceId);
@@ -313,7 +355,7 @@ namespace Rain
     }
 
     // CameraComponent
-    if (m_SelectedEntity.HasComponent<CameraComponent>())
+    if (selectedEntity.HasComponent<CameraComponent>())
     {
       if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
       {
@@ -322,7 +364,7 @@ namespace Rain
           ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 100.0f);
           ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-          auto& camera = m_SelectedEntity.GetComponent<CameraComponent>();
+          auto& camera = selectedEntity.GetComponent<CameraComponent>();
 
           PropertyLabel("Primary");
           ImGui::Checkbox("##Primary", &camera.Primary);
@@ -341,7 +383,7 @@ namespace Rain
     }
 
     // DirectionalLightComponent
-    if (m_SelectedEntity.HasComponent<DirectionalLightComponent>())
+    if (selectedEntity.HasComponent<DirectionalLightComponent>())
     {
       if (ImGui::CollapsingHeader("Directional Light", ImGuiTreeNodeFlags_DefaultOpen))
       {
@@ -350,7 +392,7 @@ namespace Rain
           ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 100.0f);
           ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-          auto& light = m_SelectedEntity.GetComponent<DirectionalLightComponent>();
+          auto& light = selectedEntity.GetComponent<DirectionalLightComponent>();
 
           PropertyLabel("Intensity");
           ImGui::DragFloat("##Intensity", &light.Intensity, 0.1f, 0.0f, 100.0f);
@@ -361,7 +403,7 @@ namespace Rain
     }
 
     // RigidBodyComponent
-    if (m_SelectedEntity.HasComponent<RigidBodyComponent>())
+    if (selectedEntity.HasComponent<RigidBodyComponent>())
     {
       if (ImGui::CollapsingHeader("Rigid Body", ImGuiTreeNodeFlags_DefaultOpen))
       {
@@ -370,7 +412,7 @@ namespace Rain
           ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 100.0f);
           ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-          auto& rb = m_SelectedEntity.GetComponent<RigidBodyComponent>();
+          auto& rb = selectedEntity.GetComponent<RigidBodyComponent>();
 
           PropertyLabel("Mass");
           ImGui::DragFloat("##Mass", &rb.Mass, 0.1f, 0.0f, 10000.0f);
@@ -410,7 +452,7 @@ namespace Rain
     }
 
     // BoxColliderComponent
-    if (m_SelectedEntity.HasComponent<BoxColliderComponent>())
+    if (selectedEntity.HasComponent<BoxColliderComponent>())
     {
       if (ImGui::CollapsingHeader("Box Collider", ImGuiTreeNodeFlags_DefaultOpen))
       {
@@ -419,7 +461,7 @@ namespace Rain
           ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 100.0f);
           ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-          auto& collider = m_SelectedEntity.GetComponent<BoxColliderComponent>();
+          auto& collider = selectedEntity.GetComponent<BoxColliderComponent>();
 
           PropertyLabel("Offset");
           ImGui::DragFloat3("##Offset", &collider.Offset.x, 0.1f);
@@ -433,7 +475,7 @@ namespace Rain
     }
 
     // CylinderCollider
-    if (m_SelectedEntity.HasComponent<CylinderCollider>())
+    if (selectedEntity.HasComponent<CylinderCollider>())
     {
       if (ImGui::CollapsingHeader("Cylinder Collider", ImGuiTreeNodeFlags_DefaultOpen))
       {
@@ -442,7 +484,7 @@ namespace Rain
           ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 100.0f);
           ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-          auto& collider = m_SelectedEntity.GetComponent<CylinderCollider>();
+          auto& collider = selectedEntity.GetComponent<CylinderCollider>();
 
           PropertyLabel("Size");
           ImGui::DragFloat2("##CylSize", &collider.Size.x, 0.1f, 0.0f, 100.0f);
@@ -453,7 +495,7 @@ namespace Rain
     }
 
     // TrackedVehicleComponent
-    if (m_SelectedEntity.HasComponent<TrackedVehicleComponent>())
+    if (selectedEntity.HasComponent<TrackedVehicleComponent>())
     {
       if (ImGui::CollapsingHeader("Tracked Vehicle", ImGuiTreeNodeFlags_DefaultOpen))
       {
@@ -462,7 +504,7 @@ namespace Rain
           ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 100.0f);
           ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-          auto& vehicle = m_SelectedEntity.GetComponent<TrackedVehicleComponent>();
+          auto& vehicle = selectedEntity.GetComponent<TrackedVehicleComponent>();
 
           PropertyLabel("COM Offset");
           ImGui::DragFloat3("##COMOffset", &vehicle.CenterOfMassOffset.x, 0.1f);
@@ -497,7 +539,7 @@ namespace Rain
     }
 
     // AnimatorComponent
-    if (m_SelectedEntity.HasComponent<AnimatorComponent>())
+    if (selectedEntity.HasComponent<AnimatorComponent>())
     {
       if (ImGui::CollapsingHeader("Animator", ImGuiTreeNodeFlags_DefaultOpen))
       {
@@ -506,7 +548,7 @@ namespace Rain
           ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 100.0f);
           ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-          auto& animator = m_SelectedEntity.GetComponent<AnimatorComponent>();
+          auto& animator = selectedEntity.GetComponent<AnimatorComponent>();
 
           PropertyLabel("Playing");
           ImGui::Checkbox("##Playing", &animator.Playing);
@@ -611,17 +653,67 @@ namespace Rain
     ImGui::End();
   }
 
+  void EditorLayer::RenderGizmo()
+  {
+    Entity selectedEntity = m_Scene->TryGetEntityWithUUID(m_SelectedEntityId);
+    if (!selectedEntity || !selectedEntity.HasComponent<TransformComponent>())
+    {
+      return;
+    }
+
+    Entity cameraEntity = m_Scene->GetMainCameraEntity();
+    if (!cameraEntity)
+    {
+      return;
+    }
+
+    glm::mat4 view = glm::inverse(m_Scene->GetWorldSpaceTransformMatrix(cameraEntity));
+    glm::vec2 windowSize = Application::Get()->GetWindowSize();
+    glm::mat4 projection = glm::perspectiveFov(glm::radians(55.0f), windowSize.x, windowSize.y, 0.1f, 1400.0f);
+
+    ImGuizmo::SetDrawlist();
+    ImGuizmo::SetRect(m_ViewportBoundsMin.x, m_ViewportBoundsMin.y,
+                      m_ViewportBoundsMax.x - m_ViewportBoundsMin.x,
+                      m_ViewportBoundsMax.y - m_ViewportBoundsMin.y);
+
+    glm::mat4 worldTransform = m_Scene->GetWorldSpaceTransformMatrix(selectedEntity);
+
+    glm::vec3 snap = (m_GizmoOperation == ImGuizmo::ROTATE) ? glm::vec3(45.0f) : m_SnapValue;
+
+    bool manipulated = ImGuizmo::Manipulate(
+        glm::value_ptr(view), glm::value_ptr(projection),
+        m_GizmoOperation, m_GizmoMode, glm::value_ptr(worldTransform),
+        nullptr, m_UseSnap ? glm::value_ptr(snap) : nullptr);
+
+    if (!manipulated)
+    {
+      return;
+    }
+
+    glm::mat4 localTransform = worldTransform;
+    if (UUID parentId = selectedEntity.GetParentUUID(); parentId != 0)
+    {
+      if (Entity parent = m_Scene->TryGetEntityWithUUID(parentId))
+      {
+        localTransform = glm::inverse(m_Scene->GetWorldSpaceTransformMatrix(parent)) * worldTransform;
+      }
+    }
+
+    selectedEntity.Transform().SetTransform(localTransform);
+  }
+
   void EditorLayer::OnEvent(Event& event)
   {
-    // Only pass events to scene when viewport is focused
     if (!m_ViewportFocused)
+    {
       return;
+    }
 
     if (event.GetEventType() == EventType::MouseMove)
     {
       MouseMoveEvent& e = static_cast<MouseMoveEvent&>(event);
       glm::vec2 p = e.GetPosition();
-      m_Scene->OnMouseMove(p.x, p.y);
+      // m_Scene->OnMouseMove(p.x, p.y);
     }
   }
 }  // namespace Rain
