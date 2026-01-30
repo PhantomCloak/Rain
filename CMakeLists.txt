@@ -11,8 +11,8 @@ file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" "${CMAKE_CURRE
 file(GLOB IMGUI_SOURCES 
   "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_glfw.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_wgpu.cpp")
-  #"${CMAKE_CURRENT_SOURCE_DIR}/vendor/ImGuizmo/*.cpp")
+  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_wgpu.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/ImGuizmo/*.cpp")
 
 list(APPEND SOURCES ${IMGUI_SOURCES})
 
@@ -39,7 +39,7 @@ target_compile_definitions(ReEngine PRIVATE RESOURCE_DIR="${CMAKE_CURRENT_SOURCE
 #endif()
 include("cmake/ThirdParty.cmake")
 
-target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui")
+target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui" "vendor/ImGuizmo")
 if(NOT EMSCRIPTEN)
   target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/dawn/include/tint)
 else()

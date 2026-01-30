@@ -1,5 +1,6 @@
 #include "EditorLayer.h"
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <unordered_set>
 #include "imgui.h"
@@ -9,6 +10,31 @@
 
 namespace Rain
 {
+  glm::vec3 EditorCamera::GetForward() const
+  {
+    float yawRad = glm::radians(Yaw);
+    float pitchRad = glm::radians(Pitch);
+    return glm::normalize(glm::vec3(
+        std::cos(yawRad) * std::cos(pitchRad),
+        std::sin(pitchRad),
+        std::sin(yawRad) * std::cos(pitchRad)));
+  }
+
+  glm::vec3 EditorCamera::GetRight() const
+  {
+    return glm::normalize(glm::cross(GetForward(), glm::vec3(0.0f, 1.0f, 0.0f)));
+  }
+
+  glm::vec3 EditorCamera::GetUp() const
+  {
+    return glm::normalize(glm::cross(GetRight(), GetForward()));
+  }
+
+  glm::mat4 EditorCamera::GetViewMatrix() const
+  {
+    return glm::lookAt(Position, Position + GetForward(), glm::vec3(0.0f, 1.0f, 0.0f));
+  }
+
   void EditorLayer::OnAttach()
   {
     m_ViewportRenderer = CreateRef<SceneRenderer>();
@@ -22,15 +48,72 @@ namespace Rain
   {
   }
 
+  void EditorLayer::UpdateEditorCamera(float dt)
+  {
+    bool rightMouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Right);
+
+    if (rightMouseDown && m_ViewportFocused)
+    {
+      ImVec2 mousePos = ImGui::GetMousePos();
+      if (m_RightMouseDown)
+      {
+        float deltaX = mousePos.x - m_LastMousePos.x;
+        float deltaY = mousePos.y - m_LastMousePos.y;
+
+        m_EditorCamera.Yaw += deltaX * m_EditorCamera.MouseSensitivity;
+        m_EditorCamera.Pitch -= deltaY * m_EditorCamera.MouseSensitivity;
+        m_EditorCamera.Pitch = glm::clamp(m_EditorCamera.Pitch, -89.0f, 89.0f);
+      }
+      m_LastMousePos = {mousePos.x, mousePos.y};
+    }
+    m_RightMouseDown = rightMouseDown;
+
+    glm::vec3 inputDir(0.0f);
+    if (rightMouseDown && m_ViewportFocused)
+    {
+      if (ImGui::IsKeyDown(ImGuiKey_W))
+      {
+        inputDir += m_EditorCamera.GetForward();
+      }
+      if (ImGui::IsKeyDown(ImGuiKey_S))
+      {
+        inputDir -= m_EditorCamera.GetForward();
+      }
+      if (ImGui::IsKeyDown(ImGuiKey_D))
+      {
+        inputDir += m_EditorCamera.GetRight();
+      }
+      if (ImGui::IsKeyDown(ImGuiKey_A))
+      {
+        inputDir -= m_EditorCamera.GetRight();
+      }
+    }
+
+    if (glm::length(inputDir) > 0.001f)
+    {
+      inputDir = glm::normalize(inputDir);
+      glm::vec3 targetVelocity = inputDir * (m_EditorCamera.MoveSpeed * (ImGui::IsKeyDown(ImGuiKey_LeftShift) ? 4.0f : 1.0f));
+      m_EditorCamera.Velocity = glm::mix(m_EditorCamera.Velocity, targetVelocity,
+                                         1.0f - std::exp(-m_EditorCamera.Acceleration * dt));
+    }
+    else
+    {
+      m_EditorCamera.Velocity = glm::mix(m_EditorCamera.Velocity, glm::vec3(0.0f),
+                                         1.0f - std::exp(-m_EditorCamera.Deceleration * dt));
+    }
+
+    m_EditorCamera.Position += m_EditorCamera.Velocity * dt;
+  }
+
   void EditorLayer::OnUpdate(float dt)
   {
+    UpdateEditorCamera(dt);
     m_Scene->OnUpdate();
-    m_Scene->OnRender(m_ViewportRenderer);
+    m_Scene->OnRender(m_ViewportRenderer, m_EditorCamera.GetViewMatrix());
   }
 
   void EditorLayer::OnRenderImGui()
   {
-    // Begin new ImGuizmo frame
     ImGuizmo::BeginFrame();
 
     if (ImGui::BeginMainMenuBar())
@@ -48,7 +131,6 @@ namespace Rain
 
     ImGui::Begin("Viewport");
 
-    // Track viewport focus and handle Escape to unfocus
     m_ViewportFocused = ImGui::IsWindowFocused();
     if (m_ViewportFocused && ImGui::IsKeyPressed(ImGuiKey_Escape))
     {
@@ -56,18 +138,18 @@ namespace Rain
       m_ViewportFocused = false;
     }
 
-    // Handle gizmo keyboard shortcuts (only when viewport is focused and not using gizmo)
-    if (m_ViewportFocused && !ImGuizmo::IsUsing())
+    bool rightMouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Right);
+    if (m_ViewportFocused && !ImGuizmo::IsUsing() && !rightMouseDown)
     {
-      if (ImGui::IsKeyPressed(ImGuiKey_W))
+      if (ImGui::IsKeyPressed(ImGuiKey_T))
       {
         m_GizmoOperation = ImGuizmo::TRANSLATE;
       }
-      if (ImGui::IsKeyPressed(ImGuiKey_E))
+      if (ImGui::IsKeyPressed(ImGuiKey_R))
       {
         m_GizmoOperation = ImGuizmo::ROTATE;
       }
-      if (ImGui::IsKeyPressed(ImGuiKey_R))
+      if (ImGui::IsKeyPressed(ImGuiKey_E))
       {
         m_GizmoOperation = ImGuizmo::SCALE;
       }
@@ -89,7 +171,6 @@ namespace Rain
 
         if (m_ConstrainAspectRatio)
         {
-          // Use 16:9 reference dimensions for aspect ratio calculation
           constexpr float srcWidth = 1920.0f;
           constexpr float srcHeight = 1080.0f;
 
@@ -97,13 +178,11 @@ namespace Rain
           float sizeX = srcWidth * scale;
           float sizeY = srcHeight * scale;
 
-          // Center the image
           ImVec2 cursorPos = ImGui::GetCursorPos();
           float posX = cursorPos.x + (area.x - sizeX) / 2.0f;
           float posY = cursorPos.y + (area.y - sizeY) / 2.0f;
           ImGui::SetCursorPos(ImVec2(posX, posY));
 
-          // Calculate screen position of the image for gizmo
           ImVec2 windowPos = ImGui::GetWindowPos();
           imagePos = ImVec2(windowPos.x + posX, windowPos.y + posY);
           imageSize = ImVec2(sizeX, sizeY);
@@ -161,7 +240,6 @@ namespace Rain
       }
     }
 
-    // Click on empty space to deselect
     if (ImGui::IsMouseClicked(0) && ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered())
     {
       m_SelectedEntityId = 0;
@@ -661,13 +739,7 @@ namespace Rain
       return;
     }
 
-    Entity cameraEntity = m_Scene->GetMainCameraEntity();
-    if (!cameraEntity)
-    {
-      return;
-    }
-
-    glm::mat4 view = glm::inverse(m_Scene->GetWorldSpaceTransformMatrix(cameraEntity));
+    glm::mat4 view = m_EditorCamera.GetViewMatrix();
     glm::vec2 windowSize = Application::Get()->GetWindowSize();
     glm::mat4 projection = glm::perspectiveFov(glm::radians(55.0f), windowSize.x, windowSize.y, 0.1f, 1400.0f);
 
@@ -704,16 +776,5 @@ namespace Rain
 
   void EditorLayer::OnEvent(Event& event)
   {
-    if (!m_ViewportFocused)
-    {
-      return;
-    }
-
-    if (event.GetEventType() == EventType::MouseMove)
-    {
-      MouseMoveEvent& e = static_cast<MouseMoveEvent&>(event);
-      glm::vec2 p = e.GetPosition();
-      // m_Scene->OnMouseMove(p.x, p.y);
-    }
   }
 }  // namespace Rain

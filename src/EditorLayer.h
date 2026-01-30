@@ -10,6 +10,24 @@
 
 namespace Rain
 {
+  struct EditorCamera
+  {
+    glm::vec3 Position = {0.0f, 2.0f, 5.0f};
+    float Yaw = -90.0f;    // Looking along -Z
+    float Pitch = 0.0f;
+    glm::vec3 Velocity = {0.0f, 0.0f, 0.0f};
+
+    float MoveSpeed = 10.0f;
+    float Acceleration = 30.0f;
+    float Deceleration = 15.0f;
+    float MouseSensitivity = 0.1f;
+
+    glm::vec3 GetForward() const;
+    glm::vec3 GetRight() const;
+    glm::vec3 GetUp() const;
+    glm::mat4 GetViewMatrix() const;
+  };
+
   class EditorLayer : public Layer
   {
     virtual void OnAttach() override;
@@ -21,6 +39,8 @@ namespace Rain
     virtual void OnEvent(Event& event) override;
 
    private:
+    void UpdateEditorCamera(float dt);
+
     void RenderLogViewer();
     void FilterLogs(const std::vector<LogEntry>& logs);
 
@@ -55,5 +75,10 @@ namespace Rain
     // Viewport bounds for gizmo
     glm::vec2 m_ViewportBoundsMin = {0.0f, 0.0f};
     glm::vec2 m_ViewportBoundsMax = {0.0f, 0.0f};
+
+    // Editor camera
+    EditorCamera m_EditorCamera;
+    glm::vec2 m_LastMousePos = {0.0f, 0.0f};
+    bool m_RightMouseDown = false;
   };
 }  // namespace Rain

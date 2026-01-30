@@ -456,7 +456,7 @@ namespace Rain
 
       auto depth = renderFrameBuffer->GetDepthAttachment();
       depthAttachment.depthClearValue = 1.0f;
-      depthAttachment.depthLoadOp = WGPULoadOp_Clear;
+      depthAttachment.depthLoadOp = renderFrameBuffer->m_FrameBufferSpec.ClearDepthOnLoad ? WGPULoadOp_Clear : WGPULoadOp_Load;
       depthAttachment.depthStoreOp = WGPUStoreOp_Store;
       depthAttachment.depthReadOnly = false;
 

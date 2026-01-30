@@ -41,22 +41,28 @@ namespace Rain
     auto camera = CreateEntity("MainCamera");
     camera.AddComponent<CameraComponent>();
 
-    // auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
-    auto bochii = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test2/untitled.gltf");
-    auto foo = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
+    auto testModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test2/untitled.gltf");
+    auto boxModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
+    auto weaponModel = Rain::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
 
-    Entity galata = CreateEntity("bump");
-    Entity box = CreateEntity("box");
+    Entity modelEntity = CreateEntity("bump");
+    Entity floorEntity = CreateEntity("box");
+    Entity weaponEntity = CreateEntity("weapon");
 
-    galata.Transform().Translation = glm::vec3(0, -0.0, 0);
-    galata.Transform().Scale = glm::vec3(0.2f);
-    galata.Transform().SetRotationEuler(glm::radians(glm::vec3(-90.0, 0.0, 180.0)));
+    modelEntity.Transform().Translation = glm::vec3(0, -0.0, 0);
+    modelEntity.Transform().Scale = glm::vec3(0.04f);
+    modelEntity.Transform().SetRotationEuler(glm::radians(glm::vec3(-90.0, 0.0, 180.0)));
 
-    box.Transform().Translation = glm::vec3(0, -0.0, 0);
-    box.Transform().Scale = glm::vec3(1.0f);
+    floorEntity.Transform().Translation = glm::vec3(0, -1.0, 0);
+    floorEntity.Transform().Scale = glm::vec3(50.0f, 1.0f, 50.0f);
 
-    BuildMeshEntityHierarchy(galata, bochii);
-    BuildMeshEntityHierarchy(box, foo);
+    weaponEntity.Transform().Translation = glm::vec3(3, 3.0, 0);
+    weaponEntity.Transform().Scale = glm::vec3(0.5f);
+    weaponEntity.Transform().SetRotationEuler(glm::radians(glm::vec3(-0.0, 90.0, 0.0)));
+
+    BuildMeshEntityHierarchy(modelEntity, testModel);
+    BuildMeshEntityHierarchy(floorEntity, boxModel);
+    BuildMeshEntityHierarchy(weaponEntity, weaponModel);
 
     Entity light = CreateEntity("DirectionalLight");
     light.GetComponent<TransformComponent>().SetRotationEuler(glm::vec3(glm::radians(lightX), glm::radians(lightY), glm::radians(lightZ)));
@@ -170,7 +176,7 @@ namespace Rain
     return {};
   }
 
-  void Scene::OnRender(Ref<SceneRenderer> renderer)
+  void Scene::OnRender(Ref<SceneRenderer> renderer, const glm::mat4& editorViewMatrix)
   {
     RN_PROFILE_FUNC;
     renderer->SetScene(this);
@@ -178,7 +184,10 @@ namespace Rain
     auto far = 400.0f;
     Entity cameraEntity = GetMainCameraEntity();
     Camera& camera = cameraEntity.GetComponent<CameraComponent>();
-    glm::mat4 cameraViewMatrix = glm::inverse(GetWorldSpaceTransformMatrix(cameraEntity));
+
+    // Use editor camera view matrix if provided (non-zero), otherwise use scene camera
+    bool useEditorCamera = editorViewMatrix != glm::mat4(0.0f);
+    glm::mat4 cameraViewMatrix = useEditorCamera ? editorViewMatrix : glm::inverse(GetWorldSpaceTransformMatrix(cameraEntity));
 
     static float w = Application::Get()->GetWindowSize().x;
     static float h = Application::Get()->GetWindowSize().y;

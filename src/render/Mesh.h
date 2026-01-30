@@ -41,7 +41,7 @@ namespace Rain
     float _pad4;
     glm::uvec4 BoneIndices;  // 16 bytes (unsigned)
     glm::vec4 BoneWeights;   // 16 bytes
-  };  // Total: 112 bytes
+  };
 
   struct SubMesh
   {

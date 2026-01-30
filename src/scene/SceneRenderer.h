@@ -117,14 +117,6 @@ namespace Rain
     glm::vec4 CascadeDistances;
   };
 
-  struct Block
-  {
-  };
-
-  struct Chunk
-  {
-  };
-
   class SceneRenderer
   {
    public:
@@ -200,6 +192,7 @@ namespace Rain
     Ref<RenderPipeline> m_SkeletalPipeline;
     Ref<RenderPass> m_SkeletalPass;
     Ref<GPUBuffer> m_BoneMatricesBuffer;
+    Ref<GPUBuffer> m_SkeletalTransformBuffer;
     std::vector<SkeletalDrawCommand> m_SkeletalDrawList;
 
     void RenderSkeletalMeshes(Ref<RenderPass> passEncoder);

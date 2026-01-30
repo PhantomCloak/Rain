@@ -31,7 +31,7 @@ namespace Rain
     void Init();
 
     void OnUpdate();
-    void OnRender(Ref<SceneRenderer> renderer);
+    void OnRender(Ref<SceneRenderer> renderer, const glm::mat4& editorViewMatrix = glm::mat4(0.0f));
 
     void BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh);
     Entity TryGetEntityWithUUID(UUID id) const;

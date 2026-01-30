@@ -440,10 +440,9 @@ namespace Rain
         {9, ShaderDataType::Float4, "a_MRow2", 32}}};
     // clang-format on
 
-    // Create bone matrices storage buffer (128 bones * 64 bytes per matrix)
     m_BoneMatricesBuffer = GPUAllocator::GAlloc("bone_matrices", WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage, 128 * sizeof(glm::mat4));
+    m_SkeletalTransformBuffer = GPUAllocator::GAlloc("skeletal_transform", WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex, 16 * sizeof(TransformVertexData));
 
-    // Initialize with identity matrices
     std::vector<glm::mat4> identityBones(128, glm::mat4(1.0f));
     m_BoneMatricesBuffer->SetData(identityBones.data(), 128 * sizeof(glm::mat4));
 
@@ -453,6 +452,7 @@ namespace Rain
     skeletalFboSpec.DebugName = "FB_Skeletal";
     skeletalFboSpec.Multisample = 1;
     skeletalFboSpec.ClearColorOnLoad = false;  // Don't clear - draw on top of existing content
+    skeletalFboSpec.ClearDepthOnLoad = false;  // Preserve depth from composite pass
     skeletalFboSpec.ExistingColorAttachment = m_CompositeFramebuffer->GetAttachment(0);
     skeletalFboSpec.ExistingDepth = m_CompositeFramebuffer->GetDepthAttachment();
 
@@ -565,39 +565,32 @@ namespace Rain
         glm::vec4(-1.0f, 1.0f, 1.0f, 1.0f)    // Top-left far
     };
 
-    // Transform corners to world space
     JPH::RVec3 nearWorldCorners[4];
     JPH::RVec3 farWorldCorners[4];
 
     for (int i = 0; i < 4; i++)
     {
-      // Transform near corners
       glm::vec4 nearWorld = invViewProj * nearCorners[i];
-      nearWorld /= nearWorld.w;  // Perspective divide
+      nearWorld /= nearWorld.w;
       nearWorldCorners[i] = JPH::RVec3(nearWorld.x, nearWorld.y, nearWorld.z);
 
-      // Transform far corners
       glm::vec4 farWorld = invViewProj * farCorners[i];
-      farWorld /= farWorld.w;  // Perspective divide
+      farWorld /= farWorld.w;
       farWorldCorners[i] = JPH::RVec3(farWorld.x, farWorld.y, farWorld.z);
     }
 
-    // Draw the frustum lines
-    // Near plane edges
     for (int i = 0; i < 4; i++)
     {
       int next = (i + 1) % 4;
       RenderDebug::sInstance->DrawLine(nearWorldCorners[i], nearWorldCorners[next], JPH::Color::sGreen);
     }
 
-    // Far plane edges
     for (int i = 0; i < 4; i++)
     {
       int next = (i + 1) % 4;
       RenderDebug::sInstance->DrawLine(farWorldCorners[i], farWorldCorners[next], JPH::Color::sGreen);
     }
 
-    // Connecting edges (from near to far)
     for (int i = 0; i < 4; i++)
     {
       RenderDebug::sInstance->DrawLine(nearWorldCorners[i], farWorldCorners[i], JPH::Color::sGreen);
@@ -680,16 +673,6 @@ namespace Rain
     }
 
     {
-      RN_PROFILE_FUNCN("Skeletal Pass");
-      if (!m_SkeletalDrawList.empty())
-      {
-        m_Renderer->BeginRenderPass(m_SkeletalPass, m_CommandBuffer);
-        RenderSkeletalMeshes(m_SkeletalPass);
-        m_Renderer->EndRenderPass(m_SkeletalPass);
-      }
-    }
-
-    {
       RN_PROFILE_FUNCN("Geometry Pass");
 
       m_Renderer->BeginRenderPass(m_LitPass, m_CommandBuffer);
@@ -703,9 +686,17 @@ namespace Rain
       // DrawCameraFrustum(SavedCam);
       //  RenderDebug::FlushDrawList();
 
-      // ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), std::static_pointer_cast<RenderPassEncoderWGPU>(litPassEncoder)->GetNativeEncoder());
-
       m_Renderer->EndRenderPass(m_LitPass);
+    }
+
+    {
+      RN_PROFILE_FUNCN("Skeletal Pass");
+      if (!m_SkeletalDrawList.empty())
+      {
+        m_Renderer->BeginRenderPass(m_SkeletalPass, m_CommandBuffer);
+        RenderSkeletalMeshes(m_SkeletalPass);
+        m_Renderer->EndRenderPass(m_SkeletalPass);
+      }
     }
 
     m_CommandBuffer->End();
@@ -734,7 +725,6 @@ namespace Rain
 
       if (cmd.Animator)
       {
-        // Use ozz-animated matrices
         const auto& animatedMatrices = cmd.Animator->GetBoneMatrices();
         for (size_t i = 0; i < animatedMatrices.size() && i < 128; i++)
         {
@@ -753,16 +743,14 @@ namespace Rain
 
       m_BoneMatricesBuffer->SetData(boneMatrices.data(), 128 * sizeof(glm::mat4));
 
-      // Create instance data for this draw
       TransformVertexData transformData;
       transformData.MRow[0] = {cmd.Transform[0][0], cmd.Transform[1][0], cmd.Transform[2][0], cmd.Transform[3][0]};
       transformData.MRow[1] = {cmd.Transform[0][1], cmd.Transform[1][1], cmd.Transform[2][1], cmd.Transform[3][1]};
       transformData.MRow[2] = {cmd.Transform[0][2], cmd.Transform[1][2], cmd.Transform[2][2], cmd.Transform[3][2]};
 
-      m_TransformBuffer->SetData(&transformData, sizeof(TransformVertexData));
+      m_SkeletalTransformBuffer->SetData(&transformData, sizeof(TransformVertexData));
 
-      // Use the dedicated skeletal mesh rendering method with materials
-      m_Renderer->RenderSkeletalMesh(renderPass, m_SkeletalPipeline->GetPipeline(), cmd.Mesh, cmd.SubmeshIndex, cmd.Materials, m_TransformBuffer, 1);
+      m_Renderer->RenderSkeletalMesh(renderPass, m_SkeletalPipeline->GetPipeline(), cmd.Mesh, cmd.SubmeshIndex, cmd.Materials, m_SkeletalTransformBuffer, 1);
     }
   }
 
