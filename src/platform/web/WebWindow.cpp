@@ -36,45 +36,49 @@ void Rain::WebWindow::Init(const WindowProps& props)
 
   glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos)
                            {
-    WebWindow* osxWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
-    osxWindow->OnMouseMove(xPos, yPos); });
+                             WebWindow* webWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
+                             webWindow->OnMouseMove(xPos, yPos);
+
+                             MouseMoveEvent MoveEvent(xPos, yPos);
+                             webWindow->OnEvent(MoveEvent);  // Copy
+                           });
 
   glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods)
                      {
-    WebWindow* osxWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
+    WebWindow* webWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
     switch (action) {
       case GLFW_PRESS: {
-        osxWindow->OnKeyPressed(key, Key::RN_KEY_PRESS);
+        webWindow->OnKeyPressed(key, Key::RN_KEY_PRESS);
         break;
       }
       case GLFW_RELEASE: {
-        osxWindow->OnKeyPressed(key, Key::RN_KEY_RELEASE);
+        webWindow->OnKeyPressed(key, Key::RN_KEY_RELEASE);
         break;
       }
       case GLFW_REPEAT: {
-        osxWindow->OnKeyPressed(key, Key::RN_KEY_REPEAT);
+        webWindow->OnKeyPressed(key, Key::RN_KEY_REPEAT);
         break;
       }
     } });
 
   glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods)
                              {
-    WebWindow* osxWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
+    WebWindow* webWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
     switch (action) {
       case GLFW_PRESS: {
-        osxWindow->OnMouseClick(Mouse::Press);
+        webWindow->OnMouseClick(Mouse::Press);
         break;
       }
       case GLFW_RELEASE: {
-        osxWindow->OnMouseClick(Mouse::Release);
+        webWindow->OnMouseClick(Mouse::Release);
         break;
       }
     } });
 
   glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, int width, int height)
                                  {
-    WebWindow* osxWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
-    osxWindow->OnResize(height, width); });
+    WebWindow* webWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
+    webWindow->OnResize(height, width); });
 }
 
 void Rain::WebWindow::Shutdown()
