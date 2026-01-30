@@ -133,10 +133,16 @@ namespace Rain
 
       glm::vec3 lightDir = -lightDirection;
 
+      glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+      if (glm::abs(glm::dot(glm::normalize(lightDir), up)) > 0.99f)
+      {
+        up = glm::vec3(0.0f, 0.0f, 1.0f);
+      }
+
       glm::mat4 lightViewMatrix = glm::lookAt(
           frustumCenter - lightDir * radius,
           frustumCenter,
-          glm::vec3(0.0f, 1.0f, 0.0f));
+          up);
 
       glm::mat4 lightOrthoMatrix = glm::ortho(
           minExtents.x, maxExtents.x,
@@ -483,6 +489,43 @@ namespace Rain
     m_SkeletalPass->Set("u_BDRFLut", bdrfLut);
     m_SkeletalPass->Bake();
 
+    // Skeletal Shadow Pipeline
+    auto skeletalShadowShader = ShaderManager::LoadShader("SH_SkeletalShadow", RESOURCE_DIR "/shaders/skeletal_shadow_map.wgsl");
+
+    FramebufferSpec skeletalShadowFboSpec;
+    skeletalShadowFboSpec.DepthFormat = TextureFormat::Depth24Plus;
+    skeletalShadowFboSpec.ExistingDepth = m_ShadowDepthTexture;
+    skeletalShadowFboSpec.ClearDepthOnLoad = false;  // Don't clear - add to existing shadow map
+
+    RenderPipelineSpec skeletalShadowPipeSpec;
+    skeletalShadowPipeSpec.VertexLayout = skeletalVertexLayout;
+    skeletalShadowPipeSpec.InstanceLayout = skeletalInstanceLayout;
+    skeletalShadowPipeSpec.CullingMode = PipelineCullingMode::BACK;
+    skeletalShadowPipeSpec.Shader = skeletalShadowShader;
+
+    for (int i = 0; i < m_NumOfCascades; i++)
+    {
+      skeletalShadowFboSpec.DebugName = fmt::format("FB_SkeletalShadow_{}", i);
+      skeletalShadowFboSpec.ExistingImageLayers.clear();
+      skeletalShadowFboSpec.ExistingImageLayers.emplace_back(i);
+
+      skeletalShadowPipeSpec.Overrides.clear();
+      skeletalShadowPipeSpec.Overrides.emplace("co", i);
+      skeletalShadowPipeSpec.DebugName = fmt::format("RP_SkeletalShadow_{}", i);
+      skeletalShadowPipeSpec.TargetFramebuffer = Framebuffer::Create(skeletalShadowFboSpec);
+
+      m_SkeletalShadowPipeline[i] = RenderPipeline::Create(skeletalShadowPipeSpec);
+
+      RenderPassSpec skeletalShadowPassSpec = {
+          .Pipeline = m_SkeletalShadowPipeline[i],
+          .DebugName = fmt::format("SkeletalShadowPass_{}", i)};
+
+      m_SkeletalShadowPass[i] = RenderPass::Create(skeletalShadowPassSpec);
+      m_SkeletalShadowPass[i]->Set("u_ShadowData", m_ShadowUniformBuffer);
+      m_SkeletalShadowPass[i]->Set("u_BoneMatrices", m_BoneMatricesBuffer);
+      m_SkeletalShadowPass[i]->Bake();
+    }
+
     RN_LOG("Skeletal pipeline initialized");
 
     // PPFX
@@ -663,12 +706,21 @@ namespace Rain
 
       for (int i = 0; i < m_NumOfCascades; i++)
       {
+        // Static mesh shadows
         m_Renderer->BeginRenderPass(m_ShadowPass[i], m_CommandBuffer);
         for (auto& [mk, dc] : m_DrawList)
         {
           m_Renderer->RenderMesh(m_ShadowPass[i], m_ShadowPipeline[i]->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
         }
         m_Renderer->EndRenderPass(m_ShadowPass[i]);
+
+        // Skeletal mesh shadows
+        if (!m_SkeletalDrawList.empty())
+        {
+          m_Renderer->BeginRenderPass(m_SkeletalShadowPass[i], m_CommandBuffer);
+          RenderSkeletalShadows(m_SkeletalShadowPass[i], i);
+          m_Renderer->EndRenderPass(m_SkeletalShadowPass[i]);
+        }
       }
     }
 
@@ -751,6 +803,47 @@ namespace Rain
       m_SkeletalTransformBuffer->SetData(&transformData, sizeof(TransformVertexData));
 
       m_Renderer->RenderSkeletalMesh(renderPass, m_SkeletalPipeline->GetPipeline(), cmd.Mesh, cmd.SubmeshIndex, cmd.Materials, m_SkeletalTransformBuffer, 1);
+    }
+  }
+
+  void SceneRenderer::RenderSkeletalShadows(Ref<RenderPass> renderPass, int cascadeIndex)
+  {
+    for (auto& cmd : m_SkeletalDrawList)
+    {
+      if (!cmd.Mesh->HasSkeleton())
+      {
+        continue;
+      }
+
+      std::vector<glm::mat4> boneMatrices(128, glm::mat4(1.0f));
+
+      if (cmd.Animator)
+      {
+        const auto& animatedMatrices = cmd.Animator->GetBoneMatrices();
+        for (size_t i = 0; i < animatedMatrices.size() && i < 128; i++)
+        {
+          boneMatrices[i] = animatedMatrices[i];
+        }
+      }
+      else
+      {
+        auto skeleton = cmd.Mesh->GetSkeleton();
+        for (size_t i = 0; i < skeleton->BoneMatrices.size() && i < 128; i++)
+        {
+          boneMatrices[i] = skeleton->BoneMatrices[i];
+        }
+      }
+
+      m_BoneMatricesBuffer->SetData(boneMatrices.data(), 128 * sizeof(glm::mat4));
+
+      TransformVertexData transformData;
+      transformData.MRow[0] = {cmd.Transform[0][0], cmd.Transform[1][0], cmd.Transform[2][0], cmd.Transform[3][0]};
+      transformData.MRow[1] = {cmd.Transform[0][1], cmd.Transform[1][1], cmd.Transform[2][1], cmd.Transform[3][1]};
+      transformData.MRow[2] = {cmd.Transform[0][2], cmd.Transform[1][2], cmd.Transform[2][2], cmd.Transform[3][2]};
+
+      m_SkeletalTransformBuffer->SetData(&transformData, sizeof(TransformVertexData));
+
+      m_Renderer->RenderSkeletalMesh(renderPass, m_SkeletalShadowPipeline[cascadeIndex]->GetPipeline(), cmd.Mesh, cmd.SubmeshIndex, cmd.Materials, m_SkeletalTransformBuffer, 1);
     }
   }
 

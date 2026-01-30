@@ -195,6 +195,11 @@ namespace Rain
     Ref<GPUBuffer> m_SkeletalTransformBuffer;
     std::vector<SkeletalDrawCommand> m_SkeletalDrawList;
 
+    // Skeletal shadow rendering
+    Ref<RenderPipeline> m_SkeletalShadowPipeline[4];
+    Ref<RenderPass> m_SkeletalShadowPass[4];
+
     void RenderSkeletalMeshes(Ref<RenderPass> passEncoder);
+    void RenderSkeletalShadows(Ref<RenderPass> renderPass, int cascadeIndex);
   };
 }  // namespace Rain

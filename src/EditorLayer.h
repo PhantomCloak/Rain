@@ -13,7 +13,7 @@ namespace Rain
   struct EditorCamera
   {
     glm::vec3 Position = {0.0f, 2.0f, 5.0f};
-    float Yaw = -90.0f;    // Looking along -Z
+    float Yaw = -90.0f;  // Looking along -Z
     float Pitch = 0.0f;
     glm::vec3 Velocity = {0.0f, 0.0f, 0.0f};
 
@@ -55,28 +55,23 @@ namespace Rain
     // Entity list state
     UUID m_SelectedEntityId = 0;
 
-    // Log viewer state
     char m_SearchBuffer[256] = {0};
     std::vector<LogEntry> m_FilteredLogs;
     bool m_AutoScroll = true;
     bool m_ScrollToBottom = false;
 
-    // Viewport settings
     bool m_ConstrainAspectRatio = true;
     float m_TargetAspectRatio = 16.0f / 9.0f;  // 1920x1080
     bool m_ViewportFocused = false;
 
-    // Gizmo state
     ImGuizmo::OPERATION m_GizmoOperation = ImGuizmo::TRANSLATE;
     ImGuizmo::MODE m_GizmoMode = ImGuizmo::WORLD;
-    bool m_UseSnap = true;
+    bool m_UseSnap = false;
     glm::vec3 m_SnapValue = {1.0f, 1.0f, 1.0f};
 
-    // Viewport bounds for gizmo
     glm::vec2 m_ViewportBoundsMin = {0.0f, 0.0f};
     glm::vec2 m_ViewportBoundsMax = {0.0f, 0.0f};
 
-    // Editor camera
     EditorCamera m_EditorCamera;
     glm::vec2 m_LastMousePos = {0.0f, 0.0f};
     bool m_RightMouseDown = false;

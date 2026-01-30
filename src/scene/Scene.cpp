@@ -25,14 +25,8 @@ namespace Rain
     return CreateChildEntity({}, name);
   }
 
-  float lightX = 0.0;
-  float lightY = 90.0;
-  float lightZ = 0.0;
-
   UUID entityIdDir = 0.0;
   UUID Select = 0;
-  Entity entityCamera;
-  Entity helment;
 
   void Scene::Init()
   {
@@ -56,16 +50,17 @@ namespace Rain
     floorEntity.Transform().Translation = glm::vec3(0, -1.0, 0);
     floorEntity.Transform().Scale = glm::vec3(50.0f, 1.0f, 50.0f);
 
-    weaponEntity.Transform().Translation = glm::vec3(3, 3.0, 0);
-    weaponEntity.Transform().Scale = glm::vec3(0.5f);
-    weaponEntity.Transform().SetRotationEuler(glm::radians(glm::vec3(-0.0, 90.0, 0.0)));
+    weaponEntity.Transform().Translation = glm::vec3(17, 5.0, 0);
+    weaponEntity.Transform().Scale = glm::vec3(3.0f);
+    weaponEntity.Transform().SetRotationEuler(glm::radians(glm::vec3(-90.0, 0.0, 0.0)));
 
     BuildMeshEntityHierarchy(modelEntity, testModel);
     BuildMeshEntityHierarchy(floorEntity, boxModel);
     BuildMeshEntityHierarchy(weaponEntity, weaponModel);
 
     Entity light = CreateEntity("DirectionalLight");
-    light.GetComponent<TransformComponent>().SetRotationEuler(glm::vec3(glm::radians(lightX), glm::radians(lightY), glm::radians(lightZ)));
+    light.Transform().Translation = glm::vec3(0, 15, 0);
+
     light.AddComponent<DirectionalLightComponent>();
     entityIdDir = light.GetUUID();
   }
@@ -150,12 +145,6 @@ namespace Rain
 
     m_PhysicsScene->Update(1.0f / 60.0);
     Cursor::Update();
-
-    ImGui::Begin("A");
-    ImGui::SliderFloat("Light X", &lightX, -1.0f, 1.0f);
-    ImGui::SliderFloat("Light Y", &lightY, -1.0f, 1.0f);
-    ImGui::SliderFloat("Light Z", &lightZ, -1.0f, 1.0f);
-    ImGui::End();
   }
 
   glm::mat4 Scene::EditTransform(glm::mat4& matrix)
@@ -194,10 +183,6 @@ namespace Rain
     camera.SetPerspectiveProjectionMatrix(glm::radians(55.0f), w, h, 0.10f, far);
     renderer->BeginScene({cameraViewMatrix, camera.GetProjectionMatrix(), 10.0f, far});
 
-    static float lightX = 0.637f;
-    static float lightY = 0.514f;
-    static float lightZ = 0.0f;
-
     static flecs::query<TransformComponent, MeshComponent> drawNodeQuery = m_World.query<TransformComponent, MeshComponent>();
     drawNodeQuery.each([&](flecs::entity entity, TransformComponent& transform, MeshComponent& meshComponent)
                        {
@@ -215,8 +200,12 @@ namespace Rain
 
       renderer->SubmitMesh(meshSource, meshComponent.SubMeshId, meshComponent.Materials, entityTransform, animator); });
 
-    SceneLightInfo.LightDirection = glm::normalize(glm::vec3(lightX, lightY, lightZ));
-    SceneLightInfo.LightPos = glm::vec3(0.0f);
+    Entity lightEntity = TryGetEntityWithUUID(entityIdDir);
+    const auto lightTransform = lightEntity.GetComponent<TransformComponent>();
+
+    glm::vec3 forward = glm::vec3(0.0f, 1.0f, 0.0f);
+    SceneLightInfo.LightDirection = glm::normalize(lightTransform.Rotation * forward);
+    SceneLightInfo.LightPos = glm::vec3(lightTransform.Translation);
 
     renderer->EndScene();
   }
