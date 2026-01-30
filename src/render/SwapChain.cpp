@@ -64,7 +64,9 @@ namespace Rain
 
   void SwapChain::Present()
   {
+#ifndef __EMSCRIPTEN__
     wgpuSurfacePresent(m_Surface);
+#endif
   }
 
   WGPUTextureView SwapChain::GetSurfaceTextureView()
