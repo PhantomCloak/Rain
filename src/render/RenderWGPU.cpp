@@ -753,6 +753,8 @@ namespace Rain
       return;
     }
 
+    Application::Get()->GetSwapChain()->Init(m_DawnInstance, nativeWindowPtr);
+
     // Create surface from HTML canvas
     const WGPUSurface surface = Application::Get()->GetSwapChain()->GetSurface();
     m_Window = (GLFWwindow*)surface;
