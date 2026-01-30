@@ -48,6 +48,7 @@ endif()
 
 if(EMSCRIPTEN)
   #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sDISABLE_EXCEPTION_CATCHING=0")
-  target_link_options(ReEngine PRIVATE -sUSE_GLFW=3 -sUSE_WEBGPU=1 -sUSE_ZLIB=1 -sASYNCIFY=1 -sALLOW_MEMORY_GROWTH=1 -sWASM_BIGINT=1 -sASSERTIONS -sSTACK_SIZE=1mb --preload-file "${CMAKE_CURRENT_SOURCE_DIR}/Resources" --preload-file "${CMAKE_CURRENT_SOURCE_DIR}/imgui.ini@imgui.ini")
+  set(PRELOAD_IMGUI "${CMAKE_CURRENT_SOURCE_DIR}/imgui.ini@imgui.ini")
+  target_link_options(ReEngine PRIVATE -sUSE_GLFW=3 -sUSE_WEBGPU=1 -sUSE_ZLIB=1 -sASYNCIFY=1 -sALLOW_MEMORY_GROWTH=1 -sWASM_BIGINT=1 -sASSERTIONS -sSTACK_SIZE=1mb --preload-file "${CMAKE_CURRENT_SOURCE_DIR}/Resources" --preload-file ${PRELOAD_IMGUI})
   set_target_properties(ReEngine PROPERTIES SUFFIX ".html")
 endif()
