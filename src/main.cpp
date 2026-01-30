@@ -36,7 +36,7 @@ int main(int argc, char** argv)
   // CommandLine::AddParam("--render", "noapi");
 
   Rain::WindowProps props("Bouncing Balls", resX, resY);
-#if EMSCRIPTTEN
+#ifdef __EMSCRIPTEN__
   double canvasWidth, canvasHeight;
   emscripten_get_element_css_size("#canvas", &canvasWidth, &canvasHeight);
   props.Width = canvasWidth * emscripten_get_device_pixel_ratio();

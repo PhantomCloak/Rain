@@ -15,10 +15,10 @@ namespace Rain
     ImGui::CreateContext();
     auto& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.FontGlobalScale = 1.0f;
+    io.FontGlobalScale = 1.5f;
 
     ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(1.0f);
+    style.ScaleAllSizes(1.5f);
 
     ImGui_ImplGlfw_InitForOther(static_cast<GLFWwindow*>(Application::Get()->GetNativeWindow()), true);
 
