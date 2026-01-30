@@ -149,9 +149,7 @@ namespace Rain
     colorAttachment.loadOp = WGPULoadOp_Load;
     colorAttachment.storeOp = WGPUStoreOp_Store;
     colorAttachment.clearValue = {0.0f, 0.0f, 0.0f, 1.0f};
-#ifndef __EMSCRIPTEN__
     colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
-#endif
 
     WGPURenderPassDescriptor renderPassDesc{};
     ZERO_INIT(renderPassDesc);
