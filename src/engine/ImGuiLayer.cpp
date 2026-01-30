@@ -4,6 +4,7 @@
 #include "backends/imgui_impl_wgpu.h"
 #include "core/Ref.h"
 #include "imgui.h"
+#include "io/filesystem.h"
 #include "render/RenderContext.h"
 #include "render/RenderUtils.h"
 
@@ -14,6 +15,14 @@ namespace Rain
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     auto& io = ImGui::GetIO();
+    io.IniFilename = nullptr;  // Disable automatic ini file loading/saving
+
+    std::string iniData = FileSys::ReadFile(RESOURCE_DIR "/imgui.ini");
+    if (!iniData.empty())
+    {
+      ImGui::LoadIniSettingsFromMemory(iniData.c_str(), iniData.size());
+    }
+
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.FontGlobalScale = 1.5f;
 
