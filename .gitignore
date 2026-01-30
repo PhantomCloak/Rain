@@ -47,6 +47,6 @@ Makefile
 /logs/
 /temp/
 
-imgui.ini
+# imgui.ini
 compile_commands.json
 
