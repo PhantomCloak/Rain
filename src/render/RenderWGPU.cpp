@@ -423,31 +423,34 @@ namespace Rain
     passDesc.depthStencilAttachment = nullptr;
     passDesc.nextInChain = nullptr;
 
-    // Declare attachments outside if-blocks so they remain valid until wgpuCommandEncoderBeginRenderPass
-    WGPURenderPassColorAttachment colorAttachment{};
+    std::vector<WGPURenderPassColorAttachment> colorAttachments;
     WGPURenderPassDepthStencilAttachment depthAttachment{};
 
     if (renderFrameBuffer->HasColorAttachment())
     {
-      ZERO_INIT(colorAttachment);
-      colorAttachment.nextInChain = nullptr;
-      colorAttachment.loadOp = renderFrameBuffer->m_FrameBufferSpec.ClearColorOnLoad
-                                   ? WGPULoadOp_Clear
-                                   : WGPULoadOp_Load;
-      colorAttachment.storeOp = WGPUStoreOp_Store;
-      colorAttachment.clearValue = RenderWGPU::Instance->m_ClearColor;
-      colorAttachment.resolveTarget = nullptr;
-      colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+      int attachmentSize = renderFrameBuffer->m_FrameBufferSpec.ColorFormats.size();
+      attachmentSize = attachmentSize == 0 ? 1 : attachmentSize;
 
-      if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget)
+      for (int i = 0; i < attachmentSize; i++)
       {
-        Instance->m_SwapTexture = Application::Get()->GetSwapChain()->GetSurfaceTextureView();
-        colorAttachment.resolveTarget = Instance->m_SwapTexture;
+        WGPURenderPassColorAttachment colorAttachment;
+        ZERO_INIT(colorAttachment);
+
+        colorAttachment.nextInChain = nullptr;
+        colorAttachment.view = renderFrameBuffer->GetAttachment(i)->GetReadableView();
+        colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+        colorAttachment.resolveTarget = renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget ? Application::Get()->GetSwapChain()->GetSurfaceTextureView() : nullptr;
+        colorAttachment.loadOp = renderFrameBuffer->m_FrameBufferSpec.ClearColorOnLoad
+                                     ? WGPULoadOp_Clear
+                                     : WGPULoadOp_Load;
+        colorAttachment.storeOp = WGPUStoreOp_Store;
+        colorAttachment.clearValue = RenderWGPU::Instance->m_ClearColor;
+
+        colorAttachments.push_back(colorAttachment);
       }
 
-      colorAttachment.view = renderFrameBuffer->GetAttachment(0)->GetReadableView();
-      passDesc.colorAttachmentCount = 1;
-      passDesc.colorAttachments = &colorAttachment;
+      passDesc.colorAttachmentCount = attachmentSize;
+      passDesc.colorAttachments = colorAttachments.data();
     }
 
     if (renderFrameBuffer->HasDepthAttachment())
@@ -495,10 +498,10 @@ namespace Rain
 
     const auto renderFrameBuffer = pass->GetTargetFrameBuffer();
 
-    if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget)
-    {
-      wgpuTextureViewRelease(Instance->m_SwapTexture);
-    }
+    // if (renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget)
+    //{
+    //   wgpuTextureViewRelease(Instance->m_SwapTexture);
+    // }
   }
 
   void RenderWGPU::RenderMesh(Ref<RenderPass> renderPass,

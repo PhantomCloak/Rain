@@ -81,7 +81,6 @@ namespace Rain
     WGPUQueue m_Queue = nullptr;
 
     GLFWwindow* m_Window = nullptr;
-    WGPUTextureView m_SwapTexture;
     WGPULimits m_Limits;
 
     WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_Undefined;

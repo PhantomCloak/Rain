@@ -154,9 +154,9 @@ namespace Rain
     std::map<MeshKey, DrawCommand> m_DrawList;
     std::map<MeshKey, TransformMapData> m_MeshTransformMap;
 
+    Ref<Texture2D> m_LitTexture;
     Ref<Texture2D> m_ShadowDepthTexture;
-    Ref<Texture2D> m_LitDepthTexture;
-    Ref<Texture2D> m_LitPassTexture;
+
     SceneCamera Cam;
     SceneCamera SavedCam;
 
@@ -165,14 +165,14 @@ namespace Rain
     Ref<Framebuffer> m_CompositeFramebuffer;
 
     Ref<RenderPass> m_ShadowPass[4];
-    Ref<RenderPass> m_LitPass;
+    Ref<RenderPass> m_CompositePass;
     Ref<RenderPass> m_VoxelPass;
     Ref<RenderPass> m_PpfxPass;
     Ref<RenderPass> m_SkyboxPass;
 
     // Ref<RenderPipeline> m_ShadowPipeline;
     Ref<RenderPipeline> m_ShadowPipeline[4];
-    Ref<RenderPipeline> m_LitPipeline;
+    Ref<RenderPipeline> m_CompositePipeline;
     Ref<RenderPipeline> m_DebugPipeline;
     Ref<RenderPipeline> m_PpfxPipeline;
     Ref<RenderPipeline> m_SkyboxPipeline;

@@ -9,8 +9,8 @@ struct VertexOutput {
 };
 
 @group(0) @binding(0) var renderTexture: texture_2d<f32>;
-@group(0) @binding(1) var textureSampler: sampler;
-
+@group(0) @binding(1) var brightnessTexture: texture_2d<f32>;
+@group(0) @binding(2) var textureSampler: sampler;
 
 @vertex
 fn vs_main(input : VertexInput) -> VertexOutput {
@@ -32,8 +32,10 @@ fn acesFilm(x: vec3<f32>) -> vec3<f32> {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let textureColor = textureSample(renderTexture, textureSampler, in.uv).rgb;
-    let acesInput = textureColor;
-    let aces = acesFilm(acesInput);
+    let brightness = textureSample(brightnessTexture, textureSampler, in.uv).rgb;
+    //let acesInput = textureColor;
+    //var aces = acesFilm(acesInput);
+    //aces.x = 0.0;
 
-    return vec4<f32>(aces, 1.0);
+    return vec4<f32>(textureColor, 1.0);
 }

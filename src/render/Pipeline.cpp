@@ -1,6 +1,8 @@
 #include "Pipeline.h"
+#include "core/Ref.h"
 #include "render/Render.h"
 #include "render/RenderContext.h"
+#include "webgpu/webgpu.h"
 
 // In some environments (such as Emscriptten) underlying implementation details of the WebGPU API might require HEAP pointers
 
@@ -156,16 +158,22 @@ namespace Rain
       blendState->alpha.dstFactor = WGPUBlendFactor_One;
       blendState->alpha.operation = WGPUBlendOperation_Add;
 
-      WGPUColorTargetState* colorTarget = ZERO_ALLOC(WGPUColorTargetState);
-      colorTarget->format = RenderTypeUtils::ToRenderType(m_PipelineSpec.TargetFramebuffer->m_FrameBufferSpec.ColorFormat);
-      colorTarget->blend = blendState;
-      colorTarget->writeMask = WGPUColorWriteMask_All;
-      colorTarget->nextInChain = nullptr;
+      const int attachmentSize = m_PipelineSpec.TargetFramebuffer->m_FrameBufferSpec.ColorFormats.size();
 
-      fragmentState->targets = colorTarget;
+      WGPUColorTargetState* colorTargets = new WGPUColorTargetState[attachmentSize];
+      for (int i = 0; i < attachmentSize; i++)
+      {
+        WGPUColorTargetState& colorTarget = colorTargets[i];
+        colorTarget.format = RenderTypeUtils::ToRenderType(m_PipelineSpec.TargetFramebuffer->m_FrameBufferSpec.ColorFormats[i]);
+        colorTarget.blend = blendState;
+        colorTarget.writeMask = WGPUColorWriteMask_All;
+        colorTarget.nextInChain = nullptr;
+      }
+
+      fragmentState->targets = colorTargets;
     };
 
-    fragmentState->targetCount = m_PipelineSpec.TargetFramebuffer->HasColorAttachment() ? 1 : 0;
+    fragmentState->targetCount = m_PipelineSpec.TargetFramebuffer->HasColorAttachment() ? m_PipelineSpec.TargetFramebuffer->m_FrameBufferSpec.ColorFormats.size() : 0;
 
     if (m_PipelineSpec.TargetFramebuffer->HasDepthAttachment())
     {

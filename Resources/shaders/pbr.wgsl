@@ -65,7 +65,7 @@ struct MaterialUniform {
 @group(3) @binding(2) var u_BDRFLut: texture_2d<f32>;
 @group(3) @binding(3) var u_irradianceMap: texture_cube<f32>;
 @group(3) @binding(4) var u_irradianceMapSampler: sampler;
-
+@group(3) @binding(5) var u_BRDFSampler: sampler;
 
 @vertex
 fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
@@ -261,20 +261,24 @@ fn IBL(F0: vec3<f32>, Lr: vec3<f32>, Normal: vec3<f32>, NdotV: f32, Albedo: vec3
     let specularIrradiance: vec3<f32> = textureSampleLevel(
         u_radianceMap,
         u_radianceMapSampler,
-        RotateVectorAboutY(0.0, Lr),
-        Roughness * f32(envRadianceTexLevels)
+        Lr,
+        Roughness * f32(envRadianceTexLevels - 1u)
     ).rgb;
 
-    let specularBRDF: vec2<f32> = textureSample(u_BDRFLut, u_TextureSampler, vec2<f32>(NdotV, Roughness)).rg;
+    let specularBRDF: vec2<f32> = textureSample(u_BDRFLut, u_BRDFSampler, vec2<f32>(NdotV, Roughness)).rg;
 
     let specularIBL: vec3<f32> = specularIrradiance * (F0 * specularBRDF.x + specularBRDF.y);
 
     return kd * diffuseIBL + specularIBL;
 }
 
+struct FragmentOutput {
+    @location(0) color: vec4<f32>,
+    @location(1) brightness: vec4<f32>,
+}
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+fn fs_main(in: VertexOutput) -> FragmentOutput  {
 
 	// Sample PBR Resources
 	let Albedo = textureSample(u_AlbedoTex, u_TextureSampler, in.Uv).rgb * uMaterial.Ao;
@@ -358,9 +362,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 			Roughness,
 			Metalness);
 
-	//return vec4f(Normal, 1.0);
-	return vec4f(acesFilm(iblContribution + lightContribution), 1.0);
-	//return vec4f(vec3f(1.0, 0.0, 0.0), 1.0);
+   var out: FragmentOutput;
+   out.color = vec4f(acesFilm(iblContribution + lightContribution), 1.0);
+   out.brightness = vec4f(1.0f, 0.0f, 0.0f, 1.0f);
+
+return out;
 }
 
 fn GetShadowMapCoords(

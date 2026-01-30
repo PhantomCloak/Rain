@@ -242,10 +242,10 @@ namespace Rain
       {7, ShaderDataType::Float4, "a_MRow2", 32}}};
     // clang-format on
 
-    auto pbrShader = ShaderManager::LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/pbr.wgsl");
-    auto shadowShader = ShaderManager::LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
-    auto skyboxShader = ShaderManager::LoadShader("SH_Skybox", RESOURCE_DIR "/shaders/skybox.wgsl");
-    auto ppfxShader = ShaderManager::LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
+    const Ref<Shader> pbrShader = ShaderManager::LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/pbr.wgsl");
+    const Ref<Shader> shadowShader = ShaderManager::LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
+    const Ref<Shader> skyboxShader = ShaderManager::LoadShader("SH_Skybox", RESOURCE_DIR "/shaders/skybox.wgsl");
+    const Ref<Shader> ppfxShader = ShaderManager::LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
 
     TextureProps cubeProps = {};
     cubeProps.Width = 2048;
@@ -279,19 +279,18 @@ namespace Rain
     shadowDepthTextureSpec.Height = 4096;
     shadowDepthTextureSpec.Format = TextureFormat::Depth24Plus;
     shadowDepthTextureSpec.layers = m_NumOfCascades;
-    // shadowDepthTextureSpec.layers = m_NumOfCascades;
 
     shadowDepthTextureSpec.DebugName = "ShadowMap";
     m_ShadowDepthTexture = Texture2D::Create(shadowDepthTextureSpec);
 
     // Common
     FramebufferSpec compositeFboSpec;
-    compositeFboSpec.ColorFormat = TextureFormat::BRGBA8,
+    compositeFboSpec.ColorFormats = {TextureFormat::BRGBA8, TextureFormat::BRGBA8};
     compositeFboSpec.DepthFormat = TextureFormat::Depth24Plus;
     compositeFboSpec.DebugName = "FB_Composite";
     compositeFboSpec.Multisample = 1;
     compositeFboSpec.SwapChainTarget = false;
-    compositeFboSpec.ClearColorOnLoad = false;  // Skybox pass clears first
+    compositeFboSpec.ClearColorOnLoad = false;
     m_CompositeFramebuffer = Framebuffer::Create(compositeFboSpec);
 
     m_SceneUniformBuffer = GPUAllocator::GAlloc(WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform, sizeof(SceneUniform));
@@ -302,7 +301,7 @@ namespace Rain
 
     // Skybox
     FramebufferSpec skyboxFboSpec;
-    skyboxFboSpec.ColorFormat = TextureFormat::BRGBA8,
+    skyboxFboSpec.ColorFormats = {TextureFormat::BRGBA8};
     skyboxFboSpec.DepthFormat = TextureFormat::Depth24Plus;
     skyboxFboSpec.DebugName = "FB_Skybox";
     skyboxFboSpec.Multisample = 1;
@@ -317,24 +316,43 @@ namespace Rain
         .DebugName = "RP_Skybox"};
 
     m_SkyboxPipeline = RenderPipeline::Create(skyboxPipeSpec);
-    auto skyboxSampler = Sampler::Create({.Name = "S_Skybox",
-                                          .WrapFormat = TextureWrappingFormat::ClampToEdges,
-                                          .MagFilterFormat = FilterMode::Linear,
-                                          .MinFilterFormat = FilterMode::Linear,
-                                          .MipFilterFormat = FilterMode::Linear,
-                                          .Compare = CompareMode::CompareUndefined,
-                                          .LodMinClamp = 0.0f,
-                                          .LodMaxClamp = 12.0f});
-    auto skyboxSampler2 = Sampler::Create({.Name = "S_Skybox2",
-                                           .WrapFormat = TextureWrappingFormat::ClampToEdges,
-                                           .MagFilterFormat = FilterMode::Linear,
-                                           .MinFilterFormat = FilterMode::Linear,
-                                           .MipFilterFormat = FilterMode::Linear,
-                                           .Compare = CompareMode::CompareUndefined,
-                                           .LodMinClamp = 0.0f,
-                                           .LodMaxClamp = 1.0f});
+
+    auto radianceMapSampler = Sampler::Create({.Name = "S_Skybox",
+                                               .WrapFormat = TextureWrappingFormat::ClampToEdges,
+                                               .MagFilterFormat = FilterMode::Linear,
+                                               .MinFilterFormat = FilterMode::Linear,
+                                               .MipFilterFormat = FilterMode::Linear,
+                                               .Compare = CompareMode::CompareUndefined,
+                                               .LodMinClamp = 0.0f,
+                                               .LodMaxClamp = 12.0f});
+    auto irradianceMapSampler = Sampler::Create({.Name = "S_Skybox2",
+                                                 .WrapFormat = TextureWrappingFormat::ClampToEdges,
+                                                 .MagFilterFormat = FilterMode::Linear,
+                                                 .MinFilterFormat = FilterMode::Linear,
+                                                 .MipFilterFormat = FilterMode::Linear,
+                                                 .Compare = CompareMode::CompareUndefined,
+                                                 .LodMinClamp = 0.0f,
+                                                 .LodMaxClamp = 1.0f});
+
+    auto ppfxSampler = Sampler::Create({.Name = "PpfxSampler",
+                                        .WrapFormat = TextureWrappingFormat::ClampToEdges,
+                                        .MagFilterFormat = FilterMode::Linear,
+                                        .MinFilterFormat = FilterMode::Linear,
+                                        .MipFilterFormat = FilterMode::Linear,
+                                        .Compare = CompareMode::CompareUndefined,
+                                        .LodMinClamp = 0.0f,
+                                        .LodMaxClamp = 1.0f});
 
     auto bdrfLut = Rain::ResourceManager::LoadTexture("BDRF", RESOURCE_DIR "/textures/BRDF_LUT.png");
+
+    auto brdfSampler = Sampler::Create({.Name = "S_BRDF",
+                                        .WrapFormat = TextureWrappingFormat::ClampToEdges,
+                                        .MagFilterFormat = FilterMode::Linear,
+                                        .MinFilterFormat = FilterMode::Linear,
+                                        .MipFilterFormat = FilterMode::Linear,
+                                        .Compare = CompareMode::CompareUndefined,
+                                        .LodMinClamp = 0.0f,
+                                        .LodMaxClamp = 1.0f});
 
     RenderPassSpec propSkyboxPass = {
         .Pipeline = m_SkyboxPipeline,
@@ -342,7 +360,7 @@ namespace Rain
 
     m_SkyboxPass = RenderPass::Create(propSkyboxPass);
     m_SkyboxPass->Set("u_Texture", envUnfiltered);
-    m_SkyboxPass->Set("textureSampler", skyboxSampler);
+    m_SkyboxPass->Set("textureSampler", radianceMapSampler);
     m_SkyboxPass->Set("u_Camera", m_CameraUniformBuffer);
     m_SkyboxPass->Bake();
     // Shadow
@@ -402,23 +420,24 @@ namespace Rain
         .TargetFramebuffer = m_CompositeFramebuffer,
         .DebugName = "RP_Composite"};
 
-    m_LitPipeline = RenderPipeline::Create(compositePipeSpec);
+    m_CompositePipeline = RenderPipeline::Create(compositePipeSpec);
 
-    RenderPassSpec litPassSpec = {
-        .Pipeline = m_LitPipeline,
+    RenderPassSpec compositePassSpec = {
+        .Pipeline = m_CompositePipeline,
         .DebugName = "LitPass"};
 
-    m_LitPass = RenderPass::Create(litPassSpec);
-    m_LitPass->Set("u_Scene", m_SceneUniformBuffer);
-    m_LitPass->Set("u_ShadowMap", m_ShadowPass[0]->GetDepthOutput());
-    m_LitPass->Set("u_ShadowSampler", m_ShadowSampler);
-    m_LitPass->Set("u_ShadowData", m_ShadowUniformBuffer);
-    m_LitPass->Set("u_radianceMap", envFiltered);
-    m_LitPass->Set("u_irradianceMap", envIrradiance);
-    m_LitPass->Set("u_radianceMapSampler", skyboxSampler);
-    m_LitPass->Set("u_irradianceMapSampler", skyboxSampler2);
-    m_LitPass->Set("u_BDRFLut", bdrfLut);
-    m_LitPass->Bake();
+    m_CompositePass = RenderPass::Create(compositePassSpec);
+    m_CompositePass->Set("u_Scene", m_SceneUniformBuffer);
+    m_CompositePass->Set("u_ShadowMap", m_ShadowPass[0]->GetDepthOutput());
+    m_CompositePass->Set("u_ShadowSampler", m_ShadowSampler);
+    m_CompositePass->Set("u_ShadowData", m_ShadowUniformBuffer);
+    m_CompositePass->Set("u_radianceMap", envFiltered);
+    m_CompositePass->Set("u_irradianceMap", envIrradiance);
+    m_CompositePass->Set("u_radianceMapSampler", radianceMapSampler);
+    m_CompositePass->Set("u_irradianceMapSampler", irradianceMapSampler);
+    m_CompositePass->Set("u_BDRFLut", bdrfLut);
+    m_CompositePass->Set("u_BRDFSampler", brdfSampler);
+    m_CompositePass->Bake();
 
     // Skeletal Mesh Pipeline
     auto skeletalShader = ShaderManager::LoadShader("SH_Skeletal", RESOURCE_DIR "/shaders/skeletal_simple.wgsl");
@@ -453,7 +472,7 @@ namespace Rain
     m_BoneMatricesBuffer->SetData(identityBones.data(), 128 * sizeof(glm::mat4));
 
     FramebufferSpec skeletalFboSpec;
-    skeletalFboSpec.ColorFormat = TextureFormat::BRGBA8,
+    skeletalFboSpec.ColorFormats = {TextureFormat::BRGBA8};
     skeletalFboSpec.DepthFormat = TextureFormat::Depth24Plus;
     skeletalFboSpec.DebugName = "FB_Skeletal";
     skeletalFboSpec.Multisample = 1;
@@ -484,12 +503,12 @@ namespace Rain
     m_SkeletalPass->Set("u_ShadowData", m_ShadowUniformBuffer);
     m_SkeletalPass->Set("u_radianceMap", envFiltered);
     m_SkeletalPass->Set("u_irradianceMap", envIrradiance);
-    m_SkeletalPass->Set("u_radianceMapSampler", skyboxSampler);
-    m_SkeletalPass->Set("u_irradianceMapSampler", skyboxSampler2);
+    m_SkeletalPass->Set("u_radianceMapSampler", radianceMapSampler);
+    m_SkeletalPass->Set("u_irradianceMapSampler", irradianceMapSampler);
     m_SkeletalPass->Set("u_BDRFLut", bdrfLut);
+    m_SkeletalPass->Set("u_BRDFSampler", brdfSampler);
     m_SkeletalPass->Bake();
 
-    // Skeletal Shadow Pipeline
     auto skeletalShadowShader = ShaderManager::LoadShader("SH_SkeletalShadow", RESOURCE_DIR "/shaders/skeletal_shadow_map.wgsl");
 
     FramebufferSpec skeletalShadowFboSpec;
@@ -530,9 +549,10 @@ namespace Rain
 
     // PPFX
     FramebufferSpec ppfxFboSpec;
-    ppfxFboSpec.SwapChainTarget = true;
-    ppfxFboSpec.ColorFormat = TextureFormat::BRGBA8;
+    ppfxFboSpec.SwapChainTarget = false;
+    ppfxFboSpec.ColorFormats = {TextureFormat::BRGBA8};
     ppfxFboSpec.ExistingDepth = m_CompositeFramebuffer->GetDepthAttachment();
+    ppfxFboSpec.Multisample = 1;
     ppfxFboSpec.DebugName = "FB_PostFX";
 
     RenderPipelineSpec ppfxPipeSpec = {
@@ -544,6 +564,16 @@ namespace Rain
         .DebugName = "RP_PostFX"};
 
     m_PpfxPipeline = RenderPipeline::Create(ppfxPipeSpec);
+
+    RenderPassSpec ppfxPass = {
+        .Pipeline = m_PpfxPipeline,
+        .DebugName = "PPFX"};
+
+    m_PpfxPass = RenderPass::Create(ppfxPass);
+    m_PpfxPass->Set("renderTexture", m_CompositePass->GetOutput(0));
+    m_PpfxPass->Set("brightnessTexture", m_CompositePass->GetOutput(1));
+    m_PpfxPass->Set("textureSampler", ppfxSampler);
+    m_PpfxPass->Bake();
 
     // auto renderContext = m_Renderer->GetRenderContext();
   }
@@ -583,7 +613,8 @@ namespace Rain
 
   Ref<Texture2D> SceneRenderer::GetLastPassImage()
   {
-    return m_LitPass->GetOutput(0);
+    // return m_LitPass->GetOutput(0);
+    return m_PpfxPass->GetOutput(0);
   }
 
   void DrawCameraFrustum(SceneCamera camera)
@@ -672,7 +703,7 @@ namespace Rain
     if (m_NeedResize)
     {
       m_SkyboxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
-      m_LitPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
+      m_CompositePass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
       // m_PpfxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
       m_NeedResize = false;
     }
@@ -727,18 +758,12 @@ namespace Rain
     {
       RN_PROFILE_FUNCN("Geometry Pass");
 
-      m_Renderer->BeginRenderPass(m_LitPass, m_CommandBuffer);
+      m_Renderer->BeginRenderPass(m_CompositePass, m_CommandBuffer);
       for (auto& [mk, dc] : m_DrawList)
       {
-        m_Renderer->RenderMesh(m_LitPass, m_LitPipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
+        m_Renderer->RenderMesh(m_CompositePass, m_CompositePipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
       }
-
-      // RenderDebug::Begin(&litPassEncoder, &commandEncoder);
-      // RenderDebug::SetMVP(m_SceneUniform.ViewProjection);
-      // DrawCameraFrustum(SavedCam);
-      //  RenderDebug::FlushDrawList();
-
-      m_Renderer->EndRenderPass(m_LitPass);
+      m_Renderer->EndRenderPass(m_CompositePass);
     }
 
     {
@@ -749,6 +774,13 @@ namespace Rain
         RenderSkeletalMeshes(m_SkeletalPass);
         m_Renderer->EndRenderPass(m_SkeletalPass);
       }
+    }
+
+    {
+      RN_PROFILE_FUNCN("PPFX Pass");
+      m_Renderer->BeginRenderPass(m_PpfxPass, m_CommandBuffer);
+      m_Renderer->SubmitFullscreenQuad(m_PpfxPass, m_PpfxPipeline->GetPipeline());
+      m_Renderer->EndRenderPass(m_PpfxPass);
     }
 
     m_CommandBuffer->End();
