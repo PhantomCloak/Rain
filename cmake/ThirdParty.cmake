@@ -15,7 +15,9 @@ set(ASSIMP_BUILD_SMD_IMPORTER TRUE)
 set(ASSIMP_BUILD_SIB_IMPORTER TRUE)
 set(ASSIMP_BUILD_OBJ_IMPORTER TRUE)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=implicit-const-int-float-conversion")
+if(NOT MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=implicit-const-int-float-conversion")
+endif()
 
 
 if(EMSCRIPTEN)
@@ -38,18 +40,31 @@ if(EMSCRIPTEN)
 else()
   add_compile_definitions(DAWN_DEBUG_BREAK_ON_ERROR) # TODO: Inspect target?
 
+  # Dawn: disable features we don't need (avoids pulling unnecessary dependencies)
+  set(DAWN_FETCH_DEPENDENCIES ON)
+  set(DAWN_BUILD_SAMPLES OFF)
+  set(DAWN_BUILD_TESTS OFF)
+  set(DAWN_BUILD_BENCHMARKS OFF)
+  #set(DAWN_BUILD_NODE_BINDINGS OFF)
+  #set(DAWN_ENABLE_SWIFTSHADER OFF)
+  #set(DAWN_BUILD_PROTOBUF OFF)
+
+  # Tint options
   set(TINT_BUILD_TESTS OFF)
   set(TINT_BUILD_BENCHMARKS OFF)
   set(TINT_BUILD_CMD_TOOLS   OFF)
   set(TINT_BUILD_FUZZERS OFF)
   set(TINT_BUILD_AS_OTHER_OS ON)
   set(TINT_BUILD_MSL_WRITER  OFF)
-  set(TINT_ENABLE_BREAK_IN_DEBUGGER OFF)
+  #set(TINT_BUILD_TINTD OFF)
+  #set(TINT_BUILD_IR_BINARY OFF)
+  #set(TINT_ENABLE_BREAK_IN_DEBUGGER OFF)
   set(TINT_ENABLE_INSTALL ON)
   set(TINT_BUILD_WGSL_READER ON)
   add_subdirectory(vendor/assimp)
   # Fix: Draco generates draco_features.h in build dir, add it to include paths
   target_include_directories(assimp PRIVATE "${CMAKE_BINARY_DIR}")
+  set(BUILD_SHARED_LIBS OFF)
   add_subdirectory(vendor/dawn)
 
   add_library(TracyClient STATIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/tracy/public/TracyClient.cpp)
@@ -63,12 +78,14 @@ set(JOLT_PHYSICS_BUILD_PERFORMANCE_TESTS OFF CACHE BOOL "Build performance tests
 set(JOLT_PHYSICS_BUILD_SAMPLES OFF CACHE BOOL "Build samples" FORCE)
 set(JPH_DEBUG_RENDERER ON CACHE BOOL "Enable debug renderer" FORCE)
 set(CPP_RTTI_ENABLED ON CACHE BOOL "Enable RTTI for Jolt" FORCE)
+set(USE_STATIC_MSVC_RUNTIME_LIBRARY OFF CACHE BOOL "Use dynamic MSVC runtime library" FORCE)
 add_subdirectory(vendor/JoltPhysics/Build)
 
 # ozz-animation - disable samples/howtos/tests to avoid GLFW collision with Dawn
 set(ozz_build_samples OFF CACHE BOOL "" FORCE)
 set(ozz_build_howtos OFF CACHE BOOL "" FORCE)
 set(ozz_build_tests OFF CACHE BOOL "" FORCE)
+set(ozz_build_msvc_rt_dll ON CACHE BOOL "Use dynamic MSVC runtime for ozz" FORCE)
 add_subdirectory(vendor/ozz-animation)
 target_include_directories(ReEngine PRIVATE vendor/ozz-animation/include)
 add_subdirectory(vendor/spdlog)

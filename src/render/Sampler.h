@@ -9,13 +9,15 @@ namespace WebEngine
   enum TextureWrappingFormat
   {
     ClampToEdges,
-    Repeat
+    Repeat,
+    WrappingUndefined
   };
 
   enum FilterMode
   {
     Nearest,
-    Linear
+    Linear,
+    FilterUndefined
   };
 
   enum CompareMode

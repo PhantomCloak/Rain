@@ -1,10 +1,13 @@
 #include "SysInfo.h"
 
-#pragma once
-
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#elif defined(__linux__)
 #include <sys/sysinfo.h>
-#include <sys/types.h>
 #include <unistd.h>
+#endif
+
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -12,6 +15,8 @@
 const std::string SysInfo::OSName() {
 #if defined(__APPLE__) || defined(__MACH__)
   return "macOS";
+#elif defined(_WIN32)
+  return "Windows";
 #elif defined(__linux__)
   std::ifstream file("/etc/os-release");
   std::string line;
@@ -40,6 +45,19 @@ const std::string SysInfo::CPUName() {
   size_t bufferSize = sizeof(buffer);
   sysctlbyname("machdep.cpu.brand_string", &buffer, &bufferSize, NULL, 0);
   cpuName = buffer;
+#elif defined(_WIN32)
+  HKEY hKey;
+  if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
+                    "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+                    0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+    char value[256];
+    DWORD size = sizeof(value);
+    if (RegQueryValueExA(hKey, "ProcessorNameString", NULL, NULL,
+                         (LPBYTE)value, &size) == ERROR_SUCCESS) {
+      cpuName = value;
+    }
+    RegCloseKey(hKey);
+  }
 #elif defined(__linux__)
   std::ifstream cpuinfo("/proc/cpuinfo");
   std::string line;
@@ -68,6 +86,10 @@ const int SysInfo::CoreCount() {
       coreCount = 1;
     }
   }
+#elif defined(_WIN32)
+  SYSTEM_INFO sysInfo;
+  GetSystemInfo(&sysInfo);
+  coreCount = sysInfo.dwNumberOfProcessors;
 #elif defined(__linux__)
   coreCount = sysconf(_SC_NPROCESSORS_ONLN);
 #endif
@@ -82,6 +104,11 @@ const int SysInfo::TotalMemory() {
   mib[1] = HW_MEMSIZE;
   size_t len = sizeof(totalMemory);
   sysctl(mib, 2, &totalMemory, &len, NULL, 0);
+#elif defined(_WIN32)
+  MEMORYSTATUSEX memInfo;
+  memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+  GlobalMemoryStatusEx(&memInfo);
+  totalMemory = memInfo.ullTotalPhys;
 #elif defined(__linux__)
   struct sysinfo sysInfo;
   sysinfo(&sysInfo);

@@ -1,4 +1,6 @@
+#ifndef JPH_DEBUG_RENDERER
 #define JPH_DEBUG_RENDERER
+#endif
 #include <Jolt.h>
 #include <Jolt/Renderer/DebugRendererSimple.h>
 #include <webgpu/webgpu.h>

@@ -1,11 +1,17 @@
 cmake_minimum_required(VERSION 3.15...3.25)
 project(RainEngine VERSION 0.1.0 LANGUAGES CXX C)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(DAWN_DEBUG_BREAK_ON_ERROR TRUE)
 set(DEBUG_BREAK_ON_ERROR TRUE)
 set(DAWN_BREAK_ON_ERROR TRUE)
-set(CMAKE_CXX_FLAGS "-Wno-error ${CMAKE_CXX_FLAGS}" CACHE STRING "" FORCE)
-set(CMAKE_C_FLAGS "-Wno-error ${CMAKE_C_FLAGS}" CACHE STRING "" FORCE)
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -v")
+if(NOT MSVC)
+  set(CMAKE_CXX_FLAGS "-Wno-error ${CMAKE_CXX_FLAGS}" CACHE STRING "" FORCE)
+  set(CMAKE_C_FLAGS "-Wno-error ${CMAKE_C_FLAGS}" CACHE STRING "" FORCE)
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -v")
+endif()
 file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
 
 file(GLOB IMGUI_SOURCES 
@@ -34,9 +40,9 @@ set_target_properties(ReEngine PROPERTIES
 
 #target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui" "vendor/ImGuizmo")
 target_compile_definitions(ReEngine PRIVATE RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources")
-#if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     add_compile_options(-Wimplicit-const-int-float-conversion)
-#endif()
+endif()
 include("cmake/ThirdParty.cmake")
 
 target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui" "vendor/ImGuizmo")

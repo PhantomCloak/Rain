@@ -23,7 +23,7 @@ struct BasisVectors {
 }
 
 
-@compute @workgroup_size(32, 32, 1)
+@compute @workgroup_size(16, 16, 1)
 	fn prefilterCubeMap(@builtin(global_invocation_id) id: vec3u) {
 		let outputDimensions = textureDimensions(outputCubemapTexture).xy;
 

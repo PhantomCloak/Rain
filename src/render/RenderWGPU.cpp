@@ -57,7 +57,7 @@ namespace WebEngine
       uint32_t width,
       uint32_t height,
       uint32_t depth = 1,
-      uint32_t workgroupSize = 32)
+      uint32_t workgroupSize = 16)
   {
     ComputeDispatchInfo info;
     info.workgroupSize = workgroupSize;
@@ -116,6 +116,7 @@ namespace WebEngine
     WGPUComputePipelineDescriptor computePipelineDesc = {};
     computePipelineDesc.compute.constantCount = 0;
     computePipelineDesc.compute.constants = nullptr;
+    computePipelineDesc.label = RenderUtils::MakeLabel("RP_ComputeMip");
     computePipelineDesc.compute.entryPoint = RenderUtils::MakeLabel("computeMipMap");
     computePipelineDesc.compute.module = computeShader->GetNativeShaderModule();
     computePipelineDesc.layout = pipelineLayout;
@@ -141,7 +142,7 @@ namespace WebEngine
       bindGroupDesc.entries = bindGroupEntries;
       WGPUBindGroup bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
 
-      const uint32_t workgroupSize = 32;
+      const uint32_t workgroupSize = 16;
       const uint32_t workgroupsX = (std::max(input->GetSpec().Width >> mipLevel, (uint32_t)1) + workgroupSize - 1) / workgroupSize;
       const uint32_t workgroupsY = (std::max(input->GetSpec().Height >> mipLevel, (uint32_t)1) + workgroupSize - 1) / workgroupSize;
 
@@ -208,7 +209,7 @@ namespace WebEngine
       bindGroupDesc.entries = bindGroupEntries;
       auto bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
 
-      const uint32_t workgroupSize = 32;
+      const uint32_t workgroupSize = 16;
       const uint32_t workgroupsX = (std::max(input->GetSpec().Width >> mipLevel, 1u) + workgroupSize - 1) / workgroupSize;
       const uint32_t workgroupsY = (std::max(input->GetSpec().Height >> mipLevel, 1u) + workgroupSize - 1) / workgroupSize;
 
@@ -313,7 +314,7 @@ namespace WebEngine
     for (uint32_t mipLevel = 0; mipLevel < mipCount; ++mipLevel)
     {
       WGPUBindGroupEntry bindGroupEntries[4] = {
-          {.binding = 0, .textureView = input->GetReadableView(0)},  // Always sample from mip 0
+          {.binding = 0, .textureView = input->GetReadableView(0)}, // Always sample from mip 0
           {.binding = 1, .textureView = output->GetWriteableView(mipLevel)},
           {.binding = 2, .sampler = *sampler->GetNativeSampler()},
           {.binding = 3, .buffer = uniformBuffer->Buffer, .offset = 0, .size = sizeof(PrefilterUniform)}};
@@ -324,7 +325,7 @@ namespace WebEngine
       bindGroupDesc.entries = bindGroupEntries;
       const auto bindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
 
-      const uint32_t workgroupSize = 32;
+      const uint32_t workgroupSize = 16;
       const uint32_t workgroupsX = (std::max(input->GetSpec().Width >> mipLevel, 1u) + workgroupSize - 1) / workgroupSize;
       const uint32_t workgroupsY = (std::max(input->GetSpec().Height >> mipLevel, 1u) + workgroupSize - 1) / workgroupSize;
 
@@ -386,7 +387,7 @@ namespace WebEngine
     pipelineDesc.compute.entryPoint = RenderUtils::MakeLabel("prefilterCubeMap");
     const auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
 
-    const uint32_t workgroupSize = 32;
+    const uint32_t workgroupSize = 16;
     const uint32_t workgroupsX = (input->GetSpec().Width + workgroupSize - 1) / workgroupSize;
     const uint32_t workgroupsY = (input->GetSpec().Height + workgroupSize - 1) / workgroupSize;
 
@@ -441,8 +442,8 @@ namespace WebEngine
         colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
         colorAttachment.resolveTarget = renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget ? Application::Get()->GetSwapChain()->GetSurfaceTextureView() : nullptr;
         colorAttachment.loadOp = renderFrameBuffer->m_FrameBufferSpec.ClearColorOnLoad
-                                     ? WGPULoadOp_Clear
-                                     : WGPULoadOp_Load;
+                                   ? WGPULoadOp_Clear
+                                   : WGPULoadOp_Load;
         colorAttachment.storeOp = WGPUStoreOp_Store;
         colorAttachment.clearValue = RenderWGPU::Instance->m_ClearColor;
 
@@ -662,7 +663,7 @@ namespace WebEngine
     pipelineDesc.compute.entryPoint = RenderUtils::MakeLabel("main");
     auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
 
-    const uint32_t workgroupSize = 32;
+    const uint32_t workgroupSize = 16;
     const uint32_t workgroupsX = (outputCubemap->GetSpec().Width + workgroupSize - 1) / workgroupSize;
     const uint32_t workgroupsY = (outputCubemap->GetSpec().Height + workgroupSize - 1) / workgroupSize;
 
@@ -727,7 +728,7 @@ namespace WebEngine
     WGPURequestAdapterCallbackInfo adapterCallbackInfo;
     ZERO_INIT(adapterCallbackInfo);
     adapterCallbackInfo.mode = WGPUCallbackMode_AllowProcessEvents,
-    adapterCallbackInfo.callback = &this->OnAdapterInstanceCallback;
+        adapterCallbackInfo.callback = &this->OnAdapterInstanceCallback;
     adapterCallbackInfo.userdata1 = this;
 
     WGPURequestAdapterOptions requestAdapterOpts;
@@ -861,7 +862,7 @@ namespace WebEngine
     WGPULimits* requiredLimits = ZERO_ALLOC(WGPULimits);
     requiredLimits->minUniformBufferOffsetAlignment = 256;
     requiredLimits->minStorageBufferOffsetAlignment = 256;
-    requiredLimits->maxComputeInvocationsPerWorkgroup = 1024;
+    requiredLimits->maxComputeInvocationsPerWorkgroup = 256;
 #else
     WGPUSupportedLimits* supportedLimits = ZERO_ALLOC(WGPUSupportedLimits);
     wgpuAdapterGetLimits(m_Adapter, supportedLimits);
@@ -925,16 +926,16 @@ namespace WebEngine
 
     QuadVertex* data = new QuadVertex[4];
 
-    data[0].Position = glm::vec3(x, y, 0.0f);  // Bottom-left
+    data[0].Position = glm::vec3(x, y, 0.0f); // Bottom-left
     data[0].TexCoord = glm::vec2(0, 1);
 
-    data[1].Position = glm::vec3(x + qwidth, y, 0.0f);  // Bottom-right
+    data[1].Position = glm::vec3(x + qwidth, y, 0.0f); // Bottom-right
     data[1].TexCoord = glm::vec2(1, 1);
 
-    data[2].Position = glm::vec3(x + qwidth, y + qheight, 0.0f);  // Top-right
+    data[2].Position = glm::vec3(x + qwidth, y + qheight, 0.0f); // Top-right
     data[2].TexCoord = glm::vec2(1, 0);
 
-    data[3].Position = glm::vec3(x, y + qheight, 0.0f);  // Top-left
+    data[3].Position = glm::vec3(x, y + qheight, 0.0f); // Top-left
     data[3].TexCoord = glm::vec2(0, 0);
 
     // TODO: Consider static buffers, immediately mapped buffers etc.
@@ -1012,4 +1013,4 @@ namespace WebEngine
     }
   }
 #endif
-}  // namespace WebEngine
+} // namespace WebEngine

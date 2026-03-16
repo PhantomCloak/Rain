@@ -7,7 +7,6 @@
 #include "scene/Scene.h"
 #define RN_DEBUG
 #include <GLFW/glfw3.h>
-#include <unistd.h>
 #include <glm/ext.hpp>
 #include <glm/glm.hpp>
 #include "Application.h"

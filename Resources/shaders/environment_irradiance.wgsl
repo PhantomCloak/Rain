@@ -2,7 +2,7 @@
 @group(0) @binding(1) var radianceMap: texture_cube<f32>;
 @group(0) @binding(2) var radianceMapSampler: sampler;
 
-@compute @workgroup_size(32, 32, 1)
+@compute @workgroup_size(16, 16, 1)
 fn prefilterCubeMap(@builtin(global_invocation_id) id: vec3u) {
     let outputDimensions = textureDimensions(outputIrradianceMap).xy;
     if (id.x >= outputDimensions.x || id.y >= outputDimensions.y) {

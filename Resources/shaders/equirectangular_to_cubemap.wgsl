@@ -55,7 +55,7 @@ fn toneMap(color: vec4<f32>, exposure: f32) -> vec4<f32> {
     return vec4<f32>(tone_mapped, color.a);
 }
 
-@compute @workgroup_size(32, 32, 1)
+@compute @workgroup_size(16, 16, 1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // Get dimensions of the cubemap texture (2D size of each face)
     let dimensions = textureDimensions(o_CubeMap);

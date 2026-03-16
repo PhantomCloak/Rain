@@ -149,6 +149,7 @@ namespace WebEngine
 
   glm::mat4 Scene::EditTransform(glm::mat4& matrix)
   {
+    return matrix;
   }
 
   Entity Scene::GetMainCameraEntity()

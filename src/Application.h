@@ -26,6 +26,9 @@ typedef WebEngine::LinuxWindow AppWindow;
 #elif __EMSCRIPTEN__
 #include "platform/web/WebWindow.h"
 typedef WebEngine::WebWindow AppWindow;
+#elif defined(_WIN32)
+#include "platform/windows/WindowsWindow.h"
+typedef WebEngine::WindowsWindow AppWindow;
 #endif
 
 namespace WebEngine

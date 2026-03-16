@@ -112,6 +112,9 @@ namespace WebEngine
     }
 
     RN_ASSERT(false, "Binding entry couldn't found");
+    // TODO: Hack to satisfy MSVC - RN_ASSERT doesn't mark as [[noreturn]]
+    static ResourceDeclaration dummy{};
+    return dummy;
   }
 
   // There is still some API limitation with deffered bindings

@@ -35,7 +35,7 @@ int main(int argc, char** argv)
 
   // CommandLine::AddParam("--render", "noapi");
 
-  WebEngine::WindowProps props("Bouncing Balls", resX, resY);
+  WebEngine::WindowProps props("Bouncing Ball", resX, resY);
 #ifdef __EMSCRIPTEN__
   double canvasWidth, canvasHeight;
   emscripten_get_element_css_size("#canvas", &canvasWidth, &canvasHeight);

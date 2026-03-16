@@ -1,0 +1,80 @@
+#include "WindowsWindow.h"
+#include "core/Assert.h"
+#include "core/Log.h"
+#include "engine/Event.h"
+
+static void GLFWErrorCallback(int error, const char* description) {
+  RN_LOG_ERR("GLFW Error ({0}): {1}", error, description);
+}
+
+WebEngine::WindowsWindow::~WindowsWindow() {
+  Shutdown();
+}
+
+void WebEngine::WindowsWindow::Init(const WindowProps& props) {
+  bool success = glfwInit();
+  //RN_CORE_ASSERT(success, "Could not initialize GLFW!");
+
+  glfwSetErrorCallback(GLFWErrorCallback);
+
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+  glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+
+  m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, "WGPU!", nullptr, nullptr);
+
+  RN_ASSERT(m_Window, "Window cannot be created!");
+
+  glfwSetWindowUserPointer(m_Window, this);
+
+  glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window) {
+    // TODO: Propagate event to gracefully stop
+    exit(0);
+  });
+
+  glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos) {
+    WindowsWindow* winWindow = static_cast<WindowsWindow*>(glfwGetWindowUserPointer(window));
+
+    MouseMoveEvent MoveEvent(xPos, yPos);
+    winWindow->OnEvent(MoveEvent);
+  });
+
+  glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods) {
+    WindowsWindow* winWindow = static_cast<WindowsWindow*>(glfwGetWindowUserPointer(window));
+    switch (action) {
+      case GLFW_PRESS: {
+        winWindow->OnKeyPressed(key, Key::RN_KEY_PRESS);
+        break;
+      }
+      case GLFW_RELEASE: {
+        winWindow->OnKeyPressed(key, Key::RN_KEY_RELEASE);
+        break;
+      }
+      case GLFW_REPEAT: {
+        winWindow->OnKeyPressed(key, Key::RN_KEY_REPEAT);
+        break;
+      }
+    }
+  });
+
+  glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods) {
+    WindowsWindow* winWindow = static_cast<WindowsWindow*>(glfwGetWindowUserPointer(window));
+    switch (action) {
+      case GLFW_PRESS: {
+        winWindow->OnMouseClick(Mouse::Press);
+        break;
+      }
+      case GLFW_RELEASE: {
+        winWindow->OnMouseClick(Mouse::Release);
+        break;
+      }
+    }
+  });
+
+  glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, int width, int height) {
+    WindowsWindow* winWindow = static_cast<WindowsWindow*>(glfwGetWindowUserPointer(window));
+    winWindow->OnResize(height, width);
+  });
+}
+
+void WebEngine::WindowsWindow::Shutdown() {
+}

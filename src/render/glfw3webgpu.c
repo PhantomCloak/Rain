@@ -149,11 +149,11 @@ WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* window) {
             .label = NULL,
                 .nextInChain =
                 (const WGPUChainedStruct*)&(
-                    WGPUSurfaceDescriptorFromWindowsHWND) {
+                    WGPUSurfaceSourceWindowsHWND) {
                 .chain =
                     (WGPUChainedStruct){
                         .next = NULL,
-                        .sType = WGPUSType_SurfaceDescriptorFromWindowsHWND,
+                        .sType = WGPUSType_SurfaceSourceWindowsHWND,
             },
             .hinstance = hinstance,
             .hwnd = hwnd,

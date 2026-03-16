@@ -1,4 +1,5 @@
 #include "RenderUtils.h"
+#include <cstring>
 
 namespace WebEngine
 {
@@ -121,16 +122,19 @@ namespace WebEngine
   TextureFormat RenderTypeUtils::FromRenderType(WGPUTextureFormat format)
   {
     RN_ASSERT(false, "Haven't implemented yet");
+    return TextureFormat::Undefined;
   }
 
   TextureWrappingFormat RenderTypeUtils::FromRenderType(WGPUAddressMode format)
   {
     RN_ASSERT(false, "Haven't implemented yet");
+    return TextureWrappingFormat::WrappingUndefined;
   }
 
   FilterMode RenderTypeUtils::FromRenderType(WGPUFilterMode format)
   {
     RN_ASSERT(false, "Haven't implemented yet");
+    return FilterMode::FilterUndefined;
   }
 
   WGPUTextureFormat RenderTypeUtils::ToRenderType(TextureFormat format)
@@ -151,6 +155,7 @@ namespace WebEngine
         return WGPUTextureFormat_Undefined;
       default:
         RN_ASSERT(false, "Format conversion for TextureFormat not exist.")
+        return WGPUTextureFormat_Undefined;
     };
   }
 
@@ -165,6 +170,7 @@ namespace WebEngine
         break;
       default:
         RN_ASSERT(false, "Format conversion for TextureWrappingFormat not exist.")
+        return WGPUAddressMode_ClampToEdge;
     }
   }
   WGPUFilterMode RenderTypeUtils::ToRenderType(FilterMode format)
@@ -177,6 +183,7 @@ namespace WebEngine
         return WGPUFilterMode_Linear;
       default:
         RN_ASSERT(false, "Format conversion for FilterMode not exist.")
+        return WGPUFilterMode_Nearest;
     }
   }
 
