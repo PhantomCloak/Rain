@@ -7,21 +7,36 @@
   },
   "configurePresets": [
     {
-      "name": "base",
+      "name": "common",
       "hidden": true,
-      "description": "Base configuration for all builds",
+      "description": "Common Dawn configuration for all platforms",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_CXX_STANDARD": "17",
+        "CMAKE_CXX_STANDARD": "20",
         "CMAKE_CXX_STANDARD_REQUIRED": "TRUE",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CPP_RTTI_ENABLED": "ON",
+        "ozz_build_samples": "OFF",
+        "ozz_build_howtos": "OFF",
+        "ozz_build_tests": "OFF",
+        "ASSIMP_BUILD_TESTS": "OFF",
+        "ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT": "FALSE",
+        "ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT": "FALSE",
+        "ASSIMP_BUILD_DRACO": "TRUE",
+        "DRACO_GLTF": "TRUE",
+        "DRACO_VERBOSE" : "TRUE",
+        "ASSIMP_BUILD_GLTF_IMPORTER": "TRUE",
+        "ASSIMP_BUILD_SMD_IMPORTER": "TRUE",
+        "ASSIMP_BUILD_SIB_IMPORTER": "TRUE",
+        "ASSIMP_BUILD_OBJ_IMPORTER": "TRUE"
       }
     },
     {
-      "name": "common",
-      "inherits": "base",
+      "name": "dawn-common",
+      "inherits": "common",
       "hidden": true,
       "description": "Common Dawn configuration for all platforms",
+      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "DAWN_FETCH_DEPENDENCIES": "ON",
         "DAWN_ENABLE_D3D11": "OFF",
@@ -29,15 +44,30 @@
         "DAWN_ENABLE_METAL": "OFF",
         "DAWN_ENABLE_VULKAN": "OFF",
         "DAWN_BUILD_SAMPLES": "OFF",
+        "DAWN_BUILD_TESTS": "OFF",
+        "DAWN_BUILD_BENCHMARKS": "OFF",
         "DAWN_ENABLE_OPENGLES": "OFF",
         "DAWN_ENABLE_DESKTOP_GL": "OFF",
-        "DEV_MODE": "ON",
+        "DAWN_BUILD_NODE_BINDINGS": "OFF",
+        "DAWN_ENABLE_SWIFTSHADER": "OFF",
+        "DAWN_BUILD_PROTOBUF": "OFF",
+        "TINT_BUILD_TESTS": "OFF",
+        "TINT_BUILD_TINTD": "OFF",
+        "TINT_BUILD_CMD_TOOLS": "OFF",
+        "TINT_BUILD_BENCHMARKS": "OFF",
+        "TINT_BUILD_FUZZERS": "OFF",
+        "TINT_BUILD_AS_OTHER_OS": "ON",
+        "TINT_BUILD_MSL_WRITER": "OFF",
+        "TINT_BUILD_IR_BINARY": "OFF",
+        "TINT_ENABLE_INSTALL": "ON",
+        "TINT_ENABLE_BREAK_IN_DEBUGGER": "OFF",
+        "TINT_BUILD_WGSL_READER": "ON",
         "IMGUI_IMPL_WEBGPU_BACKEND_DAWN": "ON"
       }
     },
     {
       "name": "linux-debug",
-      "inherits": "common",
+      "inherits": "dawn-common",
       "description": "Build with Dawn for Linux",
       "environment": {
         "RESOURCE_DIR": "${sourceDir}/Resources"
@@ -47,20 +77,16 @@
         "TINT_BUILD_SPV_WRITER": "ON",
         "USE_X11": "ON",
         "USE_VULKAN": "ON",
-        "RESOURCE_DIR": "${sourceDir}/Resources",
-        "RN_DEBUG": "ON",
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_CXX_FLAGS_DEBUG": "-g",
         "CMAKE_EXE_LINKER_FLAGS_DEBUG": "-rdynamic",
-        "TARGET_BUILD_PLATFORM": "linux",
-        "DAWN_DEBUG_BREAK_ON_ERROR": "1",
         "ASSIMP_BUILD_ZLIB": "ON",
         "DAWN_BUILD_MONOLITHIC_LIBRARY": "OFF"
       }
     },
     {
       "name": "linux-release",
-      "inherits": "common",
+      "inherits": "dawn-common",
       "description": "Build with Dawn for Linux",
       "environment": {
         "RESOURCE_DIR": "${sourceDir}/Resources"
@@ -70,47 +96,49 @@
         "TINT_BUILD_SPV_WRITER ": "ON",
         "USE_X11": "ON",
         "USE_VULKAN": "ON",
-        "RESOURCE_DIR": "${sourceDir}/Resources",
-        "RN_DEBUG": "ON",
-        "CMAKE_BUILD_TYPE": "Release",
-        "TARGET_BUILD_PLATFORM": "linux",
-        "DAWN_DEBUG_BREAK_ON_ERROR": "1"
+        "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
       "name": "osx-debug",
-      "inherits": "common",
+      "inherits": "dawn-common",
       "description": "Build with Dawn for macOS",
       "environment": {
         "RESOURCE_DIR": "${sourceDir}/Resources"
       },
       "cacheVariables": {
-        "USE_METAL": "ON",
-        "RESOURCE_DIR": "${sourceDir}/Resources",
-        "DAWN_ENABLE_METAL": "ON",
-        "RN_DEBUG": "ON",
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_CXX_FLAGS_DEBUG": "-g -fno-omit-frame-pointer",
-        "CMAKE_EXE_LINKER_FLAGS_DEBUG ": "-rdynamic",
-        "TARGET_BUILD_PLATFORM": "mac",
-        "DAWN_DEBUG_BREAK_ON_ERROR": "1"
+        "USE_METAL": "ON",
+        "DAWN_ENABLE_METAL": "ON"
       }
     },
     {
       "name": "osx-release",
-      "inherits": "common",
+      "inherits": "dawn-common",
       "description": "Build with Dawn for macOS",
       "environment": {
         "RESOURCE_DIR": "${sourceDir}/Resources"
       },
       "cacheVariables": {
         "USE_METAL": "ON",
-        "RESOURCE_DIR": "${sourceDir}/Resources",
         "DAWN_ENABLE_METAL": "ON",
-        "RN_DEBUG": "OFF",
-        "CMAKE_BUILD_TYPE": "Release",
-        "TARGET_BUILD_PLATFORM": "mac",
-        "DAWN_DEBUG_BREAK_ON_ERROR": "1"
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "windows-vs2022-debug",
+      "inherits": "dawn-common",
+      "description": "Build with Dawn for Windows (VS 2022, Debug)",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "cacheVariables": {
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL",
+        "USE_STATIC_MSVC_RUNTIME_LIBRARY": "OFF",
+        "BUILD_SHARED_LIBS": "OFF",
+        "ozz_build_msvc_rt_dll": "ON",
+        "DAWN_ENABLE_D3D12": "ON",
+        "DAWN_FORCE_SYSTEM_COMPONENT_LOAD": "ON"
       }
     },
     {
@@ -125,7 +153,6 @@
         "ASYNCIFY": "ON",
         "WASM_BIGINT": "ON",
         "ASSIMP_BUILD_ZLIB": "ON",
-        "TARGET_BUILD_PLATFORM": "emscripten",
         "ALLOW_BLOCKING_ON_MAIN_THREAD": "1"
       }
     },
@@ -141,24 +168,7 @@
         "ASYNCIFY": "ON",
         "WASM_BIGINT": "ON",
         "ASSIMP_BUILD_ZLIB": "ON",
-        "TARGET_BUILD_PLATFORM": "emscripten",
         "ALLOW_BLOCKING_ON_MAIN_THREAD": "1"
-      }
-    },
-    {
-      "name": "windows-vs2022-debug",
-      "inherits": "common",
-      "description": "Build with Dawn for Windows (VS 2022, Debug)",
-      "generator": "Visual Studio 17 2022",
-      "architecture": "x64",
-      "cacheVariables": {
-        "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
-        "TARGET_BUILD_PLATFORM": "windows",
-        "DAWN_ENABLE_D3D12": "OFF",
-        "DAWN_ENABLE_VULKAN": "ON",
-        "DAWN_ENABLE_METAL": "OFF",
-        "RN_DEBUG": "ON",
-        "DAWN_DEBUG_BREAK_ON_ERROR": "1"
       }
     }
   ]

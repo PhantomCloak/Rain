@@ -31,6 +31,7 @@ namespace WebEngine
     const auto wnd = wgpu::glfw::SetupWindowAndGetSurfaceDescriptor(static_cast<GLFWwindow*>(windowPtr));
     surfaceDescription.nextInChain = reinterpret_cast<WGPUChainedStruct*>(wnd.get());
     m_Surface = wgpuInstanceCreateSurface(instance, &surfaceDescription);
+    RN_LOG("SwapChain::Init - Surface created: {}", m_Surface != nullptr);
 #else
     WGPUSurfaceDescriptorFromCanvasHTMLSelector* canvasDesc = ZERO_ALLOC(WGPUSurfaceDescriptorFromCanvasHTMLSelector);
     canvasDesc->chain.sType = WGPUSType_SurfaceDescriptorFromCanvasHTMLSelector;
@@ -46,8 +47,10 @@ namespace WebEngine
   {
     static WGPUTextureFormat m_swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 
-    // WGPUSurfaceCapabilities* capabilities = new WGPUSurfaceCapabilities();
-    // wgpuSurfaceGetCapabilities(m_Surface, m_Adapter, capabilities);
+    m_Width = width;
+    m_Height = height;
+
+    RN_LOG("SwapChain::Create - Configuring surface {}x{}", width, height);
 
     WGPUSurfaceConfiguration config = {};
     config.device = RenderContext::GetDevice();
@@ -62,10 +65,22 @@ namespace WebEngine
     wgpuSurfaceConfigure(m_Surface, &config);
   }
 
+  void SwapChain::Resize(uint32_t width, uint32_t height)
+  {
+    if (width == 0 || height == 0)
+      return;
+    if (width == m_Width && height == m_Height)
+      return;
+    Create(width, height);
+  }
+
   void SwapChain::Present()
   {
 #ifndef __EMSCRIPTEN__
-    wgpuSurfacePresent(m_Surface);
+    if (m_CurrentTexture)
+    {
+      wgpuSurfacePresent(m_Surface);
+    }
 #endif
   }
 
@@ -73,7 +88,6 @@ namespace WebEngine
   {
     static WGPUTextureFormat swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 
-    // Release previous frame's texture
     if (m_CurrentTexture)
     {
       wgpuTextureRelease(m_CurrentTexture);
@@ -84,7 +98,8 @@ namespace WebEngine
     wgpuSurfaceGetCurrentTexture(m_Surface, &surfaceTexture);
 
 #ifndef __EMSCRIPTEN__
-    if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal)
+    if (surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal
+        && surfaceTexture.status != WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal)
 #else
     if (surfaceTexture.status != 0)
 #endif
@@ -92,13 +107,13 @@ namespace WebEngine
       switch (surfaceTexture.status)
       {
         case WGPUSurfaceGetCurrentTextureStatus_Lost:
-          // Reconfigure surface here
-          // ConfigureSurface(m_swapChainDesc.width, m_swapChainDesc.height);
-          wgpuSurfaceGetCurrentTexture(m_Surface, &surfaceTexture);
-          break;
+        case WGPUSurfaceGetCurrentTextureStatus_Outdated:
+          if (m_Width > 0 && m_Height > 0)
+            Create(m_Width, m_Height);
+          return nullptr;
 #ifndef __EMSCRIPTEN__
         case WGPUSurfaceGetCurrentTextureStatus_Error:
-          RN_CORE_ASSERT(false, "Out of memory when acquiring next swapchain texture");
+          RN_CORE_ASSERT(false, "Error when acquiring next swapchain texture");
           return nullptr;
 #else
         case WGPUSurfaceGetCurrentTextureStatus_OutOfMemory:
@@ -111,7 +126,6 @@ namespace WebEngine
       }
     }
 
-    // Store texture reference so we can release it next frame
     m_CurrentTexture = surfaceTexture.texture;
 
     WGPUTextureViewDescriptor viewDesc = {};

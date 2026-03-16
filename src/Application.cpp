@@ -5,6 +5,7 @@
 #include "render/RenderWGPU.h"
 #include "scene/Entity.h"
 #include "scene/Scene.h"
+#include "scene/SceneRenderer.h"
 #define RN_DEBUG
 #include <GLFW/glfw3.h>
 #include <glm/ext.hpp>
@@ -86,7 +87,15 @@ namespace WebEngine
 
   void Application::OnResize(int height, int width)
   {
-    // m_Renderer->SetViewportSize(height, width);
+    if (width == 0 || height == 0)
+      return;
+
+    m_SwapChain->Resize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+
+    if (SceneRenderer::instance)
+    {
+      SceneRenderer::instance->SetViewportSize(height, width);
+    }
   }
 
   void Application::Run()
@@ -125,6 +134,14 @@ namespace WebEngine
 #endif
 
     glfwPollEvents();
+
+    // Skip rendering when window is minimized
+    {
+      int fbWidth, fbHeight;
+      glfwGetFramebufferSize(m_Window, &fbWidth, &fbHeight);
+      if (fbWidth == 0 || fbHeight == 0)
+        return;
+    }
 
     float currentTime = static_cast<float>(glfwGetTime());
     m_DeltaTime = currentTime - m_LastFrameTime;

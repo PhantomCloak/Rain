@@ -704,7 +704,7 @@ namespace WebEngine
     {
       m_SkyboxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
       m_CompositePass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
-      // m_PpfxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
+      m_PpfxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
       m_NeedResize = false;
     }
 

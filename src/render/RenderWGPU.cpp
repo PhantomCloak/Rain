@@ -735,6 +735,7 @@ namespace WebEngine
     ZERO_INIT(requestAdapterOpts);
     requestAdapterOpts.compatibleSurface = Application::Get()->GetSwapChain()->GetSurface();
     requestAdapterOpts.powerPreference = WGPUPowerPreference_HighPerformance;
+    requestAdapterOpts.backendType = WGPUBackendType_D3D12;
 
     wgpuInstanceRequestAdapter(m_DawnInstance, &requestAdapterOpts, adapterCallbackInfo);
 #else
@@ -1003,6 +1004,15 @@ namespace WebEngine
     if (status == WGPURequestAdapterStatus_Success)
     {
       self->m_Adapter = adapter;
+
+      WGPUAdapterInfo info{};
+      wgpuAdapterGetInfo(adapter, &info);
+      RN_LOG("Adapter: {} (backend: {}, vendor: {})",
+             std::string(info.description.data, info.description.length),
+             (int)info.backendType,
+             std::string(info.vendor.data, info.vendor.length));
+      wgpuAdapterInfoFreeMembers(info);
+
       RN_LOG("Adapter request successful");
       self->StartRequestDevice();
     }
