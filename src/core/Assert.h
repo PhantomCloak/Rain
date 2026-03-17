@@ -8,7 +8,10 @@
 
 #ifdef __linux__
 #include <execinfo.h>
-#include <signal.h>
+#endif
+
+#if defined(__linux__) || defined(__APPLE__)
+#include <csignal>
 #endif
 
 

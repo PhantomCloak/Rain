@@ -14,17 +14,17 @@ extern "C" WGPUSurface glfwGetWGPUSurface(WGPUInstance instance, GLFWwindow* win
     metal_layer = [CAMetalLayer layer];
     [ns_window.contentView setLayer:metal_layer];
 
-    WGPUSurfaceDescriptorFromMetalLayer metalLayerDesc = {
+    WGPUSurfaceSourceMetalLayer metalLayerDesc = {
         .chain = (WGPUChainedStruct){
             .next = NULL,
-            .sType = WGPUSType_SurfaceDescriptorFromMetalLayer,
+            .sType = WGPUSType_SurfaceSourceMetalLayer,
         },
         .layer = metal_layer,
     };
 
     WGPUSurfaceDescriptor descriptor = {
         .label = NULL,
-        .nextInChain = (const WGPUChainedStruct*)&metalLayerDesc
+        .nextInChain = (WGPUChainedStruct*)&metalLayerDesc
     };
 
     return wgpuInstanceCreateSurface(instance, &descriptor);

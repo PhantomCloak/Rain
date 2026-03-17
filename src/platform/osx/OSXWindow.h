@@ -2,6 +2,7 @@
 #include "core/KeyCode.h"
 #include "core/MouseCode.h"
 #include "core/Window.h"
+#include "engine/Event.h"
 
 namespace WebEngine
 {
@@ -13,6 +14,7 @@ namespace WebEngine
     virtual void OnMouseClick(MouseCode button) {};
 
     virtual void OnResize(int height, int width) {};
+    virtual void OnEvent(Event& event) = 0;
 
    public:
     OSXWindow(const WindowProps& props) { Init(props); }
@@ -26,7 +28,7 @@ namespace WebEngine
     virtual void Init(const WindowProps& props);
     virtual void Shutdown();
 
-   private:
+   protected:
     GLFWwindow* m_Window;
   };
 }  // namespace WebEngine

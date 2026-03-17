@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.15...3.25)
-project(RainEngine VERSION 0.1.0 LANGUAGES CXX C)
+if(APPLE)
+  project(RainEngine VERSION 0.1.0 LANGUAGES CXX C OBJC OBJCXX)
+else()
+  project(RainEngine VERSION 0.1.0 LANGUAGES CXX C)
+endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
@@ -21,6 +25,8 @@ list(APPEND SOURCES ${IMGUI_SOURCES})
 
 if(APPLE)
   list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/osx/macos_window.mm")
+  list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/render/glfw3webgpu.c")
+  set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_wgpu.cpp" PROPERTIES LANGUAGE OBJCXX)
 endif()
 
 if(EMSCRIPTEN)

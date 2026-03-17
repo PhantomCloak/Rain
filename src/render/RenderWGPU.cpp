@@ -735,7 +735,13 @@ namespace WebEngine
     ZERO_INIT(requestAdapterOpts);
     requestAdapterOpts.compatibleSurface = Application::Get()->GetSwapChain()->GetSurface();
     requestAdapterOpts.powerPreference = WGPUPowerPreference_HighPerformance;
+#if defined(__APPLE__)
+    requestAdapterOpts.backendType = WGPUBackendType_Metal;
+#elif defined(__linux__)
+    requestAdapterOpts.backendType = WGPUBackendType_Vulkan;
+#else
     requestAdapterOpts.backendType = WGPUBackendType_D3D12;
+#endif
 
     wgpuInstanceRequestAdapter(m_DawnInstance, &requestAdapterOpts, adapterCallbackInfo);
 #else
