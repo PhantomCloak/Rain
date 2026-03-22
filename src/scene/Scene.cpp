@@ -5,9 +5,12 @@
 #include "SceneRenderer.h"
 #include "animation/OzzAnimator.h"
 #include "debug/Profiler.h"
+#include "physics/Physics.h"
 #include "glm/gtc/type_ptr.hpp"
 #include "imgui.h"
 #include "io/cursor.h"
+#include "io/keyboard.h"
+#include "core/KeyCode.h"
 #include "render/ResourceManager.h"
 
 // #include "ImGuizmo.h"
@@ -35,34 +38,13 @@ namespace WebEngine
     auto camera = CreateEntity("MainCamera");
     camera.AddComponent<CameraComponent>();
 
-    auto testModel = WebEngine::ResourceManager::LoadMeshSource(RESOURCE_DIR "/test2/untitled.gltf");
-    auto boxModel = WebEngine::ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
-    auto weaponModel = WebEngine::ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
-
-    Entity modelEntity = CreateEntity("bump");
-    Entity floorEntity = CreateEntity("box");
-    Entity weaponEntity = CreateEntity("weapon");
-
-    modelEntity.Transform().Translation = glm::vec3(0, -0.0, 0);
-    modelEntity.Transform().Scale = glm::vec3(0.04f);
-    modelEntity.Transform().SetRotationEuler(glm::radians(glm::vec3(-90.0, 0.0, 180.0)));
-
-    floorEntity.Transform().Translation = glm::vec3(0, -1.0, 0);
-    floorEntity.Transform().Scale = glm::vec3(50.0f, 1.0f, 50.0f);
-
-    weaponEntity.Transform().Translation = glm::vec3(17, 5.0, 0);
-    weaponEntity.Transform().Scale = glm::vec3(3.0f);
-    weaponEntity.Transform().SetRotationEuler(glm::radians(glm::vec3(-90.0, 0.0, 0.0)));
-
-    BuildMeshEntityHierarchy(modelEntity, testModel);
-    BuildMeshEntityHierarchy(floorEntity, boxModel);
-    BuildMeshEntityHierarchy(weaponEntity, weaponModel);
-
     Entity light = CreateEntity("DirectionalLight");
     light.Transform().Translation = glm::vec3(0, 15, 0);
 
     light.AddComponent<DirectionalLightComponent>();
     entityIdDir = light.GetUUID();
+
+		m_PhysicsScene = Physics::Instance->CreateScene(glm::vec3(0, -9.3f * 5, 0.0));
   }
 
   Entity Scene::CreateChildEntity(Entity parent, std::string name)
@@ -133,6 +115,7 @@ namespace WebEngine
   void Scene::OnUpdate()
   {
     ScanKeyPress();
+    Keyboard::FlushPressedKeys();
 
     // Update all animators
     float dt = Application::Get()->GetDeltaTime();
@@ -175,7 +158,6 @@ namespace WebEngine
     Entity cameraEntity = GetMainCameraEntity();
     Camera& camera = cameraEntity.GetComponent<CameraComponent>();
 
-    // Use editor camera view matrix if provided (non-zero), otherwise use scene camera
     bool useEditorCamera = editorViewMatrix != glm::mat4(0.0f);
     glm::mat4 cameraViewMatrix = useEditorCamera ? editorViewMatrix : glm::inverse(GetWorldSpaceTransformMatrix(cameraEntity));
 
@@ -191,7 +173,6 @@ namespace WebEngine
       Ref<MeshSource> meshSource = WebEngine::ResourceManager::GetMeshSource(meshComponent.MeshSourceId);
       glm::mat4 entityTransform = GetWorldSpaceTransformMatrix(e);
 
-      // Check if this entity has an animator component
       Ref<OzzAnimator> animator = nullptr;
       if (entity.has<AnimatorComponent>())
       {
@@ -297,4 +278,117 @@ namespace WebEngine
   void Scene::ScanKeyPress()
   {
   }
+
+  void DemoSceneDefault::Init()
+  {
+    Scene::Init();
+		RN_LOG("AAA");
+
+    auto testModel = ResourceManager::LoadMeshSource(RESOURCE_DIR "/test2/untitled.gltf");
+    auto boxModel = ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
+    auto weaponModel = ResourceManager::LoadMeshSource(RESOURCE_DIR "/assault_rifle_pbr/scene.gltf");
+
+    Entity modelEntity = CreateEntity("bump");
+    Entity floorEntity = CreateEntity("box");
+    Entity weaponEntity = CreateEntity("weapon");
+
+    modelEntity.Transform().Translation = glm::vec3(0, -0.0, 0);
+    modelEntity.Transform().Scale = glm::vec3(0.04f);
+    modelEntity.Transform().SetRotationEuler(glm::radians(glm::vec3(-90.0, 0.0, 180.0)));
+
+    floorEntity.Transform().Translation = glm::vec3(0, -1.0, 0);
+    floorEntity.Transform().Scale = glm::vec3(50.0f, 1.0f, 50.0f);
+
+    weaponEntity.Transform().Translation = glm::vec3(17, 5.0, 0);
+    weaponEntity.Transform().Scale = glm::vec3(3.0f);
+    weaponEntity.Transform().SetRotationEuler(glm::radians(glm::vec3(-90.0, 0.0, 0.0)));
+
+    BuildMeshEntityHierarchy(modelEntity, testModel);
+    BuildMeshEntityHierarchy(floorEntity, boxModel);
+    BuildMeshEntityHierarchy(weaponEntity, weaponModel);
+  }
+
+  void DemoScenePhysicCollisions::ScanKeyPress()
+  {
+    if (Keyboard::IsKeyPressed(Key::F))
+    {
+      ThrowBall(EditorCameraPosition, EditorCameraForward);
+    }
+  }
+
+  void DemoScenePhysicCollisions::ThrowBall(const glm::vec3& position, const glm::vec3& direction)
+  {
+    float ballScale = 0.5f;
+    float throwSpeed = 30.0f;
+
+    std::string name = "ball_" + std::to_string(m_BallCounter++);
+    Entity ball = CreateEntity(name);
+    ball.Transform().Translation = position + direction * 2.0f;
+    ball.Transform().Scale = glm::vec3(ballScale);
+    BuildMeshEntityHierarchy(ball, m_BallMesh);
+
+    auto& rb = ball.AddComponent<RigidBodyComponent>();
+    rb.BodyType = EBodyType::Dynamic;
+    rb.Mass = 5.0f;
+    rb.InitialLinearVelocity = direction * throwSpeed;
+
+    auto& collider = ball.AddComponent<BoxColliderComponent>();
+    collider.Size = glm::vec3(ballScale);
+
+    m_PhysicsScene->CreateBody(ball);
+  }
+
+  void DemoScenePhysicCollisions::Init()
+  {
+    Scene::Init();
+
+    auto boxModel = ResourceManager::LoadMeshSource(RESOURCE_DIR "/box.gltf");
+    m_BallMesh = boxModel;
+
+    // Static floor
+    Entity floorEntity = CreateEntity("floor");
+    floorEntity.Transform().Translation = glm::vec3(0.0f, -0.5f, 0.0f);
+    floorEntity.Transform().Scale = glm::vec3(50.0f, 1.0f, 50.0f);
+    BuildMeshEntityHierarchy(floorEntity, boxModel);
+    auto& floorRb = floorEntity.AddComponent<RigidBodyComponent>();
+    floorRb.BodyType = EBodyType::Static;
+    auto& floorCollider = floorEntity.AddComponent<BoxColliderComponent>();
+    floorCollider.Size = glm::vec3(50.0f, 1.0f, 50.0f);
+    m_PhysicsScene->CreateBody(floorEntity);
+
+    // Stacking boxes: 5 layers pyramid
+    // Blender default cube is 2x2x2, so at scale 1.0 the actual size is 2.0
+    float boxScale = 1.0f;
+    float boxActualSize = boxScale * 2.0f;
+    float startY = boxScale;
+    int layers = 5;
+
+    for (int layer = 0; layer < layers; layer++)
+    {
+      int boxesInRow = layers - layer;
+      float offsetX = -(boxesInRow - 1) * boxActualSize * 0.5f;
+      float offsetZ = -(boxesInRow - 1) * boxActualSize * 0.5f;
+      float y = startY + layer * boxActualSize;
+
+      for (int x = 0; x < boxesInRow; x++)
+      {
+        for (int z = 0; z < boxesInRow; z++)
+        {
+          std::string name = "box_" + std::to_string(layer) + "_" + std::to_string(x) + "_" + std::to_string(z);
+          Entity box = CreateEntity(name);
+          box.Transform().Translation = glm::vec3(offsetX + x * boxActualSize, y, offsetZ + z * boxActualSize);
+          BuildMeshEntityHierarchy(box, boxModel);
+
+          auto& rb = box.AddComponent<RigidBodyComponent>();
+          rb.BodyType = EBodyType::Dynamic;
+          rb.Mass = 10.0f;
+          auto& boxCollider = box.AddComponent<BoxColliderComponent>();
+          boxCollider.Size = glm::vec3(boxScale);
+
+          m_PhysicsScene->CreateBody(box);
+        }
+      }
+    }
+  }
+
 }  // namespace WebEngine

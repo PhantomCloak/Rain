@@ -49,9 +49,17 @@ namespace WebEngine
 		    @location(0) color: vec4<f32>,
 		}
 		
+		struct FragmentOutput {
+		    @location(0) color0: vec4<f32>,
+		    @location(1) color1: vec4<f32>,
+		}
+
 		@fragment
-		fn fs_main(input: FragmentInput) -> @location(0) vec4<f32> {
-		    return input.color;
+		fn fs_main(input: FragmentInput) -> FragmentOutput {
+		    var output: FragmentOutput;
+		    output.color0 = input.color;
+		    output.color1 = input.color;
+		    return output;
 		}
 		)";
 
@@ -131,13 +139,16 @@ namespace WebEngine
     fragmentState.module = m_LineShader->GetNativeShaderModule();
     fragmentState.entryPoint = RenderUtils::MakeLabel("fs_main");
 
-    WGPUColorTargetState colorTarget = {};
-    colorTarget.format = WGPUTextureFormat_BGRA8Unorm;
-    colorTarget.blend = nullptr;  // No blending for now
-    colorTarget.writeMask = WGPUColorWriteMask_All;
+    WGPUColorTargetState colorTargets[2] = {};
+    colorTargets[0].format = WGPUTextureFormat_BGRA8Unorm;
+    colorTargets[0].blend = nullptr;
+    colorTargets[0].writeMask = WGPUColorWriteMask_All;
+    colorTargets[1].format = WGPUTextureFormat_BGRA8Unorm;
+    colorTargets[1].blend = nullptr;
+    colorTargets[1].writeMask = WGPUColorWriteMask_All;
 
-    fragmentState.targetCount = 1;
-    fragmentState.targets = &colorTarget;
+    fragmentState.targetCount = 2;
+    fragmentState.targets = colorTargets;
     pipelineDesc.fragment = &fragmentState;
 
     // Primitive state
@@ -147,7 +158,7 @@ namespace WebEngine
     pipelineDesc.primitive.cullMode = WGPUCullMode_None;
 
     // Multisample state
-    pipelineDesc.multisample.count = 4;
+    pipelineDesc.multisample.count = 1;
     pipelineDesc.multisample.mask = ~0u;
     pipelineDesc.multisample.alphaToCoverageEnabled = false;
 

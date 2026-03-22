@@ -27,27 +27,27 @@ namespace WebEngine
   RainTrackedVehicle* veh;
   PhysicsScene::PhysicsScene(glm::vec3 gravity)
   {
-    // JPH::RegisterDefaultAllocator();
-    // JPH::Factory::sInstance = new JPH::Factory();
-    // JPH::RegisterTypes();
+    JPH::RegisterDefaultAllocator();
+    JPH::Factory::sInstance = new JPH::Factory();
+    JPH::RegisterTypes();
 
-    // m_TempAllocator = new JPH::TempAllocatorImpl(64 * 1024 * 1024);
-    // m_JobSystem = new JPH::JobSystemThreadPool(2048, 8, JPH::thread::hardware_concurrency() - 1);
+    m_TempAllocator = new JPH::TempAllocatorImpl(64 * 1024 * 1024);
+    m_JobSystem = new JPH::JobSystemThreadPool(2048, 8, JPH::thread::hardware_concurrency() - 1);
 
-    // m_BroadPhaseLayerInterface = new BPLayerInterfaceImpl();
-    // m_ObjectVsBroadPhaseLayerFilter = new ObjectVsBroadPhaseLayerFilterImpl();
-    // m_ObjectLayerPairFilter = new ObjectLayerPairFilterImpl();
+    m_BroadPhaseLayerInterface = new BPLayerInterfaceImpl();
+    m_ObjectVsBroadPhaseLayerFilter = new ObjectVsBroadPhaseLayerFilterImpl();
+    m_ObjectLayerPairFilter = new ObjectLayerPairFilterImpl();
 
-    // m_PhysicsSystem = new JPH::PhysicsSystem();
-    // m_PhysicsSystem->Init(
-    //     1024 * 16,  // cMaxBodies
-    //     0,          // cNumBodyMutexes
-    //     1024 * 16,  // cMaxBodyPairs
-    //     1024 * 16,  // cMaxContactConstraints
-    //     *m_BroadPhaseLayerInterface,
-    //     *m_ObjectVsBroadPhaseLayerFilter,
-    //     *m_ObjectLayerPairFilter);
-    // m_PhysicsSystem->SetGravity(PhysicsUtils::ToJoltVector(gravity));
+    m_PhysicsSystem = new JPH::PhysicsSystem();
+    m_PhysicsSystem->Init(
+        1024 * 16,  // cMaxBodies
+        0,          // cNumBodyMutexes
+        1024 * 16,  // cMaxBodyPairs
+        1024 * 16,  // cMaxContactConstraints
+        *m_BroadPhaseLayerInterface,
+        *m_ObjectVsBroadPhaseLayerFilter,
+        *m_ObjectLayerPairFilter);
+    m_PhysicsSystem->SetGravity(PhysicsUtils::ToJoltVector(gravity));
     m_Instance = this;
 
 #ifndef __EMSCRIPTEN__
@@ -123,18 +123,18 @@ namespace WebEngine
 
   void PhysicsScene::SynchronizeBodyTransform(PhysicsBody* body)
   {
-    // JPH::BodyLockRead bodyLock(PhysicsScene::GetBodyLockInterface(), body->m_BodyID);
-    // const JPH::Body& bodyRef = bodyLock.GetBody();
+    JPH::BodyLockRead bodyLock(PhysicsScene::GetBodyLockInterface(), body->m_BodyID);
+    const JPH::Body& bodyRef = bodyLock.GetBody();
 
-    // Entity entity = Scene::Instance->TryGetEntityWithUUID(bodyRef.GetUserData());
+    Entity entity = Scene::Instance->TryGetEntityWithUUID(bodyRef.GetUserData());
 
-    // TransformComponent& transformComponent = entity.GetComponent<TransformComponent>();
-    // glm::vec3 scale = transformComponent.Scale;
-    // transformComponent.Translation = PhysicsUtils::FromJoltVector(bodyRef.GetPosition());
-    // transformComponent.SetRotation(PhysicsUtils::FromJoltQuat(bodyRef.GetRotation()));
+    TransformComponent& transformComponent = entity.GetComponent<TransformComponent>();
+    glm::vec3 scale = transformComponent.Scale;
+    transformComponent.Translation = PhysicsUtils::FromJoltVector(bodyRef.GetPosition());
+    transformComponent.SetRotation(PhysicsUtils::FromJoltQuat(bodyRef.GetRotation()));
 
-    // Scene::Instance->ConvertToLocalSpace(entity);
-    // transformComponent.Scale = scale;
+    Scene::Instance->ConvertToLocalSpace(entity);
+    transformComponent.Scale = scale;
   }
 
   void PhysicsScene::PreUpdate(float dt)
@@ -179,54 +179,44 @@ namespace WebEngine
 
   void PhysicsScene::Update(float dt)
   {
-    // Input
-    // veh->Update(this);
+    SynchronizePendingBodyTransforms();
+    m_PhysicsSystem->Update(dt, 1, m_TempAllocator, m_JobSystem);
 
-    return;
-    // m_PhysicsSystem->DrawBodies(JPH::BodyManager::DrawSettings(), JPH::DebugRenderer::sInstance);
+#ifdef JPH_DEBUG_RENDERER
+    JPH::BodyManager::DrawSettings drawSettings;
+    drawSettings.mDrawShape = true;
+    drawSettings.mDrawShapeWireframe = true;
+    m_PhysicsSystem->DrawBodies(drawSettings, JPH::DebugRenderer::sInstance);
+#endif
 
-    // PreUpdate(dt);
-    // SynchronizePendingBodyTransforms();
-    // m_PhysicsSystem->Update(dt, 1, m_TempAllocator, m_JobSystem);
+    const auto& bodyLockInterface = m_PhysicsSystem->GetBodyLockInterface();
+    JPH::BodyIDVector activeBodies;
+    m_PhysicsSystem->GetActiveBodies(JPH::EBodyType::RigidBody, activeBodies);
+    JPH::BodyLockMultiWrite activeBodiesLock(bodyLockInterface, activeBodies.data(), static_cast<int32_t>(activeBodies.size()));
 
-    // const auto& bodyLockInterface = m_PhysicsSystem->GetBodyLockInterface();
-    // JPH::BodyIDVector activeBodies;
-    // m_PhysicsSystem->GetActiveBodies(JPH::EBodyType::RigidBody, activeBodies);
-    // JPH::BodyLockMultiWrite activeBodiesLock(bodyLockInterface, activeBodies.data(), static_cast<int32_t>(activeBodies.size()));
+    for (int32_t i = 0; i < (int32_t)activeBodies.size(); i++)
+    {
+      JPH::Body* body = activeBodiesLock.GetBody(i);
+      if (body == nullptr || body->IsKinematic())
+      {
+        continue;
+      }
 
-    // for (int32_t i = 0; i < activeBodies.size(); i++)
-    //{
-    //   JPH::Body* body = activeBodiesLock.GetBody(i);
-    //   // The position of kinematic rigid bodies is synced _before_ the physics simulation by setting its velocity such that
-    //   // the simulation will move it to the game world position.  This gives a better collision response than synching the
-    //   // position here.
-    //   if (body == nullptr || body->IsKinematic())
-    //   {
-    //     continue;
-    //   }
+      Entity entity = Scene::Instance->TryGetEntityWithUUID(body->GetUserData());
 
-    //  // Apply air resistance
-    //  // body->ApplyBuoyancyImpulse(s_AirPlane, 0.075f, 0.15f, 0.01f, JPH::Vec3::sZero(), m_JoltSystem->GetGravity(), m_FixedTimeStep);
+      if (!entity)
+      {
+        continue;
+      }
 
-    //  // Synchronize the transform
-    //  Entity entity = Scene::Instance->TryGetEntityWithUUID(body->GetUserData());
+      TransformComponent& transformComponent = entity.GetComponent<TransformComponent>();
+      glm::vec3 scale = transformComponent.Scale;
+      transformComponent.Translation = PhysicsUtils::FromJoltVector(body->GetPosition());
+      transformComponent.SetRotation(PhysicsUtils::FromJoltQuat(body->GetRotation()));
 
-    //  if (!entity)
-    //  {
-    //    continue;
-    //  }
-
-    //  auto rigidBody = m_RigidBodies.at(entity.GetUUID());
-
-    //  TransformComponent& transformComponent = entity.GetComponent<TransformComponent>();
-    //  glm::vec3 scale = transformComponent.Scale;
-    //  transformComponent.Translation = PhysicsUtils::FromJoltVector(body->GetPosition());
-
-    //  transformComponent.SetRotation(PhysicsUtils::FromJoltQuat(body->GetRotation()));
-
-    //  Scene::Instance->ConvertToLocalSpace(entity);
-    //  transformComponent.Scale = scale;
-    //}
+      Scene::Instance->ConvertToLocalSpace(entity);
+      transformComponent.Scale = scale;
+    }
   }
 
   Ref<PhysicsBody> PhysicsScene::CreateBody(Entity entity)

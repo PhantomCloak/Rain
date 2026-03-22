@@ -28,7 +28,7 @@ namespace WebEngine
     Entity CreateEntity(std::string name);
     Entity CreateChildEntity(Entity parent, std::string name);
 
-    void Init();
+    virtual void Init();
 
     void OnUpdate();
     void OnRender(Ref<SceneRenderer> renderer, const glm::mat4& editorViewMatrix = glm::mat4(0.0f));
@@ -42,7 +42,10 @@ namespace WebEngine
     Entity GetMainCameraEntity();
 
     std::pair<glm::vec3, glm::vec3> CastRay(Entity& cameraEntity, float mx, float my);
-    void ScanKeyPress();
+    virtual void ScanKeyPress();
+
+    glm::vec3 EditorCameraPosition = glm::vec3(0.0f);
+    glm::vec3 EditorCameraForward = glm::vec3(0.0f, 0.0f, -1.0f);
 
     LightInfo SceneLightInfo;
     std::unique_ptr<Camera> m_SceneCamera;
@@ -63,5 +66,31 @@ namespace WebEngine
     std::string m_Name;
     Ref<PhysicsScene> m_PhysicsScene;
     friend class Entity;
+    friend class DemoScenePhysicCollisions;
+  };
+
+}  // namespace WebEngine
+
+namespace WebEngine
+{
+  class DemoSceneDefault : public Scene
+  {
+   public:
+    DemoSceneDefault(std::string sceneName = "Untitled Scene") : Scene(std::move(sceneName)) {}
+    void Init() override;
+  };
+
+  class DemoScenePhysicCollisions : public Scene
+  {
+   public:
+    DemoScenePhysicCollisions(std::string sceneName = "Untitled Scene") : Scene(std::move(sceneName)) {}
+    void Init() override;
+    void ScanKeyPress() override;
+
+    void ThrowBall(const glm::vec3& position, const glm::vec3& direction);
+
+   private:
+    Ref<MeshSource> m_BallMesh;
+    int m_BallCounter = 0;
   };
 }  // namespace WebEngine

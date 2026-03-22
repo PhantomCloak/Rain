@@ -763,6 +763,17 @@ namespace WebEngine
       {
         m_Renderer->RenderMesh(m_CompositePass, m_CompositePipeline->GetPipeline(), dc.Mesh, dc.SubmeshIndex, dc.Materials, m_TransformBuffer, m_MeshTransformMap[mk].TransformOffset, dc.InstanceCount);
       }
+
+#ifndef __EMSCRIPTEN__
+      {
+        WGPURenderPassEncoder passEncoder = m_CompositePass->GetRenderPassEncoder();
+        WGPUCommandEncoder cmdEncoder = m_CommandBuffer->GetNativeEncoder();
+        RenderDebug::SetMVP(Cam.Projection * Cam.ViewMatrix);
+        RenderDebug::Begin(&passEncoder, &cmdEncoder);
+        RenderDebug::FlushDrawList();
+      }
+#endif
+
       m_Renderer->EndRenderPass(m_CompositePass);
     }
 

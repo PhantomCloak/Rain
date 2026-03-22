@@ -4,16 +4,19 @@
 
 namespace WebEngine {
   void* NativeWndPtr;
+  static std::vector<KeyEvent> s_KeyEvents;
 
   void Keyboard::Setup(void* nativeWndPtr) {
     NativeWndPtr = nativeWndPtr;
   }
 
   bool Keyboard::IsKeyPressed(int keyCode) {
-        if (NativeWndPtr == nullptr) {
-      return false;
+    for (const auto& event : s_KeyEvents) {
+      if (event.keyCode == keyCode && event.isPressed) {
+        return true;
+      }
     }
-    return glfwGetKey((GLFWwindow*)NativeWndPtr, keyCode);
+    return false;
   }
 
   void Keyboard::Poll() {
@@ -24,9 +27,18 @@ namespace WebEngine {
     if (NativeWndPtr == nullptr) {
       return false;
     }
-    return glfwGetKey((GLFWwindow*)NativeWndPtr, keyCode);
+    return glfwGetKey((GLFWwindow*)NativeWndPtr, keyCode) == GLFW_PRESS;
+  }
+
+  void Keyboard::PushKeyEvent(int keyCode, bool pressed) {
+    s_KeyEvents.push_back({keyCode, pressed});
+  }
+
+  std::vector<KeyEvent> Keyboard::GetPressedKeys() {
+    return s_KeyEvents;
   }
 
   void Keyboard::FlushPressedKeys() {
+    s_KeyEvents.clear();
   }
 }  // namespace WebEngine
