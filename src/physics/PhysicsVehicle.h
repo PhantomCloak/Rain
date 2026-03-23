@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Jolt.h>
-#include <Physics/Vehicle/TrackedVehicleController.h>
-#include <Physics/Body/BodyInterface.h>
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Vehicle/TrackedVehicleController.h>
+#include <Jolt/Physics/Body/BodyInterface.h>
 #include <glm/glm.hpp>
 
 #include "physics/PhysicsBody.h"

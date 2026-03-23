@@ -1,8 +1,12 @@
+#ifndef __EMSCRIPTEN__
 #ifndef JPH_DEBUG_RENDERER
 #define JPH_DEBUG_RENDERER
 #endif
-#include <Jolt.h>
+#include <Jolt/Jolt.h>
 #include <Jolt/Renderer/DebugRendererSimple.h>
+#else
+#include <Jolt.h>
+#endif
 #include <webgpu/webgpu.h>
 #include <glm/glm.hpp>
 #include "render/GPUAllocator.h"
@@ -23,6 +27,7 @@ namespace WebEngine {
     glm::mat4 viewProjectionMatrix;
   };
 
+#ifndef __EMSCRIPTEN__
   class RenderDebug : public JPH::DebugRendererSimple {
    public:
     static void Init();
@@ -58,4 +63,5 @@ namespace WebEngine {
     std::vector<QueuedLine> m_QueuedLines;
     static constexpr size_t MAX_LINES_PER_BATCH = 1000;
   };
+#endif
 }  // namespace WebEngine

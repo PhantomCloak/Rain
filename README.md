@@ -1,6 +1,6 @@
 # WebEngine
 
-Next-generation web engine tech demo. Written in C++. Uses the WebGPU rendering API, with native support for Windows, Linux, and macOS, as well as all WebGPU-compatible browsers including Safari (iOS) and Chrome (Android)
+Next-generation web engine. Written in C++. Uses the WebGPU rendering API, with native support for Windows, Linux, and macOS, as well as all WebGPU-compatible browsers including Safari (iOS) and Chrome (Android)
 
 [View on web browser &rarr;](https://phantomcloak.me)
 

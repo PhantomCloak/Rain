@@ -617,6 +617,7 @@ namespace WebEngine
     return m_PpfxPass->GetOutput(0);
   }
 
+#ifndef __EMSCRIPTEN__
   void DrawCameraFrustum(SceneCamera camera)
   {
     // Get the inverse of the view-projection matrix to transform from NDC to world space
@@ -670,6 +671,7 @@ namespace WebEngine
       RenderDebug::sInstance->DrawLine(nearWorldCorners[i], farWorldCorners[i], JPH::Color::sGreen);
     }
   }
+#endif // !__EMSCRIPTEN__
 
   void SceneRenderer::BeginScene(const SceneCamera& camera)
   {

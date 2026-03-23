@@ -1,6 +1,6 @@
 #include "PhysicsWheel.h"
 
-#include <Physics/Vehicle/VehicleConstraint.h>
+#include <Jolt/Physics/Vehicle/VehicleConstraint.h>
 
 #include "scene/Components.h"
 #include "PhysicUtils.h"

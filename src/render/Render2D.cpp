@@ -1,3 +1,4 @@
+#ifndef __EMSCRIPTEN__
 #include "Render2D.h"
 #include "physics/PhysicUtils.h"
 #include "render/RenderUtils.h"
@@ -268,3 +269,4 @@ namespace WebEngine
     DrawLine(v3, v1, color);
   }
 }  // namespace WebEngine
+#endif // !__EMSCRIPTEN__

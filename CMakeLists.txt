@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.15...3.25)
+cmake_minimum_required(VERSION 3.19...3.25)
+
 if(APPLE)
   project(RainEngine VERSION 0.1.0 LANGUAGES CXX C OBJC OBJCXX)
 else()
@@ -7,57 +8,80 @@ endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  set(CMAKE_CXX_FLAGS "-Wno-error ${CMAKE_CXX_FLAGS}" CACHE STRING "" FORCE)
-  set(CMAKE_C_FLAGS "-Wno-error ${CMAKE_C_FLAGS}" CACHE STRING "" FORCE)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -v")
-endif()
+file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.c")
 
-file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
-
-file(GLOB IMGUI_SOURCES 
-  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/*.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_glfw.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_wgpu.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/vendor/ImGuizmo/*.cpp")
-
+file(GLOB IMGUI_SOURCES
+  "vendor/imgui/*.cpp"
+  "vendor/imgui/backends/imgui_impl_glfw.cpp"
+  "vendor/imgui/backends/imgui_impl_wgpu.cpp"
+  "vendor/ImGuizmo/*.cpp"
+)
 list(APPEND SOURCES ${IMGUI_SOURCES})
 
 if(APPLE)
-  list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/osx/macos_window.mm")
+  list(APPEND SOURCES "src/platform/osx/macos_window.mm")
   list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/render/glfw3webgpu.c")
-  set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends/imgui_impl_wgpu.cpp" PROPERTIES LANGUAGE OBJCXX)
+  set_source_files_properties("vendor/imgui/backends/imgui_impl_wgpu.cpp" PROPERTIES LANGUAGE OBJCXX)
 endif()
 
-if(EMSCRIPTEN)
-  add_definitions(-DIMGUI_IMPL_WEBGPU_BACKEND_WGPU)
-else()
-  add_definitions(-DIMGUI_IMPL_WEBGPU_BACKEND_DAWN)
-endif()
 add_executable(ReEngine ${SOURCES})
-set_target_properties(ReEngine PROPERTIES
-  CXX_STANDARD 20
-  CXX_STANDARD_REQUIRED ON
-  CXX_EXTENSIONS OFF
-  EXPORT_COMPILE_COMMANDS ON
+
+target_compile_definitions(ReEngine PRIVATE
+  RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources"
+  $<IF:$<BOOL:${EMSCRIPTEN}>,IMGUI_IMPL_WEBGPU_BACKEND_WGPU,IMGUI_IMPL_WEBGPU_BACKEND_DAWN>
 )
 
-#target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui" "vendor/ImGuizmo")
-target_compile_definitions(ReEngine PRIVATE RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources")
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    add_compile_options(-Wimplicit-const-int-float-conversion)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  target_compile_options(ReEngine PRIVATE -Wno-error -Wimplicit-const-int-float-conversion)
 endif()
-include("cmake/ThirdParty.cmake")
 
-target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb "vendor/imgui" "vendor/ImGuizmo")
-if(NOT EMSCRIPTEN)
-  target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/dawn/include/tint)
-else()
-target_include_directories(ReEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb)
-endif()
+include(cmake/ThirdParty.cmake)
+
+target_include_directories(ReEngine SYSTEM PRIVATE
+  vendor/stb
+  vendor/imgui
+  vendor/ImGuizmo
+)
+
+target_link_libraries(ReEngine PRIVATE
+  assimp
+  flecs
+  spdlog
+  Jolt
+  glm
+  ozz_base
+  ozz_animation
+  ozz_animation_offline
+)
 
 if(EMSCRIPTEN)
-  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sDISABLE_EXCEPTION_CATCHING=0")
-  target_link_options(ReEngine PRIVATE -sUSE_GLFW=3 -sUSE_WEBGPU=1 -sUSE_ZLIB=1 -sASYNCIFY=1 -sALLOW_MEMORY_GROWTH=1 -sWASM_BIGINT=1 -sASSERTIONS -sSTACK_SIZE=1mb --preload-file "${CMAKE_CURRENT_SOURCE_DIR}/Resources")
+  target_link_options(ReEngine PRIVATE
+    -sUSE_GLFW=3
+    -sUSE_WEBGPU=1
+    -sUSE_ZLIB=1
+    -sASYNCIFY=1
+    -sALLOW_MEMORY_GROWTH=1
+    -sWASM_BIGINT=1
+    -sASSERTIONS
+    -sSTACK_SIZE=1mb
+    --preload-file "${CMAKE_CURRENT_SOURCE_DIR}/Resources"
+  )
   set_target_properties(ReEngine PROPERTIES SUFFIX ".html")
+endif()
+
+if(NOT EMSCRIPTEN)
+  target_link_libraries(ReEngine PRIVATE
+    dawn_common
+    dawn_glfw
+    dawn_headers
+    dawn_native
+    dawn_platform
+    dawn_wire
+    dawncpp
+    dawncpp_headers
+    libtint
+    dawn_proc
+    TracyClient
+    glfw
+  )
 endif()

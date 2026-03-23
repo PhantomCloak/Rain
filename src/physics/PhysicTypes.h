@@ -1,9 +1,9 @@
 #pragma once
-#include <Jolt.h>
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+#include <Jolt/Physics/Collision/ObjectLayer.h>
+#include <glm/ext/vector_float3.hpp>
 #include <unordered_set>
-#include "Physics/Collision/BroadPhase/BroadPhaseLayer.h"
-#include "Physics/Collision/ObjectLayer.h"
-#include "glm/ext/vector_float3.hpp"
 #include "core/UUID.h"
 
 namespace Layers {
