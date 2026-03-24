@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(find C:UserspcDocumentsProjectsWebEngine -maxdepth 1 -name *preset* -o -name *cmake* -type f)"
-    ]
-  }
-}

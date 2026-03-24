@@ -32,10 +32,6 @@ target_compile_definitions(ReEngine PRIVATE
   $<IF:$<BOOL:${EMSCRIPTEN}>,IMGUI_IMPL_WEBGPU_BACKEND_WGPU,IMGUI_IMPL_WEBGPU_BACKEND_DAWN>
 )
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  target_compile_options(ReEngine PRIVATE -Wno-error -Wimplicit-const-int-float-conversion)
-endif()
-
 include(cmake/ThirdParty.cmake)
 
 target_include_directories(ReEngine SYSTEM PRIVATE
