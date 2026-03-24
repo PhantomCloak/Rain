@@ -30,7 +30,7 @@ jobs:
         run: cmake --preset osx-release
 
       - name: Build
-        run: cmake --build build/osx-release -j
+        run: cmake --build build/osx-release -j2
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
