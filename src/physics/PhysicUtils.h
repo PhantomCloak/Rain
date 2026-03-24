@@ -2,7 +2,7 @@
 #ifndef NDEBUG
 #define NDEBUG
 #endif
-#include <Jolt.h>
+#include <Jolt/Jolt.h>
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 

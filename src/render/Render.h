@@ -1,7 +1,8 @@
 #pragma once
-#include <webgpu/webgpu.h>
 #if __EMSCRIPTEN__
 using WGPUStringView = const char*;
+#else
+#include <webgpu/webgpu.h>
 #endif
 #include "GLFW/glfw3.h"
 #include "Material.h"

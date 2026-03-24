@@ -12,8 +12,8 @@ extern "C" WGPUSurface htmlGetCanvasSurface(WGPUInstance instance, std::string s
       .selector = selector.c_str()};
 
   WGPUSurfaceDescriptor surfaceDescriptor = {
-      .label = NULL,
-      .nextInChain = (const WGPUChainedStruct *)&canvasDescriptor};
+      .nextInChain = (const WGPUChainedStruct *)&canvasDescriptor,
+      .label = NULL};
 
   WGPUSurface surface = wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
 

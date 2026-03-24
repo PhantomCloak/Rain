@@ -33,7 +33,7 @@ namespace WebEngine
     virtual void Init(const WindowProps& props);
     virtual void Shutdown();
 
-   private:
+   protected:
     GLFWwindow* m_Window;
   };
 }  // namespace WebEngine

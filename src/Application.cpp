@@ -19,6 +19,7 @@
 #include "io/keyboard.h"
 #include "EditorLayer.h"
 #include "engine/ImGuiLayer.h"
+#include "physics/Physics.h"
 #include "render/Render.h"
 #include "render/ResourceManager.h"
 
@@ -82,13 +83,18 @@ namespace WebEngine
       InitializeScene();
     }
 
+    Physics::Instance = new Physics();
+    Physics::Instance->Init();
+
     m_Layers.PushLayer(new EditorLayer());
   }
 
   void Application::OnResize(int height, int width)
   {
     if (width == 0 || height == 0)
+    {
       return;
+    }
 
     m_SwapChain->Resize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 
@@ -140,7 +146,9 @@ namespace WebEngine
       int fbWidth, fbHeight;
       glfwGetFramebufferSize(m_Window, &fbWidth, &fbHeight);
       if (fbWidth == 0 || fbHeight == 0)
+      {
         return;
+      }
     }
 
     float currentTime = static_cast<float>(glfwGetTime());
@@ -188,6 +196,15 @@ namespace WebEngine
 
   void Application::OnKeyPressed(KeyCode key, KeyAction action)
   {
+    if (action == WebEngine::Key::RN_KEY_PRESS)
+    {
+      Keyboard::PushKeyEvent(key, true);
+    }
+    else if (action == WebEngine::Key::RN_KEY_RELEASE)
+    {
+      Keyboard::PushKeyEvent(key, false);
+    }
+
     if (key == WebEngine::Key::Escape && action == WebEngine::Key::RN_KEY_RELEASE)
     {
       Cursor::CaptureMouse(false);

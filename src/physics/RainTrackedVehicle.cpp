@@ -1,13 +1,10 @@
 #include "RainTrackedVehicle.h"
-#include <Jolt.h>
-#include <Physics/Vehicle/TrackedVehicleController.h>
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Vehicle/TrackedVehicleController.h>
 #include <Jolt/Physics/Collision/GroupFilterTable.h>
-#include <Physics/Vehicle/VehicleConstraint.h>
-#include "Physics/Body/BodyLockMulti.h"
-#include "Physics/Constraints/HingeConstraint.h"
-#include "physics/PhysicUtils.h"
-#include "render/ResourceManager.h"
-#include "scene/Scene.h"
+#include <Jolt/Physics/Vehicle/VehicleConstraint.h>
+#include <Jolt/Physics/Body/BodyLockMulti.h>
+#include <Jolt/Physics/Constraints/HingeConstraint.h>
 
 #include "core/KeyCode.h"
 #include "io/keyboard.h"

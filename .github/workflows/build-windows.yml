@@ -1,0 +1,38 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "windows-build"
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup dependencies
+        run: .\setup_deps.ps1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Configure
+        run: cmake --preset windows
+
+      - name: Build
+        run: cmake --build build/windows --config Release -j
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ReEngine-Windows
+          path: build/windows/bin/Release/ReEngine.exe
+          retention-days: 30

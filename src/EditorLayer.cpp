@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstring>
 #include <unordered_set>
+#include "demo/DemoScene.h"
 #include "glm/fwd.hpp"
 #include "imgui.h"
 #include "ImGuizmo.h"
@@ -41,7 +42,8 @@ namespace WebEngine
     m_ViewportRenderer = CreateRef<SceneRenderer>();
     m_ViewportRenderer->Init();
 
-    m_Scene = std::make_unique<Scene>("Test Scene");
+    //m_Scene = std::make_unique<DemoSceneDefault>("Test Scene");
+    m_Scene = std::make_unique<DemoScenePhysicCollisions>("Test Scene");
     m_Scene->Init();
 
     m_EditorCamera.Position = glm::vec3(-10, 10.5, -24.1f);
@@ -113,6 +115,8 @@ namespace WebEngine
   void EditorLayer::OnUpdate(float dt)
   {
     UpdateEditorCamera(dt);
+    m_Scene->EditorCameraPosition = m_EditorCamera.Position;
+    m_Scene->EditorCameraForward = m_EditorCamera.GetForward();
     m_Scene->OnUpdate();
     m_Scene->OnRender(m_ViewportRenderer, m_EditorCamera.GetViewMatrix());
   }

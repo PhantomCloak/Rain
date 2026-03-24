@@ -1,8 +1,6 @@
 #include "PhysicsBody.h"
-#include "Physics/Collision/Shape/CylinderShape.h"
-#include "physics/PhysicUtils.h"
-#include "scene/Scene.h"
 
+#include <Jolt/Physics/Collision/Shape/CylinderShape.h>
 #include <Jolt/Core/Factory.h>
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Core/TempAllocator.h>
@@ -16,6 +14,9 @@
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Physics/Collision/GroupFilterTable.h>
+
+#include "physics/PhysicUtils.h"
+#include "scene/Scene.h"
 
 namespace WebEngine
 {
@@ -127,18 +128,18 @@ namespace WebEngine
 
   void PhysicsBody::CreateCollisionShapesForEntity(Entity entity)
   {
-    // if (entity.HasComponent<BoxColliderComponent>()) {
-    //   BoxColliderComponent& collider = entity.GetComponent<BoxColliderComponent>();
+    if (entity.HasComponent<BoxColliderComponent>()) {
+      BoxColliderComponent& collider = entity.GetComponent<BoxColliderComponent>();
 
-    //  if (collider.Offset != glm::vec3(0.0)) {
-    //    m_Shape = JPH::OffsetCenterOfMassShapeSettings(PhysicsUtils::ToJoltVector(collider.Offset), new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider.Size))).Create().Get();
-    //  } else {
-    //    m_Shape = new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider.Size));
-    //  }
-    //} else if (entity.HasComponent<CylinderCollider>()) {
-    //  CylinderCollider& collider = entity.GetComponent<CylinderCollider>();
-    //  m_Shape = new JPH::CylinderShape(collider.Size.x, collider.Size.y);
-    //}
+      if (collider.Offset != glm::vec3(0.0)) {
+        m_Shape = JPH::OffsetCenterOfMassShapeSettings(PhysicsUtils::ToJoltVector(collider.Offset), new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider.Size))).Create().Get();
+      } else {
+        m_Shape = new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider.Size));
+      }
+    } else if (entity.HasComponent<CylinderCollider>()) {
+      CylinderCollider& collider = entity.GetComponent<CylinderCollider>();
+      m_Shape = new JPH::CylinderShape(collider.Size.x, collider.Size.y);
+    }
   }
 
   void PhysicsBody::CreateDynamicBody(JPH::BodyInterface& bodyInterface)
@@ -158,16 +159,11 @@ namespace WebEngine
     bodySettings.mAllowSleeping = false;
     bodySettings.mLinearDamping = rigidBodyComponent.LinearDrag;
     bodySettings.mAngularDamping = rigidBodyComponent.AngularDrag;
-    // bodySettings.mGravityFactor = 1.0f;
-    //  bodySettings.mLinearVelocity = PhysicsUtils::ToJoltVector(rigidBodyComponent->InitialLinearVelocity);
-    //  bodySettings.mAngularVelocity = PhysicsUtils::ToJoltVector(rigidBodyComponent->InitialAngularVelocity);
-    //  bodySettings.mMaxLinearVelocity = rigidBodyComponent->MaxLinearVelocity;
-    //  bodySettings.mMaxAngularVelocity = rigidBodyComponent->MaxAngularVelocity;
+    bodySettings.mLinearVelocity = PhysicsUtils::ToJoltVector(rigidBodyComponent.InitialLinearVelocity);
+    bodySettings.mAngularVelocity = PhysicsUtils::ToJoltVector(rigidBodyComponent.InitialAngularVelocity);
+    bodySettings.mMaxLinearVelocity = rigidBodyComponent.MaxLinearVelocity;
+    bodySettings.mMaxAngularVelocity = rigidBodyComponent.MaxAngularVelocity;
 
-    JPH::GroupFilter* filter = new JPH::GroupFilterTable;
-    bodySettings.mCollisionGroup.SetGroupFilter(filter);
-    bodySettings.mCollisionGroup.SetGroupID(0);
-    bodySettings.mCollisionGroup.SetSubGroupID(0);
     bodySettings.mMotionQuality = JPH::EMotionQuality::Discrete;
     // bodySettings.mAllowSleeping = true;
 
@@ -200,7 +196,7 @@ namespace WebEngine
         // PhysicsUtils::ToJoltQuat(glm::normalize(worldTransform.Rotation)),
         PhysicsUtils::ToJoltQuat(worldTransform.Rotation),
         JPH::EMotionType::Static,
-        Layers::MOVING);
+        Layers::NON_MOVING);
 
     bodySettings.mIsSensor = false;
     bodySettings.mAllowDynamicOrKinematic = true;

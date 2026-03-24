@@ -13,8 +13,8 @@ int main(int argc, char** argv)
 {
   InitTracyMemoryProfiling();
 
-  int resX = 1920 * 2;
-  int resY = 1080 * 2;
+  int resX = 1920;
+  int resY = 1080;
 
   std::vector<std::string> strArgs;
   for (int i = 1; i < argc; i++)
