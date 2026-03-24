@@ -1,15 +1,11 @@
 name: Linux
-
 on:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: "linux-build"
   cancel-in-progress: true
-
 jobs:
   build-linux:
     runs-on: ubuntu-latest
@@ -19,7 +15,7 @@ jobs:
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y xorg-dev libxcb-xkb-dev x11-xkb-utils libx11-xcb-dev libxkbcommon-x11-dev libvulkan-dev
+          sudo apt-get install -y xorg-dev libxcb-xkb-dev x11-xkb-utils libx11-xcb-dev libxkbcommon-x11-dev libvulkan-dev clang
 
       - name: Init submodules
         run: |
@@ -33,9 +29,12 @@ jobs:
 
       - name: Configure
         run: cmake --preset linux-release
+        env:
+          CC: clang
+          CXX: clang++
 
       - name: Build
-        run: cmake --build build/linux-release -j
+        run: cmake --build build/linux-release -j2
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
