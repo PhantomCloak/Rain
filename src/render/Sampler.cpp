@@ -23,6 +23,7 @@ namespace WebEngine
         samplerDesc.magFilter = WGPUFilterMode_Nearest;
         break;
       case Linear:
+      default:
         samplerDesc.magFilter = WGPUFilterMode_Linear;
         break;
     }
@@ -33,6 +34,7 @@ namespace WebEngine
         samplerDesc.minFilter = WGPUFilterMode_Nearest;
         break;
       case Linear:
+      default:
         samplerDesc.minFilter = WGPUFilterMode_Linear;
         break;
     }
@@ -43,6 +45,7 @@ namespace WebEngine
         samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Nearest;
         break;
       case Linear:
+      default:
         samplerDesc.mipmapFilter = WGPUMipmapFilterMode_Linear;
         break;
     }

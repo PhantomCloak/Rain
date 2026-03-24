@@ -4,8 +4,6 @@
 #endif
 #include <Jolt/Jolt.h>
 #include <Jolt/Renderer/DebugRendererSimple.h>
-#else
-#include <Jolt.h>
 #endif
 #include <webgpu/webgpu.h>
 #include <glm/glm.hpp>

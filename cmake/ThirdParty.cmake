@@ -1,19 +1,5 @@
 target_include_directories(ReEngine PRIVATE src)
 
-add_subdirectory(vendor/assimp            SYSTEM)
-add_subdirectory(vendor/JoltPhysics/Build SYSTEM)
-add_subdirectory(vendor/ozz-animation     SYSTEM)
-add_subdirectory(vendor/spdlog            SYSTEM)
-add_subdirectory(vendor/flecs             SYSTEM)
-add_subdirectory(vendor/glm               SYSTEM)
-
-target_include_directories(assimp PRIVATE "${CMAKE_BINARY_DIR}")
-target_compile_options(assimp PRIVATE
-  -Wno-error
-  $<$<C_COMPILER_ID:Clang>:-Wimplicit-const-int-float-conversion>
-  $<$<CXX_COMPILER_ID:Clang>:-Wimplicit-const-int-float-conversion>
-)
-
 if(EMSCRIPTEN)
   set(EMSCRIPTEN_PTHREADS_FLAGS "-pthread")
 
@@ -27,6 +13,20 @@ if(EMSCRIPTEN)
   set(CMAKE_USE_PTHREADS_INIT        1          CACHE BOOL   "" FORCE)
   set(THREADS_PREFER_PTHREAD_FLAG    ON         CACHE BOOL   "" FORCE)
 endif()
+
+add_subdirectory(vendor/assimp            SYSTEM)
+add_subdirectory(vendor/JoltPhysics/Build SYSTEM)
+add_subdirectory(vendor/ozz-animation     SYSTEM)
+add_subdirectory(vendor/spdlog            SYSTEM)
+add_subdirectory(vendor/flecs             SYSTEM)
+add_subdirectory(vendor/glm               SYSTEM)
+
+target_include_directories(assimp PRIVATE "${CMAKE_BINARY_DIR}")
+target_compile_options(assimp PRIVATE
+  -Wno-error
+  $<$<C_COMPILER_ID:Clang>:-Wimplicit-const-int-float-conversion>
+  $<$<CXX_COMPILER_ID:Clang>:-Wimplicit-const-int-float-conversion>
+)
 
 if(NOT EMSCRIPTEN)
   add_subdirectory(vendor/dawn SYSTEM)
