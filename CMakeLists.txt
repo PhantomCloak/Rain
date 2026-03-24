@@ -49,8 +49,6 @@ target_link_libraries(ReEngine PRIVATE
   spdlog
   Jolt
   glm
-  ozz_base
-  ozz_animation
   ozz_animation_offline
 )
 
@@ -71,16 +69,10 @@ endif()
 
 if(NOT EMSCRIPTEN)
   target_link_libraries(ReEngine PRIVATE
-    dawn_common
     dawn_glfw
-    dawn_headers
     dawn_native
-    dawn_platform
-    dawn_wire
-    dawncpp
-    dawncpp_headers
-    libtint
     dawn_proc
+    dawncpp
     TracyClient
     glfw
   )
