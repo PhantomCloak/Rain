@@ -27,9 +27,9 @@ endif()
 
 add_executable(ReEngine ${SOURCES})
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  target_compile_options(ReEngine PRIVATE -Wno-changes-meaning)
-endif()
+target_compile_options(ReEngine PRIVATE
+  $<$<CXX_COMPILER_ID:GNU>:-Wno-changes-meaning>
+)
 
 target_compile_definitions(ReEngine PRIVATE
   RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources"
