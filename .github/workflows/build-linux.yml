@@ -15,7 +15,7 @@ jobs:
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y xorg-dev libxcb-xkb-dev x11-xkb-utils libx11-xcb-dev libxkbcommon-x11-dev libvulkan-dev clang
+          sudo apt-get install -y xorg-dev libxcb-xkb-dev x11-xkb-utils libx11-xcb-dev libxkbcommon-x11-dev libvulkan-dev
 
       - name: Init submodules
         run: |
@@ -29,9 +29,6 @@ jobs:
 
       - name: Configure
         run: cmake --preset linux-release
-        env:
-          CC: clang
-          CXX: clang++
 
       - name: Build
         run: cmake --build build/linux-release -j2
