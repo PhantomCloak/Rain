@@ -33,7 +33,8 @@
                 "ASSIMP_BUILD_SMD_IMPORTER": "TRUE",
                 "ASSIMP_BUILD_SIB_IMPORTER": "TRUE",
                 "ASSIMP_BUILD_OBJ_IMPORTER": "TRUE",
-                "CMAKE_CXX_EXTENSIONS": "OFF"
+                "CMAKE_CXX_EXTENSIONS": "OFF",
+                "FLECS_SHARED": "OFF"
             }
         },
         {
