@@ -27,10 +27,14 @@ jobs:
           python-version: '3.x'
 
       - name: Configure
-        run: cmake --preset osx-release
+        run: >
+          cmake --preset osx-release
+          -DCMAKE_CXX_FLAGS_RELEASE="-O2 -DNDEBUG -flto=thin"
+          -DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG -flto=thin"
+          -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-flto=thin"
 
       - name: Build
-        run: cmake --build build/osx-release -j
+        run: cmake --build build/osx-release -j3
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

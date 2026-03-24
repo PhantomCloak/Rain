@@ -8,9 +8,11 @@ add_subdirectory(vendor/flecs             SYSTEM)
 add_subdirectory(vendor/glm               SYSTEM)
 
 target_include_directories(assimp PRIVATE "${CMAKE_BINARY_DIR}")
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  target_compile_options(assimp PRIVATE -Wno-error -Wimplicit-const-int-float-conversion)
-endif()
+target_compile_options(assimp PRIVATE
+  -Wno-error
+  $<$<C_COMPILER_ID:Clang>:-Wimplicit-const-int-float-conversion>
+  $<$<CXX_COMPILER_ID:Clang>:-Wimplicit-const-int-float-conversion>
+)
 
 if(EMSCRIPTEN)
   set(EMSCRIPTEN_PTHREADS_FLAGS "-pthread")
