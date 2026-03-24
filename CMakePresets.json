@@ -137,10 +137,9 @@
             }
         },
         {
-            "name": "windows-vs2022-debug",
+            "name": "windows",
             "inherits": "dawn-common",
-            "description": "Build with Dawn for Windows (VS 2022, Debug)",
-            "generator": "Visual Studio 17 2022",
+            "description": "Build with Dawn for Windows",
             "architecture": "x64",
             "cacheVariables": {
                 "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
@@ -148,7 +147,9 @@
                 "USE_STATIC_MSVC_RUNTIME_LIBRARY": "OFF",
                 "ozz_build_msvc_rt_dll": "ON",
                 "DAWN_ENABLE_D3D12": "ON",
-                "DAWN_FORCE_SYSTEM_COMPONENT_LOAD": "ON"
+                "DAWN_FORCE_SYSTEM_COMPONENT_LOAD": "ON",
+                "ASSIMP_INJECT_DEBUG_POSTFIX": "OFF",
+                "ENABLE_ALL_WARNINGS": "OFF"
             }
         },
         {
