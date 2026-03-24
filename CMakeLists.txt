@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.19...3.25)
 
 if(APPLE)
@@ -46,39 +47,6 @@ target_include_directories(ReEngine SYSTEM PRIVATE
 target_link_libraries(ReEngine PRIVATE
   assimp
   flecs_static
-  spdlog
-  Jolt
-  glm
-  ozz_animation_offline
-)
-
-if(EMSCRIPTEN)
-  add_definitions(-DIMGUI_IMPL_WEBGPU_BACKEND_WGPU)
-else()
-  add_definitions(-DIMGUI_IMPL_WEBGPU_BACKEND_DAWN)
-endif()
-add_executable(ReEngine ${SOURCES})
-
-target_compile_definitions(ReEngine PRIVATE
-  RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources"
-  $<IF:$<BOOL:${EMSCRIPTEN}>,IMGUI_IMPL_WEBGPU_BACKEND_WGPU,IMGUI_IMPL_WEBGPU_BACKEND_DAWN>
-)
-
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  target_compile_options(ReEngine PRIVATE -Wno-error -Wimplicit-const-int-float-conversion)
-endif()
-
-include(cmake/ThirdParty.cmake)
-
-target_include_directories(ReEngine SYSTEM PRIVATE
-  vendor/stb
-  vendor/imgui
-  vendor/ImGuizmo
-)
-
-target_link_libraries(ReEngine PRIVATE
-  assimp
-  flecs
   spdlog
   Jolt
   glm
