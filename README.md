@@ -2,6 +2,9 @@
 
 Next-generation web engine. Written in C++. Uses the WebGPU rendering API, with native support for Windows, Linux, and macOS, as well as all WebGPU-compatible browsers including Safari (iOS) and Chrome (Android)
 
+[![Web](https://github.com/PhantomCloak/WebEngine/actions/workflows/pages.yml/badge.svg)](https://github.com/PhantomCloak/WebEngine/actions/workflows/pages.yml)
+[![Windows](https://github.com/PhantomCloak/WebEngine/actions/workflows/build-windows.yml/badge.svg)](https://github.com/PhantomCloak/WebEngine/actions/workflows/build-windows.yml) [![Linux](https://github.com/PhantomCloak/WebEngine/actions/workflows/build-linux.yml/badge.svg)](https://github.com/PhantomCloak/WebEngine/actions/workflows/build-linux.yml) [![MacOS](https://github.com/PhantomCloak/WebEngine/actions/workflows/build-macos.yml/badge.svg)](https://github.com/PhantomCloak/WebEngine/actions/workflows/build-macos.yml)
+
 [View on web browser &rarr;](https://phantomcloak.me)
 
 ### Demos
