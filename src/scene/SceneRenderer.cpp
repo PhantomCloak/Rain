@@ -276,8 +276,8 @@ namespace WebEngine
 
     // Shadow
     TextureProps shadowDepthTextureSpec = {};
-    shadowDepthTextureSpec.Width = 4096;
-    shadowDepthTextureSpec.Height = 4096;
+    shadowDepthTextureSpec.Width = 1024;
+    shadowDepthTextureSpec.Height = 1024;
     shadowDepthTextureSpec.Format = TextureFormat::Depth24Plus;
     shadowDepthTextureSpec.layers = m_NumOfCascades;
 
