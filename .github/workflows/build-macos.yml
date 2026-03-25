@@ -37,7 +37,7 @@ jobs:
           -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-flto=thin"
 
       - name: Build
-        run: cmake --build build/osx-release -j3
+        run: cmake --build build/osx-release
 
       - name: Copy files
         run: |
