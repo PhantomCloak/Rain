@@ -76,9 +76,6 @@
             "inherits": "dawn-common",
             "hidden": true,
             "description": "Common configuration for Linux",
-            "environment": {
-                "RESOURCE_DIR": "${sourceDir}/Resources"
-            },
             "cacheVariables": {
                 "DAWN_ENABLE_VULKAN": "ON",
                 "TINT_BUILD_SPV_WRITER": "ON",
@@ -111,9 +108,6 @@
             "inherits": "dawn-common",
             "hidden": true,
             "description": "Common configuration for macOS",
-            "environment": {
-                "RESOURCE_DIR": "${sourceDir}/Resources"
-            },
             "cacheVariables": {
                 "USE_METAL": "ON",
                 "DAWN_ENABLE_METAL": "ON",

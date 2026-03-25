@@ -63,7 +63,7 @@ if(EMSCRIPTEN)
     -sWASM_BIGINT=1
     -sASSERTIONS
     -sSTACK_SIZE=1mb
-    --preload-file "${CMAKE_CURRENT_SOURCE_DIR}/Resources"
+    "--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/Resources@Resources"
   )
   set_target_properties(ReEngine PROPERTIES SUFFIX ".html")
 endif()
