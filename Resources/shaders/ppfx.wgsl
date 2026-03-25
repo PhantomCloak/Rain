@@ -33,9 +33,10 @@ fn acesFilm(x: vec3<f32>) -> vec3<f32> {
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let textureColor = textureSample(renderTexture, textureSampler, in.uv).rgb;
     let brightness = textureSample(brightnessTexture, textureSampler, in.uv).rgb;
-    //let acesInput = textureColor;
-    //var aces = acesFilm(acesInput);
-    //aces.x = 0.0;
 
-    return vec4<f32>(textureColor, 1.0);
+    let exposure = 0.84;
+    let exposed = textureColor * exposure;
+    let tonemapped = acesFilm(exposed);
+
+    return vec4<f32>(tonemapped, 1.0);
 }

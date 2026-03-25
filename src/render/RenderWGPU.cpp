@@ -387,8 +387,8 @@ namespace WebEngine
     const auto pipeline = wgpuDeviceCreateComputePipeline(device, &pipelineDesc);
 
     const uint32_t workgroupSize = 16;
-    const uint32_t workgroupsX = (input->GetSpec().Width + workgroupSize - 1) / workgroupSize;
-    const uint32_t workgroupsY = (input->GetSpec().Height + workgroupSize - 1) / workgroupSize;
+    const uint32_t workgroupsX = (output->GetSpec().Width + workgroupSize - 1) / workgroupSize;
+    const uint32_t workgroupsY = (output->GetSpec().Height + workgroupSize - 1) / workgroupSize;
 
     auto encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
     {

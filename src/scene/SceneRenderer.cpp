@@ -151,7 +151,7 @@ namespace WebEngine
           maxExtents.z + CascadeFarPlaneOffset);
 
       glm::mat4 shadowMatrix = lightOrthoMatrix * lightViewMatrix;
-      float ShadowMapResolution = 4096;
+      float ShadowMapResolution = 1024;
 
       glm::vec4 shadowOrigin = (shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)) * ShadowMapResolution / 2.0f;
       glm::vec4 roundedOrigin = glm::round(shadowOrigin);
@@ -247,13 +247,13 @@ namespace WebEngine
     const Ref<Shader> skyboxShader = ShaderManager::LoadShader("SH_Skybox", "Resources/shaders/skybox.wgsl");
     const Ref<Shader> ppfxShader = ShaderManager::LoadShader("SH_Ppfx", "Resources/shaders/ppfx.wgsl");
 
-    TextureProps cubeProps = {};
-    cubeProps.Width = 2048;
-    cubeProps.Height = 2048;
-    cubeProps.GenerateMips = true;
-    cubeProps.Format = TextureFormat::RGBA16F;
+    TextureProps skyboxCubeProps = {};
+    skyboxCubeProps.Width = 2048;
+    skyboxCubeProps.Height = 2048;
+    skyboxCubeProps.GenerateMips = false;
+    skyboxCubeProps.Format = TextureFormat::RGBA16F;
 
-    Ref<TextureCube> envUnfiltered = TextureCube::Create(cubeProps);
+    Ref<TextureCube> envUnfiltered = TextureCube::Create(skyboxCubeProps);
     Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), "Resources/textures/evening_road_01_puresky_4k.hdr");
 
     m_Renderer = Render::Get();
@@ -285,7 +285,7 @@ namespace WebEngine
 
     // Common
     FramebufferSpec compositeFboSpec;
-    compositeFboSpec.ColorFormats = {TextureFormat::BRGBA8, TextureFormat::BRGBA8};
+    compositeFboSpec.ColorFormats = {TextureFormat::RGBA16F, TextureFormat::RGBA16F};
     compositeFboSpec.DepthFormat = TextureFormat::Depth24Plus;
     compositeFboSpec.DebugName = "FB_Composite";
     compositeFboSpec.Multisample = 1;
@@ -301,7 +301,7 @@ namespace WebEngine
 
     // Skybox
     FramebufferSpec skyboxFboSpec;
-    skyboxFboSpec.ColorFormats = {TextureFormat::BRGBA8};
+    skyboxFboSpec.ColorFormats = {TextureFormat::RGBA16F};
     skyboxFboSpec.DepthFormat = TextureFormat::Depth24Plus;
     skyboxFboSpec.DebugName = "FB_Skybox";
     skyboxFboSpec.Multisample = 1;
@@ -472,7 +472,7 @@ namespace WebEngine
     m_BoneMatricesBuffer->SetData(identityBones.data(), 128 * sizeof(glm::mat4));
 
     FramebufferSpec skeletalFboSpec;
-    skeletalFboSpec.ColorFormats = {TextureFormat::BRGBA8};
+    skeletalFboSpec.ColorFormats = {TextureFormat::RGBA16F};
     skeletalFboSpec.DepthFormat = TextureFormat::Depth24Plus;
     skeletalFboSpec.DebugName = "FB_Skeletal";
     skeletalFboSpec.Multisample = 1;

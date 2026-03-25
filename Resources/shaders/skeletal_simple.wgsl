@@ -353,5 +353,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
         Metalness
     );
 
-    return vec4f(acesFilm(iblContribution + lightContribution), 1.0);
+    return vec4f(iblContribution + lightContribution, 1.0);
 }

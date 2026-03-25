@@ -363,7 +363,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput  {
 			Metalness);
 
    var out: FragmentOutput;
-   out.color = vec4f(acesFilm(iblContribution + lightContribution), 1.0);
+   out.color = vec4f(iblContribution + lightContribution, 1.0);
    out.brightness = vec4f(1.0f, 0.0f, 0.0f, 1.0f);
 
 return out;
