@@ -242,10 +242,10 @@ namespace WebEngine
       {7, ShaderDataType::Float4, "a_MRow2", 32}}};
     // clang-format on
 
-    const Ref<Shader> pbrShader = ShaderManager::LoadShader("SH_DefaultBasicBatch", RESOURCE_DIR "/shaders/pbr.wgsl");
-    const Ref<Shader> shadowShader = ShaderManager::LoadShader("SH_Shadow", RESOURCE_DIR "/shaders/shadow_map.wgsl");
-    const Ref<Shader> skyboxShader = ShaderManager::LoadShader("SH_Skybox", RESOURCE_DIR "/shaders/skybox.wgsl");
-    const Ref<Shader> ppfxShader = ShaderManager::LoadShader("SH_Ppfx", RESOURCE_DIR "/shaders/ppfx.wgsl");
+    const Ref<Shader> pbrShader = ShaderManager::LoadShader("SH_DefaultBasicBatch", "Resources/shaders/pbr.wgsl");
+    const Ref<Shader> shadowShader = ShaderManager::LoadShader("SH_Shadow", "Resources/shaders/shadow_map.wgsl");
+    const Ref<Shader> skyboxShader = ShaderManager::LoadShader("SH_Skybox", "Resources/shaders/skybox.wgsl");
+    const Ref<Shader> ppfxShader = ShaderManager::LoadShader("SH_Ppfx", "Resources/shaders/ppfx.wgsl");
 
     TextureProps cubeProps = {};
     cubeProps.Width = 2048;
@@ -254,14 +254,14 @@ namespace WebEngine
     cubeProps.Format = TextureFormat::RGBA16F;
 
     Ref<TextureCube> envUnfiltered = TextureCube::Create(cubeProps);
-    Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), RESOURCE_DIR "/textures/evening_road_01_puresky_4k.hdr");
+    Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), "Resources/textures/evening_road_01_puresky_4k.hdr");
 
     m_Renderer = Render::Get();
     m_Renderer->ComputeEquirectToCubemap(envEquirect.get(), envUnfiltered.get());
 
-    auto [envFiltered, envIrradiance] = m_Renderer->CreateEnvironmentMap(RESOURCE_DIR "/textures/evening_road_01_puresky_4k.hdr");
+    auto [envFiltered, envIrradiance] = m_Renderer->CreateEnvironmentMap("Resources/textures/evening_road_01_puresky_4k.hdr");
 
-    FileSys::WatchFile(RESOURCE_DIR "/shaders/pbr.wgsl", [pbrShader](std::string filePath)
+    FileSys::WatchFile("Resources/shaders/pbr.wgsl", [pbrShader](std::string filePath)
                        {
                          std::string content = FileSys::ReadFile(filePath);
                          pbrShader->Reload(content);
@@ -343,7 +343,7 @@ namespace WebEngine
                                         .LodMinClamp = 0.0f,
                                         .LodMaxClamp = 1.0f});
 
-    auto bdrfLut = WebEngine::ResourceManager::LoadTexture("BDRF", RESOURCE_DIR "/textures/BRDF_LUT.png");
+    auto bdrfLut = WebEngine::ResourceManager::LoadTexture("BDRF", "Resources/textures/BRDF_LUT.png");
 
     auto brdfSampler = Sampler::Create({.Name = "S_BRDF",
                                         .WrapFormat = TextureWrappingFormat::ClampToEdges,
@@ -440,8 +440,8 @@ namespace WebEngine
     m_CompositePass->Bake();
 
     // Skeletal Mesh Pipeline
-    auto skeletalShader = ShaderManager::LoadShader("SH_Skeletal", RESOURCE_DIR "/shaders/skeletal_simple.wgsl");
-    FileSys::WatchFile(RESOURCE_DIR "/shaders/skeletal_simple.wgsl", [skeletalShader](std::string filePath)
+    auto skeletalShader = ShaderManager::LoadShader("SH_Skeletal", "Resources/shaders/skeletal_simple.wgsl");
+    FileSys::WatchFile("Resources/shaders/skeletal_simple.wgsl", [skeletalShader](std::string filePath)
                        {
                          std::string content = FileSys::ReadFile(filePath);
                          skeletalShader->Reload(content);
@@ -509,7 +509,7 @@ namespace WebEngine
     m_SkeletalPass->Set("u_BRDFSampler", brdfSampler);
     m_SkeletalPass->Bake();
 
-    auto skeletalShadowShader = ShaderManager::LoadShader("SH_SkeletalShadow", RESOURCE_DIR "/shaders/skeletal_shadow_map.wgsl");
+    auto skeletalShadowShader = ShaderManager::LoadShader("SH_SkeletalShadow", "Resources/shaders/skeletal_shadow_map.wgsl");
 
     FramebufferSpec skeletalShadowFboSpec;
     skeletalShadowFboSpec.DepthFormat = TextureFormat::Depth24Plus;
@@ -671,7 +671,7 @@ namespace WebEngine
       RenderDebug::sInstance->DrawLine(nearWorldCorners[i], farWorldCorners[i], JPH::Color::sGreen);
     }
   }
-#endif // !__EMSCRIPTEN__
+#endif  // !__EMSCRIPTEN__
 
   void SceneRenderer::BeginScene(const SceneCamera& camera)
   {
@@ -709,6 +709,8 @@ namespace WebEngine
       m_PpfxPass->GetTargetFrameBuffer()->Resize(m_ViewportWidth, m_ViewportHeight);
       m_NeedResize = false;
     }
+
+    Cam = camera;
 
     // JPH::DebugRenderer::sInstance = m_Renderer;
     if (SavedCam.Far != 400.0f)
@@ -768,11 +770,11 @@ namespace WebEngine
 
 #ifndef __EMSCRIPTEN__
       {
-        WGPURenderPassEncoder passEncoder = m_CompositePass->GetRenderPassEncoder();
-        WGPUCommandEncoder cmdEncoder = m_CommandBuffer->GetNativeEncoder();
-        RenderDebug::SetMVP(Cam.Projection * Cam.ViewMatrix);
-        RenderDebug::Begin(&passEncoder, &cmdEncoder);
-        RenderDebug::FlushDrawList();
+        // WGPURenderPassEncoder passEncoder = m_CompositePass->GetRenderPassEncoder();
+        // WGPUCommandEncoder cmdEncoder = m_CommandBuffer->GetNativeEncoder();
+        // RenderDebug::SetMVP(Cam.Projection * Cam.ViewMatrix);
+        // RenderDebug::Begin(&passEncoder, &cmdEncoder);
+        // RenderDebug::FlushDrawList();
       }
 #endif
 

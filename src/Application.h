@@ -1,5 +1,4 @@
 #pragma once
-#include <functional>
 #include "core/Ref.h"
 #include "engine/Event.h"
 #include "render/SwapChain.h"
@@ -37,8 +36,6 @@ namespace WebEngine
   {
    protected:
     void OnKeyPressed(KeyCode key, KeyAction action) override;
-    // void OnMouseMove(double xPos, double yPos) override;
-    void OnMouseClick(WebEngine::MouseCode button) override;
     void OnResize(int height, int width) override;
 
    public:

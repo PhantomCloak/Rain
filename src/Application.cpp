@@ -1,9 +1,6 @@
 // #include "imgui.h"
-#include "backends/imgui_impl_glfw.h"
-#include "backends/imgui_impl_wgpu.h"
 #include "core/Ref.h"
 #include "render/RenderWGPU.h"
-#include "scene/Entity.h"
 #include "scene/Scene.h"
 #include "scene/SceneRenderer.h"
 #define RN_DEBUG
@@ -22,8 +19,6 @@
 #include "physics/Physics.h"
 #include "render/Render.h"
 #include "render/ResourceManager.h"
-
-#include "imgui.h"
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -52,7 +47,7 @@ namespace WebEngine
     const auto InitializeScene = [this]()
     {
       RN_LOG("Render API is ready!");
-      WebEngine::ResourceManager::LoadTexture("T_Default", RESOURCE_DIR "/textures/placeholder.jpeg");
+      WebEngine::ResourceManager::LoadTexture("T_Default", "Resources/textures/placeholder.jpeg");
 
       if (m_Render)
       {
@@ -83,8 +78,8 @@ namespace WebEngine
       InitializeScene();
     }
 
-    Physics::Instance = new Physics();
-    Physics::Instance->Init();
+    // Physics::Instance = new Physics();
+    // Physics::Instance->Init();
 
     m_Layers.PushLayer(new EditorLayer());
   }
@@ -183,15 +178,6 @@ namespace WebEngine
     {
       layer->OnEvent(event);
     }
-  }
-
-  void Application::OnMouseClick(WebEngine::MouseCode button)
-  {
-    // ImGuiIO& io = ImGui::GetIO();
-    // if (io.WantCaptureMouse) {
-    //   return;
-    // }
-    //  Cursor::CaptureMouse(true);
   }
 
   void Application::OnKeyPressed(KeyCode key, KeyAction action)

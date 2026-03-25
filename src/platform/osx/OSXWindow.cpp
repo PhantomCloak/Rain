@@ -57,20 +57,9 @@ void WebEngine::OSXWindow::Init(const WindowProps& props)
         osxWindow->OnKeyPressed(key, Key::RN_KEY_REPEAT);
         break;
       }
-    } });
-
-  glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods)
-                             {
-    OSXWindow* osxWindow = static_cast<OSXWindow*>(glfwGetWindowUserPointer(window));
-    switch (action) {
-      case GLFW_PRESS: {
-        osxWindow->OnMouseClick(Mouse::Press);
-        break;
-      }
-      case GLFW_RELEASE: {
-        osxWindow->OnMouseClick(Mouse::Release);
-        break;
-      }
+      default:
+      RN_LOG_ERR("Received key callback with unknown type");
+      break;
     } });
 
   glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, int width, int height)

@@ -42,7 +42,7 @@ namespace WebEngine
     m_ViewportRenderer = CreateRef<SceneRenderer>();
     m_ViewportRenderer->Init();
 
-    //m_Scene = std::make_unique<DemoSceneDefault>("Test Scene");
+    // m_Scene = std::make_unique<DemoSceneDefault>("Test Scene");
     m_Scene = std::make_unique<DemoScenePhysicCollisions>("Test Scene");
     m_Scene->Init();
 
@@ -133,6 +133,26 @@ namespace WebEngine
       }
       if (ImGui::BeginMenu("Entity"))
       {
+        ImGui::EndMenu();
+      }
+      if (ImGui::BeginMenu("Demo"))
+      {
+        if (ImGui::MenuItem("Stacking Boxes"))
+        {
+          m_Scene->Cleanup();
+          m_Scene.reset();
+
+          m_Scene = std::make_unique<DemoScenePhysicCollisions>("Test Scene");
+          m_Scene->Init();
+        }
+        if (ImGui::MenuItem("Animations & PBR"))
+        {
+          m_Scene->Cleanup();
+          m_Scene.reset();
+
+          m_Scene = std::make_unique<DemoSceneDefault>("Test Scene");
+          m_Scene->Init();
+        }
         ImGui::EndMenu();
       }
       ImGui::EndMainMenuBar();

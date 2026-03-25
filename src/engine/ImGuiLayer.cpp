@@ -17,7 +17,7 @@ namespace WebEngine
     auto& io = ImGui::GetIO();
     io.IniFilename = nullptr;  // Disable automatic ini file loading/saving
 
-    std::string iniData = FileSys::ReadFile(RESOURCE_DIR "/imgui.ini");
+    std::string iniData = FileSys::ReadFile("Resources/imgui.ini");
     if (!iniData.empty())
     {
       ImGui::LoadIniSettingsFromMemory(iniData.c_str(), iniData.size());

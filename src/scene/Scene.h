@@ -26,17 +26,18 @@ namespace WebEngine
     Scene(std::string sceneName = "Untitled Scene");
 
     Entity CreateEntity(std::string name);
-    Entity CreateChildEntity(Entity parent, std::string name);
+    Entity CreateChildEntity(const Entity& parent, const std::string name);
 
     virtual void Init();
+    virtual void Cleanup();
 
     void OnUpdate();
     void OnRender(Ref<SceneRenderer> renderer, const glm::mat4& editorViewMatrix = glm::mat4(0.0f));
 
-    void BuildMeshEntityHierarchy(Entity parent, Ref<MeshSource> mesh);
-    Entity TryGetEntityWithUUID(UUID id) const;
-    glm::mat4 GetWorldSpaceTransformMatrix(Entity entity);
-    TransformComponent GetWorldSpaceTransform(Entity entity);
+    void BuildMeshEntityHierarchy(const Entity& parent, const Ref<MeshSource>& mesh);
+    Entity TryGetEntityWithUUID(const UUID& id) const;
+    glm::mat4 GetWorldSpaceTransformMatrix(const Entity& entity);
+    TransformComponent GetWorldSpaceTransform(const Entity& entity);
     glm::mat4 EditTransform(glm::mat4& matrix);
     void ConvertToLocalSpace(Entity entity);
     Entity GetMainCameraEntity();
@@ -64,33 +65,9 @@ namespace WebEngine
     std::unordered_map<UUID, Entity> m_EntityMap;
     flecs::world m_World;
     std::string m_Name;
-    Ref<PhysicsScene> m_PhysicsScene;
+    std::unique_ptr<PhysicsScene> m_PhysicsScene;
     friend class Entity;
     friend class DemoScenePhysicCollisions;
   };
 
-}  // namespace WebEngine
-
-namespace WebEngine
-{
-  class DemoSceneDefault : public Scene
-  {
-   public:
-    DemoSceneDefault(std::string sceneName = "Untitled Scene") : Scene(std::move(sceneName)) {}
-    void Init() override;
-  };
-
-  class DemoScenePhysicCollisions : public Scene
-  {
-   public:
-    DemoScenePhysicCollisions(std::string sceneName = "Untitled Scene") : Scene(std::move(sceneName)) {}
-    void Init() override;
-    void ScanKeyPress() override;
-
-    void ThrowBall(const glm::vec3& position, const glm::vec3& direction);
-
-   private:
-    Ref<MeshSource> m_BallMesh;
-    int m_BallCounter = 0;
-  };
 }  // namespace WebEngine

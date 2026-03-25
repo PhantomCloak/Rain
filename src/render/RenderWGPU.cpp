@@ -98,8 +98,7 @@ namespace WebEngine
 
   void RenderWGPU::ComputeMip(Texture2D* input)
   {
-    auto dir = RESOURCE_DIR "/shaders/ComputeMip.wgsl";
-    static Ref<Shader> computeShader = ShaderManager::LoadShader("SH_Compute", dir);
+    static Ref<Shader> computeShader = ShaderManager::LoadShader("SH_Compute", "Resources/shaders/ComputeMip.wgsl");
     auto device = RenderContext::GetDevice();
 
     std::vector<WGPUBindGroupLayout> bindGroupLayouts;
@@ -165,7 +164,7 @@ namespace WebEngine
 
   void RenderWGPU::ComputeMipCube(TextureCube* input)
   {
-    auto computeShader = ShaderManager::LoadShader("SH_ComputeCube", RESOURCE_DIR "/shaders/ComputeMipCube.wgsl");
+    auto computeShader = ShaderManager::LoadShader("SH_ComputeCube", "Resources/shaders/ComputeMipCube.wgsl");
 
     auto device = RenderContext::GetDevice();
 
@@ -278,7 +277,7 @@ namespace WebEngine
 
   void RenderWGPU::ComputePreFilter(TextureCube* input, TextureCube* output)
   {
-    auto computeShader = ShaderManager::LoadShader("SH_ComputeCube2", RESOURCE_DIR "/shaders/environment_prefilter.wgsl");
+    auto computeShader = ShaderManager::LoadShader("SH_ComputeCube2", "Resources/shaders/environment_prefilter.wgsl");
 
     const uint32_t mipCount = RenderUtils::CalculateMipCount(input->GetSpec().Width, input->GetSpec().Height);
     const uint32_t uniformStride = std::max((uint32_t)sizeof(PrefilterUniform), 256u);
@@ -314,7 +313,7 @@ namespace WebEngine
     for (uint32_t mipLevel = 0; mipLevel < mipCount; ++mipLevel)
     {
       WGPUBindGroupEntry bindGroupEntries[4] = {
-          {.binding = 0, .textureView = input->GetReadableView(0)}, // Always sample from mip 0
+          {.binding = 0, .textureView = input->GetReadableView(0)},  // Always sample from mip 0
           {.binding = 1, .textureView = output->GetWriteableView(mipLevel)},
           {.binding = 2, .sampler = *sampler->GetNativeSampler()},
           {.binding = 3, .buffer = uniformBuffer->Buffer, .offset = 0, .size = sizeof(PrefilterUniform)}};
@@ -354,7 +353,7 @@ namespace WebEngine
 
   void RenderWGPU::ComputeEnvironmentIrradiance(TextureCube* input, TextureCube* output)
   {
-    auto computeShader = ShaderManager::LoadShader("SH_EnvironmentIrradiance", RESOURCE_DIR "/shaders/environment_irradiance.wgsl");
+    auto computeShader = ShaderManager::LoadShader("SH_EnvironmentIrradiance", "Resources/shaders/environment_irradiance.wgsl");
 
     auto sampler = Sampler::Create({.Name = "S_Skybox",
                                     .WrapFormat = TextureWrappingFormat::ClampToEdges,
@@ -442,8 +441,8 @@ namespace WebEngine
         colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
         colorAttachment.resolveTarget = renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget ? Application::Get()->GetSwapChain()->GetSurfaceTextureView() : nullptr;
         colorAttachment.loadOp = renderFrameBuffer->m_FrameBufferSpec.ClearColorOnLoad
-                                   ? WGPULoadOp_Clear
-                                   : WGPULoadOp_Load;
+                                     ? WGPULoadOp_Clear
+                                     : WGPULoadOp_Load;
         colorAttachment.storeOp = WGPUStoreOp_Store;
         colorAttachment.clearValue = RenderWGPU::Instance->m_ClearColor;
 
@@ -630,7 +629,7 @@ namespace WebEngine
 
   void RenderWGPU::ComputeEquirectToCubemap(Texture2D* equirectTexture, TextureCube* outputCubemap)
   {
-    auto computeShader = ShaderManager::LoadShader("SH_EquirectToCubemap", RESOURCE_DIR "/shaders/equirectangular_to_cubemap.wgsl");
+    auto computeShader = ShaderManager::LoadShader("SH_EquirectToCubemap", "Resources/shaders/equirectangular_to_cubemap.wgsl");
 
     auto sampler = Sampler::Create({.Name = "S_EquirectSampler",
                                     .WrapFormat = TextureWrappingFormat::ClampToEdges,
@@ -728,7 +727,7 @@ namespace WebEngine
     WGPURequestAdapterCallbackInfo adapterCallbackInfo;
     ZERO_INIT(adapterCallbackInfo);
     adapterCallbackInfo.mode = WGPUCallbackMode_AllowProcessEvents,
-        adapterCallbackInfo.callback = &this->OnAdapterInstanceCallback;
+    adapterCallbackInfo.callback = &this->OnAdapterInstanceCallback;
     adapterCallbackInfo.userdata1 = this;
 
     WGPURequestAdapterOptions requestAdapterOpts;
@@ -933,16 +932,16 @@ namespace WebEngine
 
     QuadVertex* data = new QuadVertex[4];
 
-    data[0].Position = glm::vec3(x, y, 0.0f); // Bottom-left
+    data[0].Position = glm::vec3(x, y, 0.0f);  // Bottom-left
     data[0].TexCoord = glm::vec2(0, 1);
 
-    data[1].Position = glm::vec3(x + qwidth, y, 0.0f); // Bottom-right
+    data[1].Position = glm::vec3(x + qwidth, y, 0.0f);  // Bottom-right
     data[1].TexCoord = glm::vec2(1, 1);
 
-    data[2].Position = glm::vec3(x + qwidth, y + qheight, 0.0f); // Top-right
+    data[2].Position = glm::vec3(x + qwidth, y + qheight, 0.0f);  // Top-right
     data[2].TexCoord = glm::vec2(1, 0);
 
-    data[3].Position = glm::vec3(x, y + qheight, 0.0f); // Top-left
+    data[3].Position = glm::vec3(x, y + qheight, 0.0f);  // Top-left
     data[3].TexCoord = glm::vec2(0, 0);
 
     // TODO: Consider static buffers, immediately mapped buffers etc.
@@ -1029,4 +1028,4 @@ namespace WebEngine
     }
   }
 #endif
-} // namespace WebEngine
+}  // namespace WebEngine

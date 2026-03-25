@@ -15,7 +15,8 @@
 #include <sstream>
 #include <string>
 
-const std::string SysInfo::OSName() {
+const std::string SysInfo::OSName()
+{
 #if defined(__APPLE__) || defined(__MACH__)
   return "macOS";
 #elif defined(_WIN32)
@@ -25,9 +26,12 @@ const std::string SysInfo::OSName() {
   std::string line;
   std::string distroName = "Unknown Linux Distribution";
 
-  if (file.is_open()) {
-    while (std::getline(file, line)) {
-      if (line.find("PRETTY_NAME=") == 0) {
+  if (file.is_open())
+  {
+    while (std::getline(file, line))
+    {
+      if (line.find("PRETTY_NAME=") == 0)
+      {
         distroName = line.substr(13, line.length() - 14);  // Removes 'PRETTY_NAME="' and '"'
         break;
       }
@@ -41,7 +45,8 @@ const std::string SysInfo::OSName() {
 #endif
 }
 
-const std::string SysInfo::CPUName() {
+const std::string SysInfo::CPUName()
+{
   std::string cpuName;
 #if defined(__APPLE__) || defined(__MACH__)
   char buffer[128];
@@ -52,11 +57,13 @@ const std::string SysInfo::CPUName() {
   HKEY hKey;
   if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
                     "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
-                    0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+                    0, KEY_READ, &hKey) == ERROR_SUCCESS)
+  {
     char value[256];
     DWORD size = sizeof(value);
     if (RegQueryValueExA(hKey, "ProcessorNameString", NULL, NULL,
-                         (LPBYTE)value, &size) == ERROR_SUCCESS) {
+                         (LPBYTE)value, &size) == ERROR_SUCCESS)
+    {
       cpuName = value;
     }
     RegCloseKey(hKey);
@@ -64,8 +71,10 @@ const std::string SysInfo::CPUName() {
 #elif defined(__linux__)
   std::ifstream cpuinfo("/proc/cpuinfo");
   std::string line;
-  while (std::getline(cpuinfo, line)) {
-    if (line.find("model name") != std::string::npos) {
+  while (std::getline(cpuinfo, line))
+  {
+    if (line.find("model name") != std::string::npos)
+    {
       cpuName = line.substr(line.find(":") + 2);
       break;
     }
@@ -74,7 +83,8 @@ const std::string SysInfo::CPUName() {
   return cpuName;
 }
 
-const int SysInfo::CoreCount() {
+const int SysInfo::CoreCount()
+{
   int coreCount = 0;
 #if defined(__APPLE__) || defined(__MACH__)
   int mib[2];
@@ -82,10 +92,12 @@ const int SysInfo::CoreCount() {
   mib[1] = HW_AVAILCPU;
   size_t len = sizeof(coreCount);
   sysctl(mib, 2, &coreCount, &len, NULL, 0);
-  if (coreCount < 1) {
+  if (coreCount < 1)
+  {
     mib[1] = HW_NCPU;
     sysctl(mib, 2, &coreCount, &len, NULL, 0);
-    if (coreCount < 1) {
+    if (coreCount < 1)
+    {
       coreCount = 1;
     }
   }
@@ -99,7 +111,8 @@ const int SysInfo::CoreCount() {
   return coreCount;
 }
 
-const int SysInfo::TotalMemory() {
+const int SysInfo::TotalMemory()
+{
   int64_t totalMemory = 0;
 #if defined(__APPLE__) || defined(__MACH__)
   int mib[2];

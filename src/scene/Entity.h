@@ -61,7 +61,7 @@ namespace WebEngine
     Entity GetParent() const;
     UUID GetChild(int index) { return Children()[index]; }
 
-    bool RemoveChild(Entity child)
+    bool RemoveChild(const Entity& child)
     {
       UUID childId = child.GetUUID();
       std::vector<UUID>& children = Children();
@@ -103,7 +103,7 @@ namespace WebEngine
     }
 
     const std::string Name() const { return HasComponent<TagComponent>() ? GetComponent<TagComponent>().Tag : NoName; }
-    void SetParentUUID(UUID parent) { GetComponent<RelationshipComponent>().ParentHandle = parent; }
+    void SetParentUUID(const UUID& parent) { GetComponent<RelationshipComponent>().ParentHandle = parent; }
     std::vector<UUID>& Children() { return GetComponent<RelationshipComponent>().Children; }
     UUID GetParentUUID() const { return GetComponent<RelationshipComponent>().ParentHandle; }
     UUID GetUUID() const { return GetComponent<IDComponent>().ID; }

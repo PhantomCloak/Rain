@@ -3,17 +3,20 @@
 #include "core/Log.h"
 #include "engine/Event.h"
 
-static void GLFWErrorCallback(int error, const char* description) {
+static void GLFWErrorCallback(int error, const char* description)
+{
   RN_LOG_ERR("GLFW Error ({0}): {1}", error, description);
 }
 
-WebEngine::WindowsWindow::~WindowsWindow() {
+WebEngine::WindowsWindow::~WindowsWindow()
+{
   Shutdown();
 }
 
-void WebEngine::WindowsWindow::Init(const WindowProps& props) {
+void WebEngine::WindowsWindow::Init(const WindowProps& props)
+{
   bool success = glfwInit();
-  //RN_CORE_ASSERT(success, "Could not initialize GLFW!");
+  // RN_CORE_ASSERT(success, "Could not initialize GLFW!");
 
   glfwSetErrorCallback(GLFWErrorCallback);
 
@@ -26,19 +29,20 @@ void WebEngine::WindowsWindow::Init(const WindowProps& props) {
 
   glfwSetWindowUserPointer(m_Window, this);
 
-  glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window) {
+  glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window)
+                             {
     // TODO: Propagate event to gracefully stop
-    exit(0);
-  });
+    exit(0); });
 
-  glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos) {
+  glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos)
+                           {
     WindowsWindow* winWindow = static_cast<WindowsWindow*>(glfwGetWindowUserPointer(window));
 
     MouseMoveEvent MoveEvent(xPos, yPos);
-    winWindow->OnEvent(MoveEvent);
-  });
+    winWindow->OnEvent(MoveEvent); });
 
-  glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods) {
+  glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods)
+                     {
     WindowsWindow* winWindow = static_cast<WindowsWindow*>(glfwGetWindowUserPointer(window));
     switch (action) {
       case GLFW_PRESS: {
@@ -53,28 +57,17 @@ void WebEngine::WindowsWindow::Init(const WindowProps& props) {
         winWindow->OnKeyPressed(key, Key::RN_KEY_REPEAT);
         break;
       }
-    }
-  });
+      default:
+      RN_LOG_ERR("Received key callback with unknown type");
+      break;
+    } });
 
-  glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods) {
+  glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, int width, int height)
+                                 {
     WindowsWindow* winWindow = static_cast<WindowsWindow*>(glfwGetWindowUserPointer(window));
-    switch (action) {
-      case GLFW_PRESS: {
-        winWindow->OnMouseClick(Mouse::Press);
-        break;
-      }
-      case GLFW_RELEASE: {
-        winWindow->OnMouseClick(Mouse::Release);
-        break;
-      }
-    }
-  });
-
-  glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, int width, int height) {
-    WindowsWindow* winWindow = static_cast<WindowsWindow*>(glfwGetWindowUserPointer(window));
-    winWindow->OnResize(height, width);
-  });
+    winWindow->OnResize(height, width); });
 }
 
-void WebEngine::WindowsWindow::Shutdown() {
+void WebEngine::WindowsWindow::Shutdown()
+{
 }

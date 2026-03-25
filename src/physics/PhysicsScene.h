@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <Jolt/Jolt.h>
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Core/TempAllocator.h>
@@ -18,8 +19,10 @@ namespace WebEngine
   {
    public:
     PhysicsScene(glm::vec3 gravity);
+    void Init(glm::vec3 gravity = glm::vec3(0, 9.8f, 0.0));
+    void Cleanup();
 
-    Ref<PhysicsBody> CreateBody(Entity entity);
+    Ref<PhysicsBody> CreateBody(const Entity& entity);
     Ref<PhysicsWheel> CreateWheel(JPH::VehicleConstraintSettings& vehicleSettings, Entity entity);
 
     void PreUpdate(float dt);
@@ -28,8 +31,8 @@ namespace WebEngine
     static JPH::BodyInterface& GetBodyInterface(bool shouldLock = true);
     static const JPH::BodyLockInterface& GetBodyLockInterface();
 
-    Ref<PhysicsBody> GetEntityBodyByID(UUID entityID) const;
-    Ref<PhysicsBody> GetEntityBody(Entity entity) const { return GetEntityBodyByID(entity.GetUUID()); }
+    Ref<PhysicsBody> GetEntityBodyByID(const UUID& entityID) const;
+    Ref<PhysicsBody> GetEntityBody(const Entity& entity) const { return GetEntityBodyByID(entity.GetUUID()); }
     void SynchronizeBodyTransform(PhysicsBody* body);
     static void MarkForSynchronization(PhysicsBody* body)
     {
@@ -46,32 +49,22 @@ namespace WebEngine
       m_BodiesScheduledForSync.clear();
     }
     static PhysicsScene* m_Instance;
-    JPH::PhysicsSystem* m_PhysicsSystem = nullptr;
+    std::unique_ptr<JPH::PhysicsSystem> m_PhysicsSystem;
 
    protected:
     friend class RainTrackedVehicle;
 
    private:
-    JPH::TempAllocatorImpl* m_TempAllocator = nullptr;
-    JPH::JobSystemThreadPool* m_JobSystem = nullptr;
+    std::unique_ptr<JPH::TempAllocatorImpl> m_TempAllocator;
+    std::unique_ptr<JPH::JobSystemThreadPool> m_JobSystem;
 
-    BPLayerInterfaceImpl* m_BroadPhaseLayerInterface = nullptr;
-    ObjectVsBroadPhaseLayerFilterImpl* m_ObjectVsBroadPhaseLayerFilter = nullptr;
-    ObjectLayerPairFilterImpl* m_ObjectLayerPairFilter = nullptr;
+    std::unique_ptr<BPLayerInterfaceImpl> m_BroadPhaseLayerInterface;
+    std::unique_ptr<ObjectVsBroadPhaseLayerFilterImpl> m_ObjectVsBroadPhaseLayerFilter;
+    std::unique_ptr<ObjectLayerPairFilterImpl> m_ObjectLayerPairFilter;
 
     std::unordered_map<UUID, Ref<PhysicsBody>> m_RigidBodies;
     std::unordered_map<UUID, Ref<JPH::Wheel>> m_WheelColliders;
 
     std::vector<PhysicsBody*> m_BodiesScheduledForSync;
-    JPH::Body* mTankBody;
-    JPH::VehicleConstraint* mVehicleConstraint;
-    float mForward = 0.0f;
-    float mPreviousForward = 1.0f;
-    float mLeftRatio = 0.0f;
-    float mRightRatio = 0.0f;
-    float mBrake = 0.0f;
-    float mTurretHeading = 0.0f;
-    float mBarrelPitch = 0.0f;
-    bool mFire = false;
   };
 }  // namespace WebEngine

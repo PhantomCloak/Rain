@@ -30,6 +30,10 @@ jobs:
       - name: Build
         run: cmake --build build/windows --config Release -j
 
+      - name: Copy files
+        run: |
+          cp -r Resources bin/
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

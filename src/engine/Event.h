@@ -1,7 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
 
-enum class EventType
+enum class EventType : uint8_t
 {
   MouseScroll = 0,
   MouseMove = 1,
@@ -21,7 +21,7 @@ class Event
 class MouseMoveEvent : public Event
 {
  public:
-  MouseMoveEvent(float x, float y) : m_X(x), m_Y(y) {}
+  MouseMoveEvent(double x, double y) : m_X(x), m_Y(y) {}
   ~MouseMoveEvent() {};
 
   glm::vec2 GetPosition() { return glm::vec2(m_X, m_Y); }
@@ -32,8 +32,8 @@ class MouseMoveEvent : public Event
   }
 
  private:
-  float m_X = 0.0f;
-  float m_Y = 0.0f;
+  double m_X = 0.0f;
+  double m_Y = 0.0f;
 };
 
 class MouseScroll : public Event

@@ -3,20 +3,23 @@
 #include "core/Log.h"
 #include "engine/Event.h"
 
-static void GLFWErrorCallback(int error, const char* description) {
+static void GLFWErrorCallback(int error, const char* description)
+{
   RN_LOG_ERR("GLFW Error ({0}): {1}", error, description);
 }
 
-WebEngine::LinuxWindow::~LinuxWindow() {
+WebEngine::LinuxWindow::~LinuxWindow()
+{
   Shutdown();
 }
 
-void WebEngine::LinuxWindow::Init(const WindowProps& props) {
-  //WebEngine::Log::Init();
-  //RN_CORE_INFO("Creating window {0} ({1}, {2})", props.Title, props.Width, props.Height);
+void WebEngine::LinuxWindow::Init(const WindowProps& props)
+{
+  // WebEngine::Log::Init();
+  // RN_CORE_INFO("Creating window {0} ({1}, {2})", props.Title, props.Width, props.Height);
 
   bool success = glfwInit();
-  //RN_CORE_ASSERT(success, "Could not initialize GLFW!");
+  RN_CORE_ASSERT(success, "Could not initialize GLFW!");
 
   glfwSetErrorCallback(GLFWErrorCallback);
 
@@ -25,24 +28,23 @@ void WebEngine::LinuxWindow::Init(const WindowProps& props) {
 
   m_Window = glfwCreateWindow((int)props.Width, (int)props.Height, "WGPU!", nullptr, nullptr);
 
-	RN_ASSERT(m_Window, "Window cannot be created!");
-
+  RN_ASSERT(m_Window, "Window cannot be created!");
 
   glfwSetWindowUserPointer(m_Window, this);
 
-  glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window) {
-			// TODO: Propagate event to gracefully stop
-			exit(0);
-  });
+  glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window)
+                             { exit(0); });
 
-  glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos) {
-    LinuxWindow* linuxWindow = static_cast<LinuxWindow*>(glfwGetWindowUserPointer(window));
+  glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos)
+                           {
+                             LinuxWindow* linuxWindow = static_cast<LinuxWindow*>(glfwGetWindowUserPointer(window));
 
-    MouseMoveEvent MoveEvent(xPos, yPos);
-    linuxWindow->OnEvent(MoveEvent); // Copy
-  });
+                             MouseMoveEvent MoveEvent(xPos, yPos);
+                             linuxWindow->OnEvent(MoveEvent);  // Copy
+                           });
 
-  glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods) {
+  glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scancode, int action, int mods)
+                     {
     LinuxWindow* linuxWindow = static_cast<LinuxWindow*>(glfwGetWindowUserPointer(window));
     switch (action) {
       case GLFW_PRESS: {
@@ -57,28 +59,17 @@ void WebEngine::LinuxWindow::Init(const WindowProps& props) {
         linuxWindow->OnKeyPressed(key, Key::RN_KEY_REPEAT);
         break;
       }
-    }
-  });
+      default:
+      RN_LOG_ERR("Received key callback with unknown type");
+      break;
+    } });
 
-  glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods) {
+  glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, int width, int height)
+                                 {
     LinuxWindow* linuxWindow = static_cast<LinuxWindow*>(glfwGetWindowUserPointer(window));
-    switch (action) {
-      case GLFW_PRESS: {
-        linuxWindow->OnMouseClick(Mouse::Press);
-        break;
-      }
-      case GLFW_RELEASE: {
-        linuxWindow->OnMouseClick(Mouse::Release);
-        break;
-      }
-    }
-  });
-
-  glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, int width, int height) {
-    LinuxWindow* linuxWindow = static_cast<LinuxWindow*>(glfwGetWindowUserPointer(window));
-    linuxWindow->OnResize(height, width);
-  });
+    linuxWindow->OnResize(height, width); });
 }
 
-void WebEngine::LinuxWindow::Shutdown() {
+void WebEngine::LinuxWindow::Shutdown()
+{
 }

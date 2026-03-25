@@ -20,25 +20,30 @@
 #include "PhysicUtils.h"
 #include "render/Render2D.h"
 #include "scene/Scene.h"
-#include "physics/RainTrackedVehicle.h"
+
 namespace WebEngine
 {
   PhysicsScene* PhysicsScene::m_Instance;
-  RainTrackedVehicle* veh;
+
   PhysicsScene::PhysicsScene(glm::vec3 gravity)
+  {
+    Init(gravity);
+  }
+
+  void PhysicsScene::Init(glm::vec3 gravity)
   {
     JPH::RegisterDefaultAllocator();
     JPH::Factory::sInstance = new JPH::Factory();
     JPH::RegisterTypes();
 
-    m_TempAllocator = new JPH::TempAllocatorImpl(64 * 1024 * 1024);
-    m_JobSystem = new JPH::JobSystemThreadPool(2048, 8, JPH::thread::hardware_concurrency() - 1);
+    m_TempAllocator = std::make_unique<JPH::TempAllocatorImpl>(64 * 1024 * 1024);
+    m_JobSystem = std::make_unique<JPH::JobSystemThreadPool>(2048, 8, JPH::thread::hardware_concurrency() - 1);
 
-    m_BroadPhaseLayerInterface = new BPLayerInterfaceImpl();
-    m_ObjectVsBroadPhaseLayerFilter = new ObjectVsBroadPhaseLayerFilterImpl();
-    m_ObjectLayerPairFilter = new ObjectLayerPairFilterImpl();
+    m_BroadPhaseLayerInterface = std::make_unique<BPLayerInterfaceImpl>();
+    m_ObjectVsBroadPhaseLayerFilter = std::make_unique<ObjectVsBroadPhaseLayerFilterImpl>();
+    m_ObjectLayerPairFilter = std::make_unique<ObjectLayerPairFilterImpl>();
 
-    m_PhysicsSystem = new JPH::PhysicsSystem();
+    m_PhysicsSystem = std::make_unique<JPH::PhysicsSystem>();
     m_PhysicsSystem->Init(
         1024 * 16,  // cMaxBodies
         0,          // cNumBodyMutexes
@@ -51,57 +56,41 @@ namespace WebEngine
     m_Instance = this;
 
 #ifndef __EMSCRIPTEN__
-    RenderDebug::Init();
+    //RenderDebug::Init();
 #endif
-
-    //// Create turret
-    // JPH::RVec3 turret_position = body_position + JPH::Vec3(0, half_vehicle_height + half_turret_height, 0);
-    // JPH::BodyCreationSettings turret_body_setings(new JPH::BoxShape(JPH::Vec3(half_turret_width, half_turret_height, half_turret_length)), turret_position, JPH::Quat::sIdentity(), JPH::EMotionType::Dynamic, Layers::MOVING);
-    // turret_body_setings.mCollisionGroup.SetGroupFilter(filter);
-    // turret_body_setings.mCollisionGroup.SetGroupID(0);
-    // turret_body_setings.mCollisionGroup.SetSubGroupID(0);
-    // turret_body_setings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
-    // turret_body_setings.mMassPropertiesOverride.mMass = 2000.0f;
-    // auto mTurretBody = m_PhysicsSystem->GetBodyInterface().CreateBody(turret_body_setings);
-    // m_PhysicsSystem->GetBodyInterface().AddBody(mTurretBody->GetID(), JPH::EActivation::Activate);
-
-    //// Attach turret to body
-    // JPH::HingeConstraintSettings turret_hinge;
-    // turret_hinge.mPoint1 = turret_hinge.mPoint2 = body_position + JPH::Vec3(0, half_vehicle_height, 0);
-    // turret_hinge.mHingeAxis1 = turret_hinge.mHingeAxis2 = JPH::Vec3::sAxisY();
-    // turret_hinge.mNormalAxis1 = turret_hinge.mNormalAxis2 = JPH::Vec3::sAxisZ();
-    // turret_hinge.mMotorSettings = JPH::MotorSettings(0.5f, 1.0f);
-    // auto mTurretHinge = static_cast<JPH::HingeConstraint*>(turret_hinge.Create(*mTankBody, *mTurretBody));
-    // mTurretHinge->SetMotorState(JPH::EMotorState::Position);
-    // m_PhysicsSystem->AddConstraint(mTurretHinge);
-
-    //// Create barrel
-    // JPH::RVec3 barrel_position = turret_position + JPH::Vec3(0, 0, half_turret_length + half_barrel_length - barrel_rotation_offset);
-    // JPH::BodyCreationSettings barrel_body_setings(new JPH::CylinderShape(half_barrel_length, barrel_radius), barrel_position, JPH::Quat::sRotation(JPH::Vec3::sAxisX(), 0.5f * JPH::JPH_PI), JPH::EMotionType::Dynamic, Layers::MOVING);
-    // barrel_body_setings.mCollisionGroup.SetGroupFilter(filter);
-    // barrel_body_setings.mCollisionGroup.SetGroupID(0);
-    // barrel_body_setings.mCollisionGroup.SetSubGroupID(0);
-    // barrel_body_setings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
-    // barrel_body_setings.mMassPropertiesOverride.mMass = 200.0f;
-    // auto mBarrelBody = m_PhysicsSystem->GetBodyInterface().CreateBody(barrel_body_setings);
-    // m_PhysicsSystem->GetBodyInterface().AddBody(mBarrelBody->GetID(), JPH::EActivation::Activate);
-
-    //// Attach barrel to turret
-    // JPH::HingeConstraintSettings barrel_hinge;
-    // barrel_hinge.mPoint1 = barrel_hinge.mPoint2 = barrel_position - JPH::Vec3(0, 0, half_barrel_length);
-    // barrel_hinge.mHingeAxis1 = barrel_hinge.mHingeAxis2 = -JPH::Vec3::sAxisX();
-    // barrel_hinge.mNormalAxis1 = barrel_hinge.mNormalAxis2 = JPH::Vec3::sAxisZ();
-    // barrel_hinge.mLimitsMin = JPH::DegreesToRadians(-10.0f);
-    // barrel_hinge.mLimitsMax = JPH::DegreesToRadians(40.0f);
-    // barrel_hinge.mMotorSettings = JPH::MotorSettings(10.0f, 1.0f);
-    // auto mBarrelHinge = static_cast<JPH::HingeConstraint*>(barrel_hinge.Create(*mTurretBody, *mBarrelBody));
-    // mBarrelHinge->SetMotorState(JPH::EMotorState::Position);
-    // m_PhysicsSystem->AddConstraint(mBarrelHinge);
-    // veh = new RainTrackedVehicle();
-    // veh->CreateVehicle(this);
   }
 
-  Ref<PhysicsBody> PhysicsScene::GetEntityBodyByID(UUID entityID) const
+  void PhysicsScene::Cleanup()
+  {
+    JPH::BodyInterface& bodyInterface = m_PhysicsSystem->GetBodyInterface();
+    for (auto& [id, body] : m_RigidBodies)
+    {
+      if (body && !body->GetBodyId().IsInvalid())
+      {
+        bodyInterface.RemoveBody(body->GetBodyId());
+        bodyInterface.DestroyBody(body->GetBodyId());
+      }
+    }
+
+    m_RigidBodies.clear();
+    m_WheelColliders.clear();
+    m_BodiesScheduledForSync.clear();
+
+    m_PhysicsSystem.reset();
+    m_JobSystem.reset();
+    m_TempAllocator.reset();
+    m_BroadPhaseLayerInterface.reset();
+    m_ObjectVsBroadPhaseLayerFilter.reset();
+    m_ObjectLayerPairFilter.reset();
+
+    JPH::UnregisterTypes();
+    delete JPH::Factory::sInstance;
+    JPH::Factory::sInstance = nullptr;
+
+    m_Instance = nullptr;
+  }
+
+  Ref<PhysicsBody> PhysicsScene::GetEntityBodyByID(const UUID& entityID) const
   {
     if (auto iter = m_RigidBodies.find(entityID); iter != m_RigidBodies.end())
     {
@@ -180,13 +169,19 @@ namespace WebEngine
   void PhysicsScene::Update(float dt)
   {
     SynchronizePendingBodyTransforms();
-    m_PhysicsSystem->Update(dt, 1, m_TempAllocator, m_JobSystem);
+
+    if (m_TempAllocator == nullptr || m_JobSystem == nullptr)
+    {
+      return;
+    }
+
+    m_PhysicsSystem->Update(dt, 1, m_TempAllocator.get(), m_JobSystem.get());
 
 #ifdef JPH_DEBUG_RENDERER
-    JPH::BodyManager::DrawSettings drawSettings;
-    drawSettings.mDrawShape = true;
-    drawSettings.mDrawShapeWireframe = true;
-    m_PhysicsSystem->DrawBodies(drawSettings, JPH::DebugRenderer::sInstance);
+    //JPH::BodyManager::DrawSettings drawSettings;
+    //drawSettings.mDrawShape = true;
+    //drawSettings.mDrawShapeWireframe = true;
+    //m_PhysicsSystem->DrawBodies(drawSettings, JPH::DebugRenderer::sInstance);
 #endif
 
     const auto& bodyLockInterface = m_PhysicsSystem->GetBodyLockInterface();
@@ -219,16 +214,8 @@ namespace WebEngine
     }
   }
 
-  Ref<PhysicsBody> PhysicsScene::CreateBody(Entity entity)
+  Ref<PhysicsBody> PhysicsScene::CreateBody(const Entity& entity)
   {
-    // if (!entity.HasAny<CompoundColliderComponent, BoxColliderComponent, SphereColliderComponent, CapsuleColliderComponent, MeshColliderComponent>()) {
-    //   // This can happen as a result of a user trying to create a RigidBodyComponent from C# script on an entity that does
-    //   // not have a collider.
-    //   // Tell them what went wrong, rather than silently doing nothing.
-    //   HZ_CONSOLE_LOG_ERROR("Entity does not have a collider component!");
-    //   return nullptr;
-    // }
-
     if (auto existingBody = GetEntityBody(entity))
     {
       return existingBody;

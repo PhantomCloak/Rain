@@ -2,7 +2,6 @@
 
 #include <GLFW/glfw3.h>
 #include "core/KeyCode.h"
-#include "core/MouseCode.h"
 #include "core/Window.h"
 #include "engine/Event.h"
 
@@ -13,7 +12,6 @@ namespace WebEngine
    protected:
     virtual void OnKeyPressed(KeyCode key, KeyAction action) {};
     virtual void OnMouseMove(double xPos, double yPos) {};
-    virtual void OnMouseClick(MouseCode button) {};
 
     virtual void OnResize(int height, int width) {};
     virtual void OnEvent(Event& event) = 0;

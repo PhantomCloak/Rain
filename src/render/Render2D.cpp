@@ -64,7 +64,7 @@ namespace WebEngine
 		}
 		)";
 
-    auto device = RenderContext::GetDevice();
+    const auto device = RenderContext::GetDevice();
 
     m_LineShader = ShaderManager::LoadShaderFromString("LineShader", LINE_SHADER);
 
@@ -129,13 +129,11 @@ namespace WebEngine
 
     pipelineDesc.depthStencil = depthStencilState;
 
-    // Vertex state
     pipelineDesc.vertex.module = m_LineShader->GetNativeShaderModule();
     pipelineDesc.vertex.entryPoint = RenderUtils::MakeLabel("vs_main");
     pipelineDesc.vertex.bufferCount = 1;
     pipelineDesc.vertex.buffers = &vertexBufferLayout;
 
-    // Fragment state
     WGPUFragmentState fragmentState = {};
     fragmentState.module = m_LineShader->GetNativeShaderModule();
     fragmentState.entryPoint = RenderUtils::MakeLabel("fs_main");
@@ -152,13 +150,11 @@ namespace WebEngine
     fragmentState.targets = colorTargets;
     pipelineDesc.fragment = &fragmentState;
 
-    // Primitive state
     pipelineDesc.primitive.topology = WGPUPrimitiveTopology_LineList;
     pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
     pipelineDesc.primitive.frontFace = WGPUFrontFace_CCW;
     pipelineDesc.primitive.cullMode = WGPUCullMode_None;
 
-    // Multisample state
     pipelineDesc.multisample.count = 1;
     pipelineDesc.multisample.mask = ~0u;
     pipelineDesc.multisample.alphaToCoverageEnabled = false;
@@ -169,7 +165,6 @@ namespace WebEngine
                                                WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
                                                sizeof(LineUniforms));
 
-    // Create bind group
     WGPUBindGroupEntry bindGroupEntry = {};
     bindGroupEntry.binding = 0;
     bindGroupEntry.buffer = m_LineUniformBuffer->Buffer;
@@ -212,7 +207,7 @@ namespace WebEngine
 
     if (!Instance->m_LineVertexBuffer || Instance->m_LineVertexBuffer->Size < vertexDataSize)
     {
-      size_t bufferSize = std::max(vertexDataSize, sizeof(LineVertex) * MAX_LINES_PER_BATCH * 2);
+      int bufferSize = (int)std::max(vertexDataSize, sizeof(LineVertex) * MAX_LINES_PER_BATCH * 2);
       Instance->m_LineVertexBuffer = GPUAllocator::GAlloc("Line Vertices",
                                                           WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
                                                           bufferSize);
@@ -252,9 +247,6 @@ namespace WebEngine
 
   void RenderDebug::DrawText3D(JPH::RVec3Arg inPosition, const JPH::string_view& inString, JPH::ColorArg inColor, float inHeight)
   {
-    // TODO: Implement 3D text rendering if needed
-    // For now, this is a stub to make the class non-abstract
-    // You can leave this empty or add basic text rendering later
   }
 
   void RenderDebug::DrawTriangle(JPH::RVec3Arg inV1, JPH::RVec3Arg inV2, JPH::RVec3Arg inV3, JPH::ColorArg inColor, ECastShadow inCastShadow)

@@ -128,15 +128,21 @@ namespace WebEngine
 
   void PhysicsBody::CreateCollisionShapesForEntity(Entity entity)
   {
-    if (entity.HasComponent<BoxColliderComponent>()) {
+    if (entity.HasComponent<BoxColliderComponent>())
+    {
       BoxColliderComponent& collider = entity.GetComponent<BoxColliderComponent>();
 
-      if (collider.Offset != glm::vec3(0.0)) {
+      if (collider.Offset != glm::vec3(0.0))
+      {
         m_Shape = JPH::OffsetCenterOfMassShapeSettings(PhysicsUtils::ToJoltVector(collider.Offset), new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider.Size))).Create().Get();
-      } else {
+      }
+      else
+      {
         m_Shape = new JPH::BoxShape(PhysicsUtils::ToJoltVector(collider.Size));
       }
-    } else if (entity.HasComponent<CylinderCollider>()) {
+    }
+    else if (entity.HasComponent<CylinderCollider>())
+    {
       CylinderCollider& collider = entity.GetComponent<CylinderCollider>();
       m_Shape = new JPH::CylinderShape(collider.Size.x, collider.Size.y);
     }

@@ -1,5 +1,4 @@
 #include "WebWindow.h"
-#include "core/Assert.h"
 #include "core/Log.h"
 
 static void GLFWErrorCallback(int error, const char* description)
@@ -59,20 +58,9 @@ void WebEngine::WebWindow::Init(const WindowProps& props)
         webWindow->OnKeyPressed(key, Key::RN_KEY_REPEAT);
         break;
       }
-    } });
-
-  glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods)
-                             {
-    WebWindow* webWindow = static_cast<WebWindow*>(glfwGetWindowUserPointer(window));
-    switch (action) {
-      case GLFW_PRESS: {
-        webWindow->OnMouseClick(Mouse::Press);
-        break;
-      }
-      case GLFW_RELEASE: {
-        webWindow->OnMouseClick(Mouse::Release);
-        break;
-      }
+      default:
+      RN_LOG_ERR("Received key callback with unknown type");
+      break;
     } });
 
   glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow* window, int width, int height)

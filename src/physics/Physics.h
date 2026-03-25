@@ -15,14 +15,16 @@
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/RegisterTypes.h>
 #include <glm/glm.hpp>
+#include <memory>
 
-namespace WebEngine {
-  class Physics {
+namespace WebEngine
+{
+  class Physics
+  {
    public:
-    static Physics* Instance;
     void Init();
-    void Shutdown(){};
-    Ref<PhysicsScene> CreateScene(glm::vec3 gravity) { return CreateRef<PhysicsScene>(gravity); }
+    void Shutdown() {};
+    static std::unique_ptr<PhysicsScene> CreateScene(glm::vec3 gravity) { return std::make_unique<PhysicsScene>(gravity); };
 
    private:
   };
