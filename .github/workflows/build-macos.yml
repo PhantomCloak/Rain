@@ -21,6 +21,9 @@ jobs:
           git submodule update --init --depth 1 vendor/dawn
           git submodule update --init --recursive vendor/spdlog vendor/imgui vendor/assimp vendor/flecs vendor/tracy vendor/stb vendor/ImGuizmo vendor/JoltPhysics vendor/ozz-animation
 
+      - name: Install Ninja
+        run: brew install ninja
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

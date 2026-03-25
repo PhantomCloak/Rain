@@ -15,7 +15,7 @@ jobs:
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y xorg-dev libxcb-xkb-dev x11-xkb-utils libx11-xcb-dev libxkbcommon-x11-dev libvulkan-dev
+          sudo apt-get install -y xorg-dev libxcb-xkb-dev x11-xkb-utils libx11-xcb-dev libxkbcommon-x11-dev libvulkan-dev ninja-build
 
       - name: Init submodules
         run: |
