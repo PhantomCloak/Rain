@@ -51,6 +51,8 @@ namespace WebEngine
     uint32_t IndexCount;
     uint32_t VertexCount;
     uint32_t MaterialIndex;
+    glm::vec3 BoundsMin = glm::vec3(0.0f);
+    glm::vec3 BoundsMax = glm::vec3(0.0f);
   };
 
   class MeshNode

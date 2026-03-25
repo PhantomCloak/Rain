@@ -1,6 +1,7 @@
 #include "Mesh.h"
 #include <glm/gtx/matrix_decompose.hpp>
 #include <iostream>
+#include <limits>
 #include "ResourceManager.h"
 #include "animation/OzzConverter.h"
 #include "core/KeyCode.h"
@@ -237,6 +238,9 @@ namespace WebEngine
       std::vector<VertexAttribute> vertices;
       std::vector<unsigned int> indices;
 
+      glm::vec3 boundsMin(std::numeric_limits<float>::max());
+      glm::vec3 boundsMax(std::numeric_limits<float>::lowest());
+
       for (int j = 0; j < mesh->mNumVertices; j++)
       {
         VertexAttribute vertex;
@@ -245,6 +249,9 @@ namespace WebEngine
         vector.y = mesh->mVertices[j].y;
         vector.z = mesh->mVertices[j].z;
         vertex.Position = vector;
+
+        boundsMin = glm::min(boundsMin, vertex.Position);
+        boundsMax = glm::max(boundsMax, vertex.Position);
 
         if (mesh->HasNormals())
         {
@@ -303,6 +310,9 @@ namespace WebEngine
 
       subMesh.BaseIndex = offsetIndex;
       subMesh.IndexCount = indices.size();
+
+      subMesh.BoundsMin = boundsMin;
+      subMesh.BoundsMax = boundsMax;
 
       offsetVertex += vertices.size();
       offsetIndex += indices.size();

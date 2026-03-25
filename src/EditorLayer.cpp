@@ -2,12 +2,15 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <unordered_set>
 #include "demo/DemoScene.h"
 #include "glm/fwd.hpp"
 #include "imgui.h"
 #include "ImGuizmo.h"
 #include "Application.h"
+#include "core/Log.h"
+#include "render/ResourceManager.h"
 #include <glm/gtc/type_ptr.hpp>
 
 namespace WebEngine
@@ -35,6 +38,50 @@ namespace WebEngine
   glm::mat4 EditorCamera::GetViewMatrix() const
   {
     return glm::lookAt(Position, Position + GetForward(), glm::vec3(0.0f, 1.0f, 0.0f));
+  }
+
+  static bool RayIntersectsOBB(const glm::vec3& rayOrigin, const glm::vec3& rayDir, const glm::mat4& modelMatrix, const glm::vec3& aabbMin, const glm::vec3& aabbMax, float& outDistance)
+  {
+    glm::mat4 invModel = glm::inverse(modelMatrix);
+    glm::vec3 localOrigin = glm::vec3(invModel * glm::vec4(rayOrigin, 1.0f));
+    glm::vec3 localDir = glm::vec3(invModel * glm::vec4(rayDir, 0.0f));
+
+    float tMin = 0.0f;
+    float tMax = std::numeric_limits<float>::max();
+
+    for (int i = 0; i < 3; i++)
+    {
+      if (std::abs(localDir[i]) < 1e-8f)
+      {
+        if (localOrigin[i] < aabbMin[i] || localOrigin[i] > aabbMax[i])
+        {
+          return false;
+        }
+      }
+      else
+      {
+        float invD = 1.0f / localDir[i];
+        float t1 = (aabbMin[i] - localOrigin[i]) * invD;
+        float t2 = (aabbMax[i] - localOrigin[i]) * invD;
+
+        if (t1 > t2)
+        {
+          std::swap(t1, t2);
+        }
+        tMin = std::max(tMin, t1);
+        tMax = std::min(tMax, t2);
+
+        if (tMin > tMax)
+        {
+          return false;
+        }
+      }
+    }
+
+    glm::vec3 localHit = localOrigin + localDir * tMin;
+    glm::vec3 worldHit = glm::vec3(modelMatrix * glm::vec4(localHit, 1.0f));
+    outDistance = glm::distance(rayOrigin, worldHit);
+    return true;
   }
 
   void EditorLayer::OnAttach()
@@ -232,6 +279,98 @@ namespace WebEngine
         m_ViewportBoundsMax = {imagePos.x + imageSize.x, imagePos.y + imageSize.y};
 
         RenderGizmo();
+
+        // Viewport click-to-select via CPU ray-OBB picking
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered() && !ImGuizmo::IsOver() && !rightMouseDown)
+        {
+          ImVec2 mousePos = ImGui::GetMousePos();
+          float mx = mousePos.x - m_ViewportBoundsMin.x;
+          float my = mousePos.y - m_ViewportBoundsMin.y;
+          float viewportW = m_ViewportBoundsMax.x - m_ViewportBoundsMin.x;
+          float viewportH = m_ViewportBoundsMax.y - m_ViewportBoundsMin.y;
+
+          if (mx >= 0 && my >= 0 && mx < viewportW && my < viewportH)
+          {
+            float ndcX = (2.0f * mx / viewportW) - 1.0f;
+            float ndcY = 1.0f - (2.0f * my / viewportH);
+
+            glm::vec2 windowSize = Application::Get()->GetWindowSize();
+            glm::mat4 projection = glm::perspectiveFov(glm::radians(55.0f), windowSize.x, windowSize.y, 0.1f, 1400.0f);
+            glm::mat4 view = m_EditorCamera.GetViewMatrix();
+
+            glm::vec4 clipPos(ndcX, ndcY, -1.0f, 1.0f);
+            glm::vec4 eyePos = glm::inverse(projection) * clipPos;
+            eyePos = glm::vec4(eyePos.x, eyePos.y, -1.0f, 0.0f);
+            glm::vec3 rayDir = glm::normalize(glm::vec3(glm::inverse(view) * eyePos));
+            glm::vec3 rayOrigin = m_EditorCamera.Position;
+
+            float closestDist = std::numeric_limits<float>::max();
+            UUID closestEntity = 0;
+
+            auto meshEntities = m_Scene->GetAllEntitiesWithComponent<MeshComponent>();
+            RN_LOG("Viewport click: ray=({:.2f},{:.2f},{:.2f})->({:.2f},{:.2f},{:.2f}), entities={}",
+                   rayOrigin.x, rayOrigin.y, rayOrigin.z, rayDir.x, rayDir.y, rayDir.z, meshEntities.size());
+
+            for (const auto& entity : meshEntities)
+            {
+              glm::mat4 worldTransform = m_Scene->GetWorldSpaceTransformMatrix(entity);
+
+              auto& meshComp = entity.GetComponent<MeshComponent>();
+              Ref<MeshSource> meshSource = ResourceManager::GetMeshSource(meshComp.MeshSourceId);
+              if (!meshSource || meshComp.SubMeshId >= meshSource->m_SubMeshes.size())
+              {
+                continue;
+              }
+
+              const SubMesh& subMesh = meshSource->m_SubMeshes[meshComp.SubMeshId];
+
+              float scaleX = glm::length(glm::vec3(worldTransform[0]));
+              float scaleY = glm::length(glm::vec3(worldTransform[1]));
+              float scaleZ = glm::length(glm::vec3(worldTransform[2]));
+              float minScale = glm::max(glm::min(scaleX, glm::min(scaleY, scaleZ)), 0.001f);
+              float localMinExtent = 3.0f / minScale;
+
+              glm::vec3 center = (subMesh.BoundsMin + subMesh.BoundsMax) * 0.5f;
+              glm::vec3 halfExt = glm::max((subMesh.BoundsMax - subMesh.BoundsMin) * 0.5f, glm::vec3(localMinExtent));
+
+              glm::mat4 invModel = glm::inverse(worldTransform);
+              glm::vec3 localOrig = glm::vec3(invModel * glm::vec4(rayOrigin, 1.0f));
+              glm::vec3 localDir = glm::vec3(invModel * glm::vec4(rayDir, 0.0f));
+              glm::vec3 worldPos = glm::vec3(worldTransform[3]);
+
+              float dist;
+              bool hit = RayIntersectsOBB(rayOrigin, rayDir, worldTransform, center - halfExt, center + halfExt, dist);
+              // RN_LOG("  '{}' worldPos=({:.2f},{:.2f},{:.2f}) localRay=({:.1f},{:.1f},{:.1f})->({:.4f},{:.4f},{:.4f}) aabb=({:.1f},{:.1f},{:.1f})-({:.1f},{:.1f},{:.1f}) hit={}",
+              //        entity.Name(),
+              //        worldPos.x, worldPos.y, worldPos.z,
+              //        localOrig.x, localOrig.y, localOrig.z,
+              //        localDir.x, localDir.y, localDir.z,
+              //        (center - halfExt).x, (center - halfExt).y, (center - halfExt).z,
+              //        (center + halfExt).x, (center + halfExt).y, (center + halfExt).z, hit);
+              if (hit && dist < closestDist)
+              {
+                closestDist = dist;
+                closestEntity = entity.GetUUID();
+              }
+            }
+
+            if (closestEntity != 0)
+            {
+              Entity hitEntity = m_Scene->TryGetEntityWithUUID(closestEntity);
+              while (hitEntity && hitEntity.GetParentUUID() != 0)
+              {
+                Entity parent = m_Scene->TryGetEntityWithUUID(hitEntity.GetParentUUID());
+                if (!parent)
+                {
+                  break;
+                }
+                hitEntity = parent;
+              }
+              closestEntity = hitEntity.GetUUID();
+            }
+            m_SelectedEntityId = closestEntity;
+          }
+        }
       }
     }
 
