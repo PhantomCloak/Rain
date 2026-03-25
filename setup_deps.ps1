@@ -8,6 +8,6 @@ if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
         exit 1
     }
     Write-Host "Installing cmake via scoop..."
-    scoop install cmake
+    scoop install cmake python
 }
 

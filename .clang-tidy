@@ -1,0 +1,10 @@
+---
+Checks: >
+  bugprone-*,
+  clang-analyzer-*,
+  performance-*,
+  -clang-analyzer-optin.cplusplus.UninitializedObject,
+  -bugprone-easily-swappable-parameters
+
+WarningsAsErrors: ""
+

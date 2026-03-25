@@ -17,6 +17,8 @@ Next-generation web engine. Written in C++. Uses the WebGPU rendering API, with 
 - [Assimp](https://github.com/assimp/assimp) - Asset importer supporting 40+ file formats
 - [ImGui](https://github.com/ocornut/imgui) - Immediate mode GUI for debug tooling
 - [Emscripten](https://github.com/emscripten-core/emscripten) - C++ to WebAssembly compiler toolchain
+- [Tracy](https://github.com/wolfpld/tracy) - A real time, nanosecond resolution, remote telemetry, hybrid frame and sampling profiler
+- [CodeChecker](https://github.com/Ericsson/codechecker) - Static analysis tool built on LLVM/Clang Static Analyzer toolchain
 
 ## Rendering
 
@@ -33,26 +35,19 @@ Built on **WebGPU**, running natively via [Dawn](https://dawn.googlesource.com/d
 - **Dynamic material uniforms** — scalar and vector properties set by name, offsets resolved via shader reflection and written directly into the GPU uniform buffer
 - **Modular render pass** — each pass independently declares its framebuffer, bind groups, and pipeline, with live shader hot-reload
 
-### Building the engine
+## Building the engine
+For Linux check `./setup_deps.sh` and windows `./setup_deps.ps1`.
 
-### Windows Dependencies
-
-- Visual Studio 2022 or above
+### Dependencies
+- MSVC or Clang, GCC
 - CMake
 - Git
-
-### Web Build Dependencies
-
+- Python
 - Emscriptten SDK 4.0.10
 
-### OSX Dependencies
+### Building
+- Web: `cmake --preset emscripten && cmake --build build/emscripten-debug`
+- Windows: `cmake --preset windows && cmake --build build/windows --config Release`
+- Linux: `cmake --preset linux-debug && cmake --build build/linux-debug`
+- MacOS: `cmake --preset osx-debug && cmake --build build/osx-debug`
 
-- Homebrew
-- Git
-
-1. Run setup_deps.ps1 in the root folder to install required dependencies
-
-- Web: `cmake --preset emscripten`
-- Windows: `cmake --preset windows-vs2022-debug`
-- Linux: `cmake --preset linux-debug`
-- MacOS: `cmake --preset osx-debug`
