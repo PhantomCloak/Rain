@@ -10,7 +10,7 @@ struct Uniforms {
 }
 
 const MIN_ROUGHNESS = 0.002025;
-const SAMPLE_COUNT = 512u;
+const SAMPLE_COUNT = 128u;
 
 fn D_GGX(NoH: f32, roughness: f32) -> f32 {
     let a = NoH * roughness;
@@ -37,7 +37,11 @@ struct BasisVectors {
 
 		let roughness = lodToAlpha(f32(ud_uniforms.currentMipLevel) / f32(ud_uniforms.mipLevelCount - 1));
 
-		let uv = vec2f(id.xy) / vec2f(outputDimensions - 1u);
+		// Solid angle associated with a single cubemap texel at mip 0.
+		// Used for mip-filtered importance sampling (GPU Gems 3, Ch. 20.4).
+		let inputSize = vec2f(textureDimensions(inputCubemapTexture, 0));
+		let wt = 4.0 * PI / (6.0 * inputSize.x * inputSize.y);
+
 		let N = getCubeMapTexCoord(vec2f(textureDimensions(outputCubemapTexture).xy), id);
 		let Lo = N;
 
@@ -50,10 +54,18 @@ struct BasisVectors {
 			let cosLi = dot(N, Li);
 			if(cosLi > 0.0) {
 				let cosLh = max(dot(N, Lh), 0.0);
+
+				// GGX NDF pdf, scaled by 1/4 for Lh -> Li change of variable
 				let pdf = ndfGGX(cosLh, roughness) * 0.25;
+
+				// Solid angle associated with this sample
 				let ws = 1.0 / (f32(SAMPLE_COUNT) * pdf);
 
-				color = color + textureSampleLevel(inputCubemapTexture, textureSampler, Li, 0.0).rgb * cosLi;
+				// Mip level to sample from: reduces noise by sampling pre-blurred mips
+				// for wide sample distributions (high roughness)
+				let mipLevel = max(0.5 * log2(ws / wt) + 1.0, 0.0);
+
+				color = color + textureSampleLevel(inputCubemapTexture, textureSampler, Li, f32(mipLevel)).rgb * cosLi;
 				total_weight += cosLi;
 			}
 		}

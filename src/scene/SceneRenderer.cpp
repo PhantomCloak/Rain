@@ -250,7 +250,7 @@ namespace WebEngine
     TextureProps skyboxCubeProps = {};
     skyboxCubeProps.Width = 2048;
     skyboxCubeProps.Height = 2048;
-    skyboxCubeProps.GenerateMips = false;
+    skyboxCubeProps.GenerateMips = true;
     skyboxCubeProps.Format = TextureFormat::RGBA16F;
 
     Ref<TextureCube> envUnfiltered = TextureCube::Create(skyboxCubeProps);
@@ -258,8 +258,9 @@ namespace WebEngine
 
     m_Renderer = Render::Get();
     m_Renderer->ComputeEquirectToCubemap(envEquirect.get(), envUnfiltered.get());
+    m_Renderer->ComputeMipCube(envUnfiltered.get());
 
-    auto [envFiltered, envIrradiance] = m_Renderer->CreateEnvironmentMap("Resources/textures/evening_road_01_puresky_4k.hdr");
+    auto [envFiltered, envIrradiance] = m_Renderer->CreateEnvironmentMap(envUnfiltered.get());
 
     FileSys::WatchFile("Resources/shaders/pbr.wgsl", [pbrShader](std::string filePath)
                        {

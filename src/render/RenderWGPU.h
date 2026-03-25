@@ -54,7 +54,7 @@ namespace WebEngine
     virtual void ComputePreFilter(TextureCube* input, TextureCube* output) override;
     virtual void ComputeEnvironmentIrradiance(TextureCube* input, TextureCube* output) override;
     virtual void ComputeEquirectToCubemap(Texture2D* equirectTexture, TextureCube* outputCubemap) override;
-    virtual std::pair<Ref<TextureCube>, Ref<TextureCube>> CreateEnvironmentMap(const std::string& filepath) override;
+    virtual std::pair<Ref<TextureCube>, Ref<TextureCube>> CreateEnvironmentMap(TextureCube* sourceCubemap) override;
 
     virtual bool IsReady() override { return Instance && Instance->m_DawnInstance && Instance->m_Adapter && Instance->m_Device; }
     virtual void Tick() override;

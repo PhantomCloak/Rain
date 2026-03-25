@@ -240,36 +240,29 @@ namespace WebEngine
     uint32_t _pad[2];
   };
 
-  std::pair<Ref<TextureCube>, Ref<TextureCube>> RenderWGPU::CreateEnvironmentMap(const std::string& filepath)
+  std::pair<Ref<TextureCube>, Ref<TextureCube>> RenderWGPU::CreateEnvironmentMap(TextureCube* sourceCubemap)
   {
-    const uint32_t cubemapSize = 2048;
+    const uint32_t cubemapSize = sourceCubemap->GetSpec().Width;
     const uint32_t irradianceMapSize = 32;
 
-    RN_LOG("Creating environment map. Size {} Sample {}", cubemapSize, irradianceMapSize);
+    RN_LOG("Creating environment map. Size {} Irradiance {}", cubemapSize, irradianceMapSize);
 
-    TextureProps cubeProps = {};
-    cubeProps.Width = cubemapSize;
-    cubeProps.Height = cubemapSize;
-    cubeProps.GenerateMips = true;
-    cubeProps.Format = TextureFormat::RGBA16F;
+    TextureProps filteredProps = {};
+    filteredProps.Width = cubemapSize;
+    filteredProps.Height = cubemapSize;
+    filteredProps.GenerateMips = true;
+    filteredProps.Format = TextureFormat::RGBA16F;
 
-    Ref<TextureCube> envUnfiltered = TextureCube::Create(cubeProps);
-    Ref<TextureCube> envFiltered = TextureCube::Create(cubeProps);
+    Ref<TextureCube> envFiltered = TextureCube::Create(filteredProps);
 
-    cubeProps.Width = irradianceMapSize;
-    cubeProps.Height = irradianceMapSize;
-    cubeProps.Format = TextureFormat::RGBA32F;
-    cubeProps.GenerateMips = false;
-    Ref<TextureCube> irradianceMap = TextureCube::Create(cubeProps);
+    TextureProps irradianceProps = {};
+    irradianceProps.Width = irradianceMapSize;
+    irradianceProps.Height = irradianceMapSize;
+    irradianceProps.Format = TextureFormat::RGBA32F;
+    irradianceProps.GenerateMips = false;
+    Ref<TextureCube> irradianceMap = TextureCube::Create(irradianceProps);
 
-    Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), filepath);
-
-    RenderWGPU::ComputeEquirectToCubemap(envEquirect.get(), envUnfiltered.get());
-    RenderWGPU::ComputeMipCube(envUnfiltered.get());
-
-    RenderWGPU::ComputeEquirectToCubemap(envEquirect.get(), envFiltered.get());
-
-    RenderWGPU::ComputePreFilter(envUnfiltered.get(), envFiltered.get());
+    RenderWGPU::ComputePreFilter(sourceCubemap, envFiltered.get());
     RenderWGPU::ComputeEnvironmentIrradiance(envFiltered.get(), irradianceMap.get());
 
     return std::make_pair(envFiltered, irradianceMap);
@@ -313,7 +306,7 @@ namespace WebEngine
     for (uint32_t mipLevel = 0; mipLevel < mipCount; ++mipLevel)
     {
       WGPUBindGroupEntry bindGroupEntries[4] = {
-          {.binding = 0, .textureView = input->GetReadableView(0)},  // Always sample from mip 0
+          {.binding = 0, .textureView = input->GetReadableView(0)},  // Cube view with full mip chain for mip-filtered importance sampling
           {.binding = 1, .textureView = output->GetWriteableView(mipLevel)},
           {.binding = 2, .sampler = *sampler->GetNativeSampler()},
           {.binding = 3, .buffer = uniformBuffer->Buffer, .offset = 0, .size = sizeof(PrefilterUniform)}};

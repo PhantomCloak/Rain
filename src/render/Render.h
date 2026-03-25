@@ -64,7 +64,7 @@ namespace WebEngine
     virtual void ComputePreFilter(TextureCube* input, TextureCube* output) = 0;
     virtual void ComputeEnvironmentIrradiance(TextureCube* input, TextureCube* output) = 0;
     virtual void ComputeEquirectToCubemap(Texture2D* equirectTexture, TextureCube* outputCubemap) = 0;
-    virtual std::pair<Ref<TextureCube>, Ref<TextureCube>> CreateEnvironmentMap(const std::string& filepath) = 0;
+    virtual std::pair<Ref<TextureCube>, Ref<TextureCube>> CreateEnvironmentMap(TextureCube* sourceCubemap) = 0;
 
     static void RegisterShaderDependency(Ref<Shader> shader, Material* material);
     static void RegisterShaderDependency(Ref<Shader> shader, RenderPipeline* material);
