@@ -2,9 +2,9 @@
 cmake_minimum_required(VERSION 3.19...3.25)
 
 if(APPLE)
-  project(RainEngine VERSION 0.1.0 LANGUAGES CXX C OBJC OBJCXX)
+  project(WebEngine VERSION 0.1.0 LANGUAGES CXX C OBJC OBJCXX)
 else()
-  project(RainEngine VERSION 0.1.0 LANGUAGES CXX C)
+  project(WebEngine VERSION 0.1.0 LANGUAGES CXX C)
 endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -25,26 +25,20 @@ if(APPLE)
   set_source_files_properties("vendor/imgui/backends/imgui_impl_wgpu.cpp" PROPERTIES LANGUAGE OBJCXX)
 endif()
 
-add_executable(ReEngine ${SOURCES})
+add_executable(WebEngine ${SOURCES})
 
-target_compile_options(ReEngine PRIVATE
+target_compile_options(WebEngine PRIVATE
   $<$<CXX_COMPILER_ID:GNU>:-Wno-changes-meaning>
 )
 
-target_compile_definitions(ReEngine PRIVATE
+target_compile_definitions(WebEngine PRIVATE
   RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources"
   $<IF:$<BOOL:${EMSCRIPTEN}>,IMGUI_IMPL_WEBGPU_BACKEND_WGPU,IMGUI_IMPL_WEBGPU_BACKEND_DAWN>
 )
 
 include(cmake/ThirdParty.cmake)
 
-target_include_directories(ReEngine SYSTEM PRIVATE
-  vendor/stb
-  vendor/imgui
-  vendor/ImGuizmo
-)
-
-target_link_libraries(ReEngine PRIVATE
+target_link_libraries(WebEngine PRIVATE
   assimp
   flecs_static
   spdlog
@@ -54,7 +48,7 @@ target_link_libraries(ReEngine PRIVATE
 )
 
 if(EMSCRIPTEN)
-  target_link_options(ReEngine PRIVATE
+  target_link_options(WebEngine PRIVATE
     -sUSE_GLFW=3
     -sUSE_WEBGPU=1
     -sUSE_ZLIB=1
@@ -63,13 +57,13 @@ if(EMSCRIPTEN)
     -sWASM_BIGINT=1
     -sASSERTIONS
     -sSTACK_SIZE=1mb
-    "--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/Resources@Resources"
+    "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/Resources@Resources"
   )
-  set_target_properties(ReEngine PROPERTIES SUFFIX ".html")
+  set_target_properties(WebEngine PROPERTIES SUFFIX ".html")
 endif()
 
 if(NOT EMSCRIPTEN)
-  target_link_libraries(ReEngine PRIVATE
+  target_link_libraries(WebEngine PRIVATE
     dawn_glfw
     dawn_native
     dawn_proc

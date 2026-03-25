@@ -35,7 +35,7 @@ jobs:
 
       - name: Copy files
         run: |
-          cp -r Resources bin/
+          cp -r Resources build/linux-release/bin/
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

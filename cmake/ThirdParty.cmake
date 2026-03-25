@@ -1,4 +1,10 @@
-target_include_directories(ReEngine PRIVATE src)
+target_include_directories(WebEngine PRIVATE src)
+
+target_include_directories(WebEngine SYSTEM PRIVATE
+  vendor/stb
+  vendor/imgui
+  vendor/ImGuizmo
+)
 
 if(EMSCRIPTEN)
   set(EMSCRIPTEN_PTHREADS_FLAGS "-pthread")
@@ -23,7 +29,7 @@ add_subdirectory(vendor/glm               SYSTEM)
 
 target_include_directories(assimp PRIVATE "${CMAKE_BINARY_DIR}")
 target_compile_options(assimp PRIVATE
-  -Wno-error
+  $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-error>
   $<$<C_COMPILER_ID:Clang>:-Wimplicit-const-int-float-conversion>
   $<$<CXX_COMPILER_ID:Clang>:-Wimplicit-const-int-float-conversion>
 )
