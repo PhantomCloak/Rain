@@ -37,7 +37,12 @@ namespace WebEngine
     JPH::RegisterTypes();
 
     m_TempAllocator = std::make_unique<JPH::TempAllocatorImpl>(64 * 1024 * 1024);
-    m_JobSystem = std::make_unique<JPH::JobSystemThreadPool>(2048, 8, JPH::thread::hardware_concurrency() - 1);
+#if __EMSCRIPTEN__
+    int numThreads = std::min((int)JPH::thread::hardware_concurrency() - 1, 2);
+#else
+    int numThreads = (int)JPH::thread::hardware_concurrency() - 1;
+#endif
+    m_JobSystem = std::make_unique<JPH::JobSystemThreadPool>(2048, 8, numThreads);
 
     m_BroadPhaseLayerInterface = std::make_unique<BPLayerInterfaceImpl>();
     m_ObjectVsBroadPhaseLayerFilter = std::make_unique<ObjectVsBroadPhaseLayerFilterImpl>();
@@ -56,7 +61,7 @@ namespace WebEngine
     m_Instance = this;
 
 #ifndef __EMSCRIPTEN__
-    //RenderDebug::Init();
+    // RenderDebug::Init();
 #endif
   }
 
@@ -178,10 +183,10 @@ namespace WebEngine
     m_PhysicsSystem->Update(dt, 1, m_TempAllocator.get(), m_JobSystem.get());
 
 #ifdef JPH_DEBUG_RENDERER
-    //JPH::BodyManager::DrawSettings drawSettings;
-    //drawSettings.mDrawShape = true;
-    //drawSettings.mDrawShapeWireframe = true;
-    //m_PhysicsSystem->DrawBodies(drawSettings, JPH::DebugRenderer::sInstance);
+    // JPH::BodyManager::DrawSettings drawSettings;
+    // drawSettings.mDrawShape = true;
+    // drawSettings.mDrawShapeWireframe = true;
+    // m_PhysicsSystem->DrawBodies(drawSettings, JPH::DebugRenderer::sInstance);
 #endif
 
     const auto& bodyLockInterface = m_PhysicsSystem->GetBodyLockInterface();
