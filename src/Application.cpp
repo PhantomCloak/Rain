@@ -166,6 +166,15 @@ namespace WebEngine
 
     m_SwapChain->Present();
 
+#ifdef __EMSCRIPTEN__
+    static int frameCounter = 0;
+    if (++frameCounter % 300 == 0)
+    {
+      size_t heapSize = (size_t)EM_ASM_INT({ return HEAP8.length; });
+      RN_LOG("WASM heap: {} MB (frame {})", heapSize / (1024 * 1024), frameCounter);
+    }
+#endif
+
     if (m_Render != nullptr)
     {
       m_Render->Tick();

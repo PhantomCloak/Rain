@@ -1008,6 +1008,20 @@ namespace WebEngine
     {
       RN_LOG("Device request successful");
       self->m_Device = device;
+#ifdef __EMSCRIPTEN__
+      EM_ASM({
+        var device = WebGPU.mgrDevice.get($0);
+        if (device) {
+          device.onuncapturederror = function(event) {
+            console.error("[WebGPU] Uncaptured error:", event.error.message);
+          };
+          device.lost.then(function(info) {
+            console.error("[WebGPU] Device lost — reason:", info.reason, "message:", info.message);
+          });
+          console.log("[WebGPU] Error listeners attached");
+        }
+      }, self->m_Device);
+#endif
       self->Initialize();
     }
     else
