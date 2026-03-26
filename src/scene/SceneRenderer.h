@@ -181,7 +181,11 @@ namespace WebEngine
     Ref<TextureCube> m_IrradianceMap;
 
     bool m_NeedResize = false;
+#ifdef EMSCRIPTEN_MOBILE
+    uint32_t m_NumOfCascades = 2;
+#else
     uint32_t m_NumOfCascades = 4;
+#endif
 
     uint32_t m_ViewportWidth;
     uint32_t m_ViewportHeight;

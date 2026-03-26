@@ -10,6 +10,7 @@
 #include "render/ShaderManager.h"
 #include "webgpu/webgpu.h"
 
+#define EMSCRIPTEN_MOBILE
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image.h>
 #include <stb_image_write.h>
@@ -164,7 +165,11 @@ namespace WebEngine
 
   void RenderWGPU::ComputeMipCube(TextureCube* input)
   {
+#ifdef EMSCRIPTEN_MOBILE
+    auto computeShader = ShaderManager::LoadShader("SH_ComputeCube", "Resources/shaders/mobile/ComputeMipCube.wgsl");
+#else
     auto computeShader = ShaderManager::LoadShader("SH_ComputeCube", "Resources/shaders/ComputeMipCube.wgsl");
+#endif
 
     auto device = RenderContext::GetDevice();
 
@@ -251,14 +256,22 @@ namespace WebEngine
     filteredProps.Width = cubemapSize;
     filteredProps.Height = cubemapSize;
     filteredProps.GenerateMips = true;
+#ifdef EMSCRIPTEN_MOBILE
+    filteredProps.Format = TextureFormat::RGBA8;
+#else
     filteredProps.Format = TextureFormat::RGBA16F;
+#endif
 
     Ref<TextureCube> envFiltered = TextureCube::Create(filteredProps);
 
     TextureProps irradianceProps = {};
     irradianceProps.Width = irradianceMapSize;
     irradianceProps.Height = irradianceMapSize;
+#ifdef EMSCRIPTEN_MOBILE
+    irradianceProps.Format = TextureFormat::RGBA8;
+#else
     irradianceProps.Format = TextureFormat::RGBA32F;
+#endif
     irradianceProps.GenerateMips = false;
     Ref<TextureCube> irradianceMap = TextureCube::Create(irradianceProps);
 
@@ -270,7 +283,11 @@ namespace WebEngine
 
   void RenderWGPU::ComputePreFilter(TextureCube* input, TextureCube* output)
   {
+#ifdef EMSCRIPTEN_MOBILE
+    auto computeShader = ShaderManager::LoadShader("SH_ComputeCube2", "Resources/shaders/mobile/environment_prefilter.wgsl");
+#else
     auto computeShader = ShaderManager::LoadShader("SH_ComputeCube2", "Resources/shaders/environment_prefilter.wgsl");
+#endif
 
     const uint32_t mipCount = RenderUtils::CalculateMipCount(input->GetSpec().Width, input->GetSpec().Height);
     const uint32_t uniformStride = std::max((uint32_t)sizeof(PrefilterUniform), 256u);
@@ -346,7 +363,11 @@ namespace WebEngine
 
   void RenderWGPU::ComputeEnvironmentIrradiance(TextureCube* input, TextureCube* output)
   {
+#ifdef EMSCRIPTEN_MOBILE
+    auto computeShader = ShaderManager::LoadShader("SH_EnvironmentIrradiance", "Resources/shaders/mobile/environment_irradiance.wgsl");
+#else
     auto computeShader = ShaderManager::LoadShader("SH_EnvironmentIrradiance", "Resources/shaders/environment_irradiance.wgsl");
+#endif
 
     auto sampler = Sampler::Create({.Name = "S_Skybox",
                                     .WrapFormat = TextureWrappingFormat::ClampToEdges,
@@ -622,7 +643,11 @@ namespace WebEngine
 
   void RenderWGPU::ComputeEquirectToCubemap(Texture2D* equirectTexture, TextureCube* outputCubemap)
   {
+#ifdef EMSCRIPTEN_MOBILE
+    auto computeShader = ShaderManager::LoadShader("SH_EquirectToCubemap", "Resources/shaders/mobile/equirectangular_to_cubemap.wgsl");
+#else
     auto computeShader = ShaderManager::LoadShader("SH_EquirectToCubemap", "Resources/shaders/equirectangular_to_cubemap.wgsl");
+#endif
 
     auto sampler = Sampler::Create({.Name = "S_EquirectSampler",
                                     .WrapFormat = TextureWrappingFormat::ClampToEdges,

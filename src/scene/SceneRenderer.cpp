@@ -3,6 +3,7 @@
 #include <memory>
 #include "Application.h"
 #include "core/Log.h"
+#define EMSCRIPTEN_MOBILE
 
 #include "backends/imgui_impl_wgpu.h"
 #include "imgui.h"
@@ -242,16 +243,31 @@ namespace WebEngine
       {7, ShaderDataType::Float4, "a_MRow2", 32}}};
     // clang-format on
 
+#ifdef EMSCRIPTEN_MOBILE
+    const Ref<Shader> pbrShader = ShaderManager::LoadShader("SH_DefaultBasicBatch", "Resources/shaders/mobile/pbr.wgsl");
+#else
     const Ref<Shader> pbrShader = ShaderManager::LoadShader("SH_DefaultBasicBatch", "Resources/shaders/pbr.wgsl");
+#endif
     const Ref<Shader> shadowShader = ShaderManager::LoadShader("SH_Shadow", "Resources/shaders/shadow_map.wgsl");
     const Ref<Shader> skyboxShader = ShaderManager::LoadShader("SH_Skybox", "Resources/shaders/skybox.wgsl");
+#ifdef EMSCRIPTEN_MOBILE
+    const Ref<Shader> ppfxShader = ShaderManager::LoadShader("SH_Ppfx", "Resources/shaders/mobile/ppfx.wgsl");
+#else
     const Ref<Shader> ppfxShader = ShaderManager::LoadShader("SH_Ppfx", "Resources/shaders/ppfx.wgsl");
+#endif
 
     TextureProps skyboxCubeProps = {};
+#ifdef EMSCRIPTEN_MOBILE
+    skyboxCubeProps.Width = 512;
+    skyboxCubeProps.Height = 512;
+    skyboxCubeProps.GenerateMips = true;
+    skyboxCubeProps.Format = TextureFormat::RGBA8;
+#else
     skyboxCubeProps.Width = 2048;
     skyboxCubeProps.Height = 2048;
     skyboxCubeProps.GenerateMips = true;
     skyboxCubeProps.Format = TextureFormat::RGBA16F;
+#endif
 
     Ref<TextureCube> envUnfiltered = TextureCube::Create(skyboxCubeProps);
     Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), "Resources/textures/evening_road_01_puresky_4k.hdr");
@@ -286,7 +302,11 @@ namespace WebEngine
 
     // Common
     FramebufferSpec compositeFboSpec;
+#ifdef EMSCRIPTEN_MOBILE
+    compositeFboSpec.ColorFormats = {TextureFormat::RGBA8};
+#else
     compositeFboSpec.ColorFormats = {TextureFormat::RGBA16F, TextureFormat::RGBA16F};
+#endif
     compositeFboSpec.DepthFormat = TextureFormat::Depth24Plus;
     compositeFboSpec.DebugName = "FB_Composite";
     compositeFboSpec.Multisample = 1;
@@ -302,7 +322,11 @@ namespace WebEngine
 
     // Skybox
     FramebufferSpec skyboxFboSpec;
+#ifdef EMSCRIPTEN_MOBILE
+    skyboxFboSpec.ColorFormats = {TextureFormat::RGBA8};
+#else
     skyboxFboSpec.ColorFormats = {TextureFormat::RGBA16F};
+#endif
     skyboxFboSpec.DepthFormat = TextureFormat::Depth24Plus;
     skyboxFboSpec.DebugName = "FB_Skybox";
     skyboxFboSpec.Multisample = 1;
@@ -441,7 +465,11 @@ namespace WebEngine
     m_CompositePass->Bake();
 
     // Skeletal Mesh Pipeline
+#ifdef EMSCRIPTEN_MOBILE
+    auto skeletalShader = ShaderManager::LoadShader("SH_Skeletal", "Resources/shaders/mobile/skeletal_simple.wgsl");
+#else
     auto skeletalShader = ShaderManager::LoadShader("SH_Skeletal", "Resources/shaders/skeletal_simple.wgsl");
+#endif
     FileSys::WatchFile("Resources/shaders/skeletal_simple.wgsl", [skeletalShader](std::string filePath)
                        {
                          std::string content = FileSys::ReadFile(filePath);
@@ -473,7 +501,11 @@ namespace WebEngine
     m_BoneMatricesBuffer->SetData(identityBones.data(), 128 * sizeof(glm::mat4));
 
     FramebufferSpec skeletalFboSpec;
+#ifdef EMSCRIPTEN_MOBILE
+    skeletalFboSpec.ColorFormats = {TextureFormat::RGBA8};
+#else
     skeletalFboSpec.ColorFormats = {TextureFormat::RGBA16F};
+#endif
     skeletalFboSpec.DepthFormat = TextureFormat::Depth24Plus;
     skeletalFboSpec.DebugName = "FB_Skeletal";
     skeletalFboSpec.Multisample = 1;
@@ -572,7 +604,9 @@ namespace WebEngine
 
     m_PpfxPass = RenderPass::Create(ppfxPass);
     m_PpfxPass->Set("renderTexture", m_CompositePass->GetOutput(0));
+#ifndef EMSCRIPTEN_MOBILE
     m_PpfxPass->Set("brightnessTexture", m_CompositePass->GetOutput(1));
+#endif
     m_PpfxPass->Set("textureSampler", ppfxSampler);
     m_PpfxPass->Bake();
 
