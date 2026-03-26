@@ -37,6 +37,11 @@ namespace WebEngine
     return textureRef;
   }
 
+  Texture2D::~Texture2D()
+  {
+    Release();
+  }
+
   Texture2D::Texture2D(const TextureProps& props)
       : m_TextureProps(props)
   {
@@ -57,18 +62,16 @@ namespace WebEngine
 
   void Texture2D::Release()
   {
-    wgpuTextureRelease(TextureBuffer);
-
-    for (const auto& view : m_ReadViews)
+    if (TextureBuffer)
     {
-      wgpuTextureViewRelease(view);
+      for (const auto& view : m_ReadViews)
+        wgpuTextureViewRelease(view);
+      m_ReadViews.clear();
+      m_WriteViews.clear();
+      wgpuTextureRelease(TextureBuffer);
+      TextureBuffer = NULL;
     }
-
-    if (m_TextureProps.CreateSampler)
-    {
-      Sampler->Release();
-    }
-    m_ReadViews.clear();
+    m_ImageData.Release();
   }
 
   void Texture2D::Invalidate()
@@ -146,6 +149,7 @@ namespace WebEngine
     if (m_ImageData.GetSize() > 0)
     {
       WriteTexture(m_ImageData.Data, TextureBuffer, m_TextureProps.Width, m_TextureProps.Height, 0, 0, m_TextureProps.Format);
+      m_ImageData.Release();
     }
 
     m_ReadViews.clear();
@@ -242,6 +246,23 @@ namespace WebEngine
     Invalidate();
   }
 
+  TextureCube::~TextureCube()
+  {
+    if (m_TextureBuffer)
+    {
+      for (const auto& view : m_ReadViews)
+        wgpuTextureViewRelease(view);
+      for (const auto& view : m_WriteViews)
+        wgpuTextureViewRelease(view);
+      m_ReadViews.clear();
+      m_WriteViews.clear();
+      wgpuTextureRelease(m_TextureBuffer);
+      m_TextureBuffer = NULL;
+    }
+    for (auto& buf : m_ImageData)
+      buf.Release();
+  }
+
   TextureCube::TextureCube(const TextureProps& props, const std::filesystem::path (&path)[6])
       : m_TextureProps(props)
   {
@@ -289,6 +310,18 @@ namespace WebEngine
       return;
     }
 
+    if (m_TextureBuffer)
+    {
+      for (const auto& view : m_ReadViews)
+        wgpuTextureViewRelease(view);
+      for (const auto& view : m_WriteViews)
+        wgpuTextureViewRelease(view);
+      m_ReadViews.clear();
+      m_WriteViews.clear();
+      wgpuTextureRelease(m_TextureBuffer);
+      m_TextureBuffer = NULL;
+    }
+
     uint32_t mipCount = 1;
     if (m_TextureProps.GenerateMips)
     {
@@ -314,10 +347,10 @@ namespace WebEngine
     WGPUExtent3D cubemapLayerSize = {cubemapSize.width, cubemapSize.height, 1};
     for (uint32_t faceIndex = 0; faceIndex < 6; ++faceIndex)
     {
-      WGPUOrigin3D origin = {0, 0, faceIndex};
       if (m_ImageData[faceIndex].Size > 0)
       {
         WriteTexture(m_ImageData[faceIndex].Data, m_TextureBuffer, m_TextureProps.Width, m_TextureProps.Height, 0, faceIndex, m_TextureProps.Format);
+        m_ImageData[faceIndex].Release();
       }
     }
 

@@ -75,6 +75,7 @@ namespace WebEngine
     void Release();
 
     Texture2D();
+    ~Texture2D();
     Texture2D(const TextureProps& props);
     Texture2D(const TextureProps& props, const std::filesystem::path& path);
 
@@ -117,6 +118,7 @@ namespace WebEngine
     TextureCube(const TextureProps& props, const std::filesystem::path (&paths)[6]);
     TextureCube(const TextureProps& props);
     TextureCube() {};
+    ~TextureCube();
 
     glm::uvec2 GetSize() const override { return glm::uvec2(m_TextureProps.Width, m_TextureProps.Height); }
 

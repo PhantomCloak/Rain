@@ -270,7 +270,7 @@ namespace WebEngine
 #endif
 
     Ref<TextureCube> envUnfiltered = TextureCube::Create(skyboxCubeProps);
-    Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), "Resources/textures/evening_road_01_puresky_4k.hdr");
+    Ref<Texture2D> envEquirect = Texture2D::Create(TextureProps(), "Resources/textures/evening_road_01_puresky_1k.hdr");
 
     m_Renderer = Render::Get();
     m_Renderer->ComputeEquirectToCubemap(envEquirect.get(), envUnfiltered.get());
