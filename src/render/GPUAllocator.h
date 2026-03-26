@@ -35,6 +35,14 @@ namespace WebEngine
     GPUBuffer() {};
     GPUBuffer(WGPUBuffer buffer, int size)
         : Buffer(buffer), Size(size) {};
+    ~GPUBuffer()
+    {
+      if (Buffer)
+      {
+        wgpuBufferRelease(Buffer);
+        Buffer = nullptr;
+      }
+    }
 
     void SetData(void const* data, int size);
     void SetData(void const* data, int offset, int size);

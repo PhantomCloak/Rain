@@ -296,6 +296,10 @@ namespace WebEngine
         RN_ASSERT(bindGroup != 0, "BindGroup creation failed.");
         RN_LOG("Created BindingManager {} {}", m_BindingSpec.Name, (void*)bindGroup);
 
+        if (m_BindGroups.count(index) && m_BindGroups[index] != nullptr)
+        {
+          wgpuBindGroupRelease(m_BindGroups[index]);
+        }
         m_BindGroups[index] = bindGroup;
       }
     }

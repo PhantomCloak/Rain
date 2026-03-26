@@ -876,11 +876,20 @@ namespace WebEngine
     };
 #endif
 
-    std::vector<WGPUFeatureName> requiredFeatures = {
+    std::vector<WGPUFeatureName> desiredFeatures = {
         WGPUFeatureName_TimestampQuery,
         WGPUFeatureName_TextureCompressionBC,
         WGPUFeatureName_Float32Filterable,
         WGPUFeatureName_DepthClipControl};
+
+    std::vector<WGPUFeatureName> requiredFeatures;
+    for (auto feature : desiredFeatures)
+    {
+      if (wgpuAdapterHasFeature(m_Adapter, feature))
+      {
+        requiredFeatures.push_back(feature);
+      }
+    }
 
 #ifndef __EMSCRIPTEN__
     WGPULimits* requiredLimits = ZERO_ALLOC(WGPULimits);
@@ -895,7 +904,6 @@ namespace WebEngine
     requiredLimits->limits = supportedLimits->limits;
     requiredLimits->limits.minUniformBufferOffsetAlignment = 256;
     requiredLimits->limits.minStorageBufferOffsetAlignment = 256;
-    requiredLimits->limits.maxComputeInvocationsPerWorkgroup = 1024;
     requiredLimits->limits.maxInterStageShaderComponents = WGPU_LIMIT_U32_UNDEFINED;
 #endif
 

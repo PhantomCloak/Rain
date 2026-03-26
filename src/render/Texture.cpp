@@ -73,14 +73,16 @@ namespace WebEngine
 
   void Texture2D::Invalidate()
   {
-    if (TextureBuffer != NULL && m_ReadViews.size() <= 0)
+    if (TextureBuffer != NULL)
     {
-      wgpuTextureRelease(TextureBuffer);
       for (const auto& view : m_ReadViews)
       {
         wgpuTextureViewRelease(view);
       }
       m_ReadViews.clear();
+      m_WriteViews.clear();
+      wgpuTextureRelease(TextureBuffer);
+      TextureBuffer = NULL;
     }
 
     uint32_t mipCount = 1;
