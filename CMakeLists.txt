@@ -31,6 +31,7 @@ target_compile_options(WebEngine PRIVATE
   $<$<CXX_COMPILER_ID:GNU>:-Wno-changes-meaning>
 )
 
+
 target_compile_definitions(WebEngine PRIVATE
   RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources"
   $<IF:$<BOOL:${EMSCRIPTEN}>,IMGUI_IMPL_WEBGPU_BACKEND_WGPU,IMGUI_IMPL_WEBGPU_BACKEND_DAWN>
@@ -52,7 +53,7 @@ if(EMSCRIPTEN)
     -sUSE_GLFW=3
     -sUSE_WEBGPU=1
     -sUSE_ZLIB=1
-    -sASYNCIFY=1
+    #-sASYNCIFY=1
     -sALLOW_MEMORY_GROWTH=0
     -sINITIAL_MEMORY=512mb
     -sWASM_BIGINT=1
