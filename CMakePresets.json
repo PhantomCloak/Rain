@@ -174,7 +174,10 @@
             "inherits": "emscripten-common",
             "description": "Build for Emscripten (Debug)",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O1 -g -gsource-map",
+                "CMAKE_C_FLAGS_RELWITHDEBINFO": "-O1 -g -gsource-map",
+                "CMAKE_EXE_LINKER_FLAGS": "-O1 -g -gsource-map"
             }
         },
         {
