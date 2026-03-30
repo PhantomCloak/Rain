@@ -67,13 +67,11 @@ namespace WebEngine
       m_Render->OnReady = InitializeScene;
       m_Render->Init(GetNativeWindow());
 
-#ifndef __EMSCRIPTEN__
       while (!m_Render->IsReady())
       {
         m_Render->Tick();
         Thread::Sleep(16);
       }
-#endif
     }
     else
     {
