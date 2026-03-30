@@ -37,7 +37,7 @@ namespace WebEngine
       case PT_Uniform:
         return input.UniformIntput != NULL && input.UniformIntput->Buffer != NULL;
       case PT_Texture:
-        return input.TextureInput != NULL && input.TextureInput->GetReadableView() != NULL;
+        return input.TextureInput != NULL && input.TextureInput->GetReadView() != NULL;
       case PT_Sampler:
         return input.SamplerInput != NULL && input.SamplerInput->GetNativeSampler() != NULL;
       case PT_Storage:
@@ -217,12 +217,12 @@ namespace WebEngine
             break;
           case PT_Texture:
 
-            if (input.TextureInput->GetType() == TextureType::TextureDimCube && storedEntry.textureView != input.TextureInput->GetReadableView())
+            if (input.TextureInput->GetType() == TextureType::TextureDimCube && storedEntry.textureView != input.TextureInput->GetReadView())
             {
               m_InvalidatedInputs[index][location] = input;
             }
 
-            if (storedEntry.textureView != input.TextureInput->GetReadableView())
+            if (storedEntry.textureView != input.TextureInput->GetReadView())
             {
               m_InvalidatedInputs[index][location] = input;
             }
@@ -263,7 +263,7 @@ namespace WebEngine
             storedEntry.size = input.UniformIntput->Size;
             break;
           case PT_Texture:
-            storedEntry.textureView = input.TextureInput->GetReadableView();
+            storedEntry.textureView = input.TextureInput->GetReadView();
             break;
           case PT_Sampler:
             storedEntry.sampler = *input.SamplerInput->GetNativeSampler();

@@ -141,17 +141,23 @@ namespace WebEngine
   {
     switch (format)
     {
-      case RGBA8:
+      case TextureFormat::RGBA8:
         return WGPUTextureFormat_RGBA8Unorm;
-      case BRGBA8:
+      case TextureFormat::BRGBA8:
         return WGPUTextureFormat_BGRA8Unorm;
-      case Depth24Plus:
+      case TextureFormat::Depth24Plus:
         return WGPUTextureFormat_Depth24Plus;
-      case RGBA16F:
+      case TextureFormat::RGBA16F:
         return WGPUTextureFormat_RGBA16Float;
-      case RGBA32F:
+      case TextureFormat::RGBA32F:
         return WGPUTextureFormat_RGBA32Float;
-      case Undefined:
+      case TextureFormat::BC7:
+        return WGPUTextureFormat_BC7RGBAUnorm;
+      case TextureFormat::ETC2_RGBA8:
+        return WGPUTextureFormat_ETC2RGBA8Unorm;
+      case TextureFormat::ASTC_4x4:
+        return WGPUTextureFormat_ASTC4x4Unorm;
+      case TextureFormat::Undefined:
         return WGPUTextureFormat_Undefined;
       default:
         RN_ASSERT(false, "Format conversion for TextureFormat not exist.")
@@ -242,11 +248,30 @@ namespace WebEngine
         return 4;
       case TextureFormat::RGBA16F:
         return 8;
-
       case TextureFormat::RGBA32F:
         return 16;
       default:
         RN_LOG_ERR("GetBytesPerPixel: Unsupported format {}", (int)format);
+        return 0;
+    }
+  }
+
+  bool TextureUtils::IsBlockCompressed(TextureFormat format)
+  {
+    return format == TextureFormat::BC7 ||
+           format == TextureFormat::ETC2_RGBA8 ||
+           format == TextureFormat::ASTC_4x4;
+  }
+
+  uint32_t TextureUtils::GetBytesPerBlock(TextureFormat format)
+  {
+    switch (format)
+    {
+      case TextureFormat::BC7:        return 16;  // 4x4 block, 128 bits
+      case TextureFormat::ETC2_RGBA8: return 16;  // 4x4 block, 128 bits
+      case TextureFormat::ASTC_4x4:   return 16;  // 4x4 block, 128 bits
+      default:
+        RN_LOG_ERR("GetBytesPerBlock: Not a block-compressed format {}", (int)format);
         return 0;
     }
   }

@@ -37,6 +37,240 @@ namespace WebEngine
     return textureRef;
   }
 
+  Ref<Texture2D> Texture2D::CreateFromMemory(const TextureProps& props, Buffer imageData)
+  {
+    auto tex = CreateRef<Texture2D>();
+    tex->m_TextureProps = props;
+    tex->m_ImageData    = imageData;
+    tex->Invalidate();
+    return tex;
+  }
+
+  Ref<Texture2D> Texture2D::CreateFromKTX(const TextureProps& props, KTXImportResult& ktxData)
+  {
+    auto tex = CreateRef<Texture2D>();
+    tex->m_TextureProps = props;
+
+    const bool isCompressed = TextureUtils::IsBlockCompressed(props.Format);
+    uint32_t mipCount = static_cast<uint32_t>(ktxData.mips.size());
+
+    bool needsComputeMip = false;
+    if (mipCount == 1 && !isCompressed && props.GenerateMips)
+    {
+      mipCount = RenderUtils::CalculateMipCount(props.Width, props.Height);
+      needsComputeMip = true;
+    }
+
+    WGPUTextureDescriptor textureDesc = {};
+    ZERO_INIT(textureDesc);
+    textureDesc.nextInChain = nullptr;
+    textureDesc.label = RenderUtils::MakeLabel(props.DebugName);
+
+    if (isCompressed)
+    {
+      textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+    }
+    else if (needsComputeMip)
+    {
+      textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_StorageBinding | WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst;
+    }
+    else
+    {
+      textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+    }
+
+    textureDesc.dimension = WGPUTextureDimension_2D;
+    textureDesc.size.width  = isCompressed ? (props.Width + 3) & ~3u : props.Width;
+    textureDesc.size.height = isCompressed ? (props.Height + 3) & ~3u : props.Height;
+    textureDesc.size.depthOrArrayLayers = 1;
+    textureDesc.sampleCount = 1;
+    textureDesc.format = RenderTypeUtils::ToRenderType(props.Format);
+    textureDesc.mipLevelCount = mipCount;
+
+    if (props.CreateSampler)
+    {
+      std::string samplerName = "S_" + props.DebugName;
+      SamplerProps samplerProps = {
+          .Name = samplerName,
+          .WrapFormat = props.SamplerWrap,
+          .MagFilterFormat = props.SamplerFilter,
+          .MinFilterFormat = props.SamplerFilter,
+          .MipFilterFormat = props.SamplerFilter,
+          .LodMinClamp = 0.0f,
+          .LodMaxClamp = (float)mipCount};
+      tex->Sampler = Sampler::Create(samplerProps);
+    }
+
+    auto* Renderer = Render::Get();
+    auto renderContext = Renderer->GetRenderContext();
+    WGPUDevice device = renderContext->GetDevice();
+    const Ref<WGPUQueue> queue = renderContext->GetQueue();
+
+    tex->TextureBuffer = wgpuDeviceCreateTexture(device, &textureDesc);
+
+    // Batch all mip uploads into a single staging buffer + single submit
+    uint32_t ktxMipCount = static_cast<uint32_t>(ktxData.mips.size());
+    uint32_t blockSize = isCompressed
+        ? TextureUtils::GetBytesPerBlock(props.Format)
+        : TextureUtils::GetBytesPerPixel(props.Format);
+
+    struct StagedMip {
+      uint64_t bufferOffset;
+      uint32_t bytesPerRow;
+      uint32_t rowCount;
+      uint32_t copyWidth;
+      uint32_t copyHeight;
+    };
+
+    std::vector<StagedMip> stagedMips(ktxMipCount);
+    uint64_t totalStagingSize = 0;
+
+    for (uint32_t i = 0; i < ktxMipCount; i++)
+    {
+      const auto& mip = ktxData.mips[i];
+      auto& staged = stagedMips[i];
+
+      if (isCompressed)
+      {
+        uint32_t blockCols = (mip.width + 3) / 4;
+        uint32_t blockRows = (mip.height + 3) / 4;
+        staged.bytesPerRow = ((blockCols * blockSize) + 255) & ~255u;
+        staged.rowCount    = blockRows;
+        staged.copyWidth   = (mip.width + 3) & ~3u;
+        staged.copyHeight  = (mip.height + 3) & ~3u;
+      }
+      else
+      {
+        staged.bytesPerRow = ((blockSize * mip.width) + 255) & ~255u;
+        staged.rowCount    = mip.height;
+        staged.copyWidth   = mip.width;
+        staged.copyHeight  = mip.height;
+      }
+
+      totalStagingSize = (totalStagingSize + 255) & ~255ull;
+      staged.bufferOffset = totalStagingSize;
+      totalStagingSize += static_cast<uint64_t>(staged.bytesPerRow) * staged.rowCount;
+    }
+
+    // Create staging buffer mapped at creation
+    WGPUBufferDescriptor bufDesc = {};
+    ZERO_INIT(bufDesc);
+    bufDesc.label = RenderUtils::MakeLabel("ktx_staging");
+    bufDesc.size  = totalStagingSize;
+    bufDesc.usage = WGPUBufferUsage_CopySrc;
+    bufDesc.mappedAtCreation = true;
+
+    WGPUBuffer stagingBuffer = wgpuDeviceCreateBuffer(device, &bufDesc);
+    uint8_t* mapped = static_cast<uint8_t*>(
+        wgpuBufferGetMappedRange(stagingBuffer, 0, totalStagingSize));
+
+    // Pack all mip data into the staging buffer
+    for (uint32_t i = 0; i < ktxMipCount; i++)
+    {
+      const auto& mip = ktxData.mips[i];
+      const auto& staged = stagedMips[i];
+      const uint8_t* srcData = static_cast<const uint8_t*>(ktxData.data.Data) + mip.offset;
+
+      uint32_t srcBytesPerRow = isCompressed
+          ? ((mip.width + 3) / 4) * blockSize
+          : blockSize * mip.width;
+
+      if (srcBytesPerRow == staged.bytesPerRow)
+      {
+        memcpy(mapped + staged.bufferOffset, srcData,
+               static_cast<size_t>(srcBytesPerRow) * staged.rowCount);
+      }
+      else
+      {
+        for (uint32_t row = 0; row < staged.rowCount; row++)
+        {
+          memcpy(mapped + staged.bufferOffset + static_cast<size_t>(row) * staged.bytesPerRow,
+                 srcData + static_cast<size_t>(row) * srcBytesPerRow,
+                 srcBytesPerRow);
+        }
+      }
+    }
+
+    wgpuBufferUnmap(stagingBuffer);
+    ktxData.data.Release();
+
+    // Single command encoder for all mip copies
+    WGPUCommandEncoderDescriptor encDesc = {};
+    ZERO_INIT(encDesc);
+    encDesc.label = RenderUtils::MakeLabel("ktx_upload");
+    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, &encDesc);
+
+    for (uint32_t i = 0; i < ktxMipCount; i++)
+    {
+      const auto& staged = stagedMips[i];
+
+#ifdef __EMSCRIPTEN__
+      WGPUImageCopyBuffer src = {};
+      src.nextInChain = nullptr;
+      src.layout.offset       = staged.bufferOffset;
+      src.layout.bytesPerRow  = staged.bytesPerRow;
+      src.layout.rowsPerImage = staged.rowCount;
+      src.buffer = stagingBuffer;
+
+      WGPUImageCopyTexture dst = {};
+      dst.texture  = tex->TextureBuffer;
+      dst.mipLevel = i;
+      dst.origin   = {0, 0, 0};
+      dst.aspect   = WGPUTextureAspect_All;
+#else
+      WGPUTexelCopyBufferInfo src = {};
+      src.layout.offset       = staged.bufferOffset;
+      src.layout.bytesPerRow  = staged.bytesPerRow;
+      src.layout.rowsPerImage = staged.rowCount;
+      src.buffer = stagingBuffer;
+
+      WGPUTexelCopyTextureInfo dst = {};
+      dst.texture  = tex->TextureBuffer;
+      dst.mipLevel = i;
+      dst.origin   = {0, 0, 0};
+      dst.aspect   = WGPUTextureAspect_All;
+#endif
+
+      WGPUExtent3D copySize = {staged.copyWidth, staged.copyHeight, 1};
+      wgpuCommandEncoderCopyBufferToTexture(encoder, &src, &dst, &copySize);
+    }
+
+    WGPUCommandBufferDescriptor cmdDesc = {};
+    ZERO_INIT(cmdDesc);
+    cmdDesc.label = RenderUtils::MakeLabel("ktx_upload_cmd");
+    WGPUCommandBuffer cmdBuf = wgpuCommandEncoderFinish(encoder, &cmdDesc);
+    wgpuQueueSubmit(*queue, 1, &cmdBuf);
+
+    wgpuCommandBufferRelease(cmdBuf);
+    wgpuCommandEncoderRelease(encoder);
+    wgpuBufferRelease(stagingBuffer);
+
+    // Create views for all mip levels
+    for (uint32_t mip = 0; mip < mipCount; mip++)
+    {
+      WGPUTextureViewDescriptor viewMipDesc = {};
+      viewMipDesc.dimension = WGPUTextureViewDimension_2D;
+      viewMipDesc.aspect = WGPUTextureAspect_All;
+      viewMipDesc.baseArrayLayer = 0;
+      viewMipDesc.arrayLayerCount = 1;
+      viewMipDesc.baseMipLevel = mip;
+      viewMipDesc.mipLevelCount = 1;
+      viewMipDesc.format = textureDesc.format;
+
+      WGPUTextureView view = wgpuTextureCreateView(tex->TextureBuffer, &viewMipDesc);
+      tex->m_ReadViews.push_back(view);
+      tex->m_WriteViews.push_back(view);
+    }
+
+    // Fall back to compute mip gen only if KTX had 1 level + uncompressed
+    if (needsComputeMip)
+    {
+      Renderer->ComputeMip(tex.get());
+    }
+
+    return tex;
+  }
+
   Texture2D::~Texture2D()
   {
     Release();
@@ -65,7 +299,9 @@ namespace WebEngine
     if (TextureBuffer)
     {
       for (const auto& view : m_ReadViews)
+      {
         wgpuTextureViewRelease(view);
+      }
       m_ReadViews.clear();
       m_WriteViews.clear();
       wgpuTextureRelease(TextureBuffer);
@@ -88,8 +324,10 @@ namespace WebEngine
       TextureBuffer = NULL;
     }
 
+    const bool isCompressed = TextureUtils::IsBlockCompressed(m_TextureProps.Format);
+
     uint32_t mipCount = 1;
-    if (m_TextureProps.GenerateMips)
+    if (m_TextureProps.GenerateMips && !isCompressed)
     {
       mipCount = RenderUtils::CalculateMipCount(m_TextureProps.Width, m_TextureProps.Height);
     }
@@ -100,7 +338,12 @@ namespace WebEngine
     textureDesc.nextInChain = nullptr;
     textureDesc.label = RenderUtils::MakeLabel(m_TextureProps.DebugName);
 
-    if (m_TextureProps.GenerateMips)
+    if (isCompressed)
+    {
+      // Block-compressed formats cannot be storage textures or render attachments
+      textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_CopyDst;
+    }
+    else if (m_TextureProps.GenerateMips)
     {
       textureDesc.usage = WGPUTextureUsage_TextureBinding | WGPUTextureUsage_StorageBinding | WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst;
     }
@@ -110,13 +353,13 @@ namespace WebEngine
     }
 
     textureDesc.dimension = WGPUTextureDimension_2D;
-    textureDesc.size.width = m_TextureProps.Width;
-    textureDesc.size.height = m_TextureProps.Height;
-    textureDesc.size.depthOrArrayLayers = m_TextureProps.layers;
+    // Block-compressed textures require dimensions to be multiples of block size (4)
+    textureDesc.size.width  = isCompressed ? (m_TextureProps.Width  + 3) & ~3u : m_TextureProps.Width;
+    textureDesc.size.height = isCompressed ? (m_TextureProps.Height + 3) & ~3u : m_TextureProps.Height;
+    textureDesc.size.depthOrArrayLayers = m_TextureProps.Layers;
     textureDesc.sampleCount = m_TextureProps.MultiSample;
     textureDesc.format = RenderTypeUtils::ToRenderType(m_TextureProps.Format);
     textureDesc.mipLevelCount = mipCount;
-    textureDesc.sampleCount = m_TextureProps.MultiSample;
 
     if (m_TextureProps.CreateSampler)
     {
@@ -134,101 +377,73 @@ namespace WebEngine
     }
 
     auto* Renderer = Render::Get();
-    if (Renderer)
+    if (auto renderContext = Renderer->GetRenderContext())
     {
-      if (auto renderContext = Renderer->GetRenderContext())
-      {
-        TextureBuffer = wgpuDeviceCreateTexture(renderContext->GetDevice(), &textureDesc);
-      }
-      else
-      {
-        return;
-      }
+      TextureBuffer = wgpuDeviceCreateTexture(renderContext->GetDevice(), &textureDesc);
     }
 
     if (m_ImageData.GetSize() > 0)
     {
+      // We only write for mip 0 then generate mips in the compute pass
       WriteTexture(m_ImageData.Data, TextureBuffer, m_TextureProps.Width, m_TextureProps.Height, 0, 0, m_TextureProps.Format);
       m_ImageData.Release();
     }
 
-    m_ReadViews.clear();
-    WGPUTextureViewDescriptor viewDesc = {};
-    ZERO_INIT(viewDesc);
-    // Browser WebGPU requires DepthOnly aspect for depth-only formats like Depth24Plus
-    viewDesc.aspect = (m_TextureProps.Format == TextureFormat::Depth24Plus)
-                          ? WGPUTextureAspect_DepthOnly
-                          : WGPUTextureAspect_All;
-    viewDesc.baseArrayLayer = 0;
-    viewDesc.arrayLayerCount = m_TextureProps.layers;
-    viewDesc.baseMipLevel = 0;
-    viewDesc.mipLevelCount = textureDesc.mipLevelCount;
-    viewDesc.dimension = WGPUTextureViewDimension_2DArray;
-    viewDesc.format = textureDesc.format;
+    RN_ASSERT(!(m_TextureProps.Layers > 1 && m_TextureProps.GenerateMips), "Not Implemented Yet");
 
-    // Create the appropriate primary view
-    if (m_TextureProps.layers > 1)
+    // If Layers more than one we put ArrayView instead of the plain view
+    if (m_TextureProps.Layers > 1)
     {
-      // Array texture: create one 2D array view
-      viewDesc.dimension = WGPUTextureViewDimension_2DArray;
-      viewDesc.baseArrayLayer = 0;
-      viewDesc.arrayLayerCount = m_TextureProps.layers;
-      viewDesc.baseMipLevel = 0;
-      viewDesc.mipLevelCount = mipCount;
-      m_ReadViews.push_back(wgpuTextureCreateView(TextureBuffer, &viewDesc));
-    }
+      WGPUTextureViewDescriptor viewLayerDesc = {};
+      viewLayerDesc.dimension = WGPUTextureViewDimension_2DArray;
+      viewLayerDesc.baseArrayLayer = 0;
+      viewLayerDesc.arrayLayerCount = m_TextureProps.Layers;
+      viewLayerDesc.baseMipLevel = 0;
+      viewLayerDesc.mipLevelCount = m_TextureProps.GenerateMips ? mipCount : 1;
+      viewLayerDesc.format = textureDesc.format;
 
-    // Create individual views based on texture type
-    if (m_TextureProps.GenerateMips)
-    {
-      // For mipmapped textures: create a view for each mip level
-      for (uint32_t mip = 0; mip < mipCount; mip++)
+      WGPUTextureView viewLayer = wgpuTextureCreateView(TextureBuffer, &viewLayerDesc);
+      m_ReadViews.push_back(viewLayer);
+
+      for (uint32_t layer = 0; layer < m_TextureProps.Layers; layer++)
       {
-        viewDesc.dimension = WGPUTextureViewDimension_2D;
-        viewDesc.baseArrayLayer = 0;
-        viewDesc.arrayLayerCount = 1;
-        viewDesc.baseMipLevel = mip;
-        viewDesc.mipLevelCount = 1;
+        WGPUTextureViewDescriptor viewLayerDesc = {};
+        viewLayerDesc.dimension = WGPUTextureViewDimension_2D;
+        viewLayerDesc.aspect = (m_TextureProps.Format == TextureFormat::Depth24Plus)
+                                   ? WGPUTextureAspect_DepthOnly
+                                   : WGPUTextureAspect_All;
+        viewLayerDesc.baseArrayLayer = layer;
+        viewLayerDesc.arrayLayerCount = 1;
+        viewLayerDesc.baseMipLevel = 0;
+        viewLayerDesc.mipLevelCount = 1;
+        viewLayerDesc.format = textureDesc.format;
 
-        WGPUTextureView view = wgpuTextureCreateView(TextureBuffer, &viewDesc);
-        m_ReadViews.push_back(view);
-        m_WriteViews.push_back(view);  // Same view for both read/write
-      }
-    }
-    else if (m_TextureProps.layers > 1)
-    {
-      // For array textures without mipmaps: create a view for each layer
-      for (uint32_t layer = 0; layer < m_TextureProps.layers; layer++)
-      {
-        viewDesc.dimension = WGPUTextureViewDimension_2D;
-        viewDesc.baseArrayLayer = layer;
-        viewDesc.arrayLayerCount = 1;
-        viewDesc.baseMipLevel = 0;
-        viewDesc.mipLevelCount = 1;
-
-        WGPUTextureView view = wgpuTextureCreateView(TextureBuffer, &viewDesc);
+        WGPUTextureView view = wgpuTextureCreateView(TextureBuffer, &viewLayerDesc);
         m_ReadViews.push_back(view);
         m_WriteViews.push_back(view);  // Same view for both read/write
       }
     }
     else
     {
-      // Simple 2D texture: just create one view
-      viewDesc.dimension = WGPUTextureViewDimension_2D;
-      viewDesc.baseArrayLayer = 0;
-      viewDesc.arrayLayerCount = 1;
-      viewDesc.baseMipLevel = 0;
-      viewDesc.mipLevelCount = 1;
+      for (uint32_t mip = 0; mip < mipCount; mip++)
+      {
+        WGPUTextureViewDescriptor viewMipDesc = {};
+        viewMipDesc.dimension = WGPUTextureViewDimension_2D;
+        viewMipDesc.aspect = (m_TextureProps.Format == TextureFormat::Depth24Plus)
+                                 ? WGPUTextureAspect_DepthOnly
+                                 : WGPUTextureAspect_All;
+        viewMipDesc.baseArrayLayer = 0;
+        viewMipDesc.arrayLayerCount = 1;
+        viewMipDesc.baseMipLevel = mip;
+        viewMipDesc.mipLevelCount = 1;
+        viewMipDesc.format = textureDesc.format;
 
-      WGPUTextureView view = wgpuTextureCreateView(TextureBuffer, &viewDesc);
-      m_ReadViews.push_back(view);
-      m_WriteViews.push_back(view);
-    }
+        WGPUTextureView view = wgpuTextureCreateView(TextureBuffer, &viewMipDesc);
+        m_ReadViews.push_back(view);
+        m_WriteViews.push_back(view);  // Same view for both read/write
+      }
 
-    if (m_TextureProps.GenerateMips)
-    {
-      auto* Renderer = Render::Get();
-      if (Renderer)
+      if (m_TextureProps.GenerateMips && !isCompressed)
       {
         Renderer->ComputeMip(this);
       }
@@ -239,7 +454,7 @@ namespace WebEngine
   {
     if (!std::filesystem::exists(path))
     {
-      std::cerr << "Texture file not found: " << path << std::endl;
+      std::cerr << "Texture file not found: " << path << '\n';
       return;
     }
     m_ImageData = TextureImporter::ImportFileToBuffer(path, m_TextureProps.Format, m_TextureProps.Width, m_TextureProps.Height);
@@ -251,16 +466,22 @@ namespace WebEngine
     if (m_TextureBuffer)
     {
       for (const auto& view : m_ReadViews)
+      {
         wgpuTextureViewRelease(view);
+      }
       for (const auto& view : m_WriteViews)
+      {
         wgpuTextureViewRelease(view);
+      }
       m_ReadViews.clear();
       m_WriteViews.clear();
       wgpuTextureRelease(m_TextureBuffer);
       m_TextureBuffer = NULL;
     }
     for (auto& buf : m_ImageData)
+    {
       buf.Release();
+    }
   }
 
   TextureCube::TextureCube(const TextureProps& props, const std::filesystem::path (&path)[6])
@@ -294,7 +515,7 @@ namespace WebEngine
       auto& path = paths[i];
       if (!std::filesystem::exists(path))
       {
-        std::cerr << "Texture file not found: " << path << std::endl;
+        std::cerr << "Texture file not found: " << path << '\n';
         return;
       }
 
@@ -313,9 +534,13 @@ namespace WebEngine
     if (m_TextureBuffer)
     {
       for (const auto& view : m_ReadViews)
+      {
         wgpuTextureViewRelease(view);
+      }
       for (const auto& view : m_WriteViews)
+      {
         wgpuTextureViewRelease(view);
+      }
       m_ReadViews.clear();
       m_WriteViews.clear();
       wgpuTextureRelease(m_TextureBuffer);
@@ -393,13 +618,6 @@ namespace WebEngine
       return;
     }
 
-    uint32_t bytesPerPixel = TextureUtils::GetBytesPerPixel(format);
-    if (bytesPerPixel == 0)
-    {
-      RN_LOG_ERR("WriteTexture: Unsupported format {}", (int)format);
-      return;
-    }
-
     auto* Renderer = Render::Get();
     if (Renderer == nullptr)
     {
@@ -433,44 +651,101 @@ namespace WebEngine
       .aspect = WGPUTextureAspect_All
     };
 
-    uint32_t unalignedBytesPerRow = bytesPerPixel * width;
-    uint32_t alignedBytesPerRow = (unalignedBytesPerRow + 255) & ~255;  // Align to 256 bytes
-
-#ifdef __EMSCRIPTEN__
-    WGPUTextureDataLayout textureLayout = {
-#else
-    WGPUTexelCopyBufferLayout textureLayout = {
-#endif
-      .offset = 0,
-      .bytesPerRow = alignedBytesPerRow,
-      .rowsPerImage = height
-    };
-
-    WGPUExtent3D textureSize = {
-        .width = width,
-        .height = height,
-        .depthOrArrayLayers = 1};
-
-    if (unalignedBytesPerRow != alignedBytesPerRow)
+    if (TextureUtils::IsBlockCompressed(format))
     {
-      size_t alignedDataSize = alignedBytesPerRow * height;
-      std::vector<uint8_t> alignedData(alignedDataSize, 0);
-
-      const uint8_t* srcData = static_cast<const uint8_t*>(pixelData);
-      for (uint32_t y = 0; y < height; y++)
+      // Block-compressed path: bytesPerRow is based on block columns, rowsPerImage is block rows
+      uint32_t bytesPerBlock = TextureUtils::GetBytesPerBlock(format);
+      if (bytesPerBlock == 0)
       {
-        memcpy(
-            alignedData.data() + y * alignedBytesPerRow,
-            srcData + y * unalignedBytesPerRow,
-            unalignedBytesPerRow);
+        RN_LOG_ERR("WriteTexture: Unsupported compressed format {}", (int)format);
+        return;
       }
 
-      wgpuQueueWriteTexture(*queue, &dest, alignedData.data(), alignedDataSize, &textureLayout, &textureSize);
+      uint32_t blockCols = (width  + 3) / 4;
+      uint32_t blockRows = (height + 3) / 4;
+      uint32_t unalignedBytesPerRow = blockCols * bytesPerBlock;
+      uint32_t alignedBytesPerRow   = (unalignedBytesPerRow + 255) & ~255u;
+
+#ifdef __EMSCRIPTEN__
+      WGPUTextureDataLayout textureLayout = {
+#else
+      WGPUTexelCopyBufferLayout textureLayout = {
+#endif
+        .offset       = 0,
+        .bytesPerRow  = alignedBytesPerRow,
+        .rowsPerImage = blockRows
+      };
+
+      WGPUExtent3D textureSize = {
+          .width             = (width  + 3) & ~3u,
+          .height            = (height + 3) & ~3u,
+          .depthOrArrayLayers = 1};
+
+      if (unalignedBytesPerRow != alignedBytesPerRow)
+      {
+        size_t alignedDataSize = alignedBytesPerRow * blockRows;
+        std::vector<uint8_t> alignedData(alignedDataSize, 0);
+        const uint8_t* srcData = static_cast<const uint8_t*>(pixelData);
+        for (uint32_t row = 0; row < blockRows; row++)
+        {
+          memcpy(alignedData.data() + row * alignedBytesPerRow,
+                 srcData            + row * unalignedBytesPerRow,
+                 unalignedBytesPerRow);
+        }
+        wgpuQueueWriteTexture(*queue, &dest, alignedData.data(), alignedDataSize, &textureLayout, &textureSize);
+      }
+      else
+      {
+        size_t dataSize = alignedBytesPerRow * blockRows;
+        wgpuQueueWriteTexture(*queue, &dest, pixelData, dataSize, &textureLayout, &textureSize);
+      }
     }
     else
     {
-      size_t dataSize = alignedBytesPerRow * height;
-      wgpuQueueWriteTexture(*queue, &dest, pixelData, dataSize, &textureLayout, &textureSize);
+      // Uncompressed path
+      uint32_t bytesPerPixel = TextureUtils::GetBytesPerPixel(format);
+      if (bytesPerPixel == 0)
+      {
+        RN_LOG_ERR("WriteTexture: Unsupported format {}", (int)format);
+        return;
+      }
+
+      uint32_t unalignedBytesPerRow = bytesPerPixel * width;
+      uint32_t alignedBytesPerRow   = (unalignedBytesPerRow + 255) & ~255u;
+
+#ifdef __EMSCRIPTEN__
+      WGPUTextureDataLayout textureLayout = {
+#else
+      WGPUTexelCopyBufferLayout textureLayout = {
+#endif
+        .offset       = 0,
+        .bytesPerRow  = alignedBytesPerRow,
+        .rowsPerImage = height
+      };
+
+      WGPUExtent3D textureSize = {
+          .width             = width,
+          .height            = height,
+          .depthOrArrayLayers = 1};
+
+      if (unalignedBytesPerRow != alignedBytesPerRow)
+      {
+        size_t alignedDataSize = alignedBytesPerRow * height;
+        std::vector<uint8_t> alignedData(alignedDataSize, 0);
+        const uint8_t* srcData = static_cast<const uint8_t*>(pixelData);
+        for (uint32_t y = 0; y < height; y++)
+        {
+          memcpy(alignedData.data() + y * alignedBytesPerRow,
+                 srcData            + y * unalignedBytesPerRow,
+                 unalignedBytesPerRow);
+        }
+        wgpuQueueWriteTexture(*queue, &dest, alignedData.data(), alignedDataSize, &textureLayout, &textureSize);
+      }
+      else
+      {
+        size_t dataSize = alignedBytesPerRow * height;
+        wgpuQueueWriteTexture(*queue, &dest, pixelData, dataSize, &textureLayout, &textureSize);
+      }
     }
   }
 }  // namespace WebEngine

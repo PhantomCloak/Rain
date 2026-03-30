@@ -1,5 +1,6 @@
 #pragma once
 #include <webgpu/webgpu.h>
+#include <cstdint>
 #include <filesystem>
 #include <glm/glm.hpp>
 #include <string>
@@ -9,17 +10,20 @@
 
 namespace WebEngine
 {
-  enum TextureFormat
+  enum class TextureFormat : uint8_t
   {
     RGBA8,
     BRGBA8,
     RGBA16F,
     RGBA32F,
     Depth24Plus,
+    BC7,        // BC7 RGBA (desktop, requires TextureCompressionBC feature)
+    ETC2_RGBA8, // ETC2 RGBA8 (mobile, requires TextureCompressionETC2 feature)
+    ASTC_4x4,   // ASTC 4x4 RGBA (mobile/desktop, requires TextureCompressionASTC feature)
     Undefined
   };
 
-  enum TextureType
+  enum class TextureType : uint8_t
   {
     TextureDim2D,
     TextureDimCube
@@ -27,17 +31,17 @@ namespace WebEngine
 
   struct TextureProps
   {
-    TextureFormat Format = TextureFormat::RGBA8;
-    TextureWrappingFormat SamplerWrap = TextureWrappingFormat::Repeat;
-    FilterMode SamplerFilter = FilterMode::Linear;
-
     uint32_t Width = 1;
     uint32_t Height = 1;
     uint32_t MultiSample = 1;
 
     bool GenerateMips = false;
     bool CreateSampler = false;
-    uint32_t layers = 1;
+    uint32_t Layers = 1;
+
+    TextureFormat Format = TextureFormat::RGBA8;
+    TextureWrappingFormat SamplerWrap = TextureWrappingFormat::Repeat;
+    FilterMode SamplerFilter = FilterMode::Linear;
 
     std::string DebugName;
   };
@@ -54,22 +58,19 @@ namespace WebEngine
 
    public:
     virtual TextureType GetType() const = 0;
-    virtual WGPUTextureView GetView() = 0;
-    virtual WGPUTextureView GetReadableView(int layer = 0) = 0;
-    virtual WGPUTextureView GetWriteableView(int layer = 0) = 0;
+    virtual WGPUTextureView GetReadView(int layer = 0) = 0;
+    virtual WGPUTextureView GetWriteView(int layer = 0) = 0;
   };
+
+  struct KTXImportResult;
 
   class Texture2D : public Texture
   {
    public:
-    UUID Id;
-    std::string type;
-    std::string path;
-    WGPUTexture TextureBuffer = NULL;
-    Ref<Sampler> Sampler;
-
     static Ref<Texture2D> Create(const TextureProps& props);
     static Ref<Texture2D> Create(const TextureProps& props, const std::filesystem::path& path);
+    static Ref<Texture2D> CreateFromMemory(const TextureProps& props, Buffer imageData);
+    static Ref<Texture2D> CreateFromKTX(const TextureProps& props, KTXImportResult& ktxData);
 
     void Resize(uint width, uint height);
     void Release();
@@ -79,30 +80,27 @@ namespace WebEngine
     Texture2D(const TextureProps& props);
     Texture2D(const TextureProps& props, const std::filesystem::path& path);
 
-    const int GetViewCount() { return m_ReadViews.size(); }
-    WGPUTextureView GetView() override { return m_View; }
-    WGPUTextureView GetReadableView(int layer = 0) override { return m_ReadViews[layer]; }
-    WGPUTextureView GetWriteableView(int layer = 0) override { return m_ReadViews[layer]; }
-
-    glm::uvec2 GetSize() const override { return glm::uvec2(m_TextureProps.Width, m_TextureProps.Height); }
+    const int GetViewCount() { return (int)m_ReadViews.size(); }
+    WGPUTextureView GetReadView(int layer = 0) override { return m_ReadViews[layer]; }
+    WGPUTextureView GetWriteView(int layer = 0) override { return m_ReadViews[layer]; }
 
     uint32_t GetWidth() const override { return GetSize().x; }
     uint32_t GetHeight() const override { return GetSize().y; }
     uint32_t GetMipLevelCount() const override { return 15; }
+    glm::uvec2 GetSize() const override { return glm::uvec2(m_TextureProps.Width, m_TextureProps.Height); }
 
     TextureFormat GetFormat() const override { return m_TextureProps.Format; }
     TextureType GetType() const override { return TextureType::TextureDim2D; }
 
     const TextureProps& GetSpec() { return m_TextureProps; }
 
-    WGPUTextureView m_View;
-    ;
     std::vector<WGPUTextureView> m_ReadViews;
     std::vector<WGPUTextureView> m_WriteViews;
 
-    WGPUTextureView m_ArrayView;
+    Ref<Sampler> Sampler;
 
    private:
+    WGPUTexture TextureBuffer = NULL;
     TextureProps m_TextureProps;
     Buffer m_ImageData;
 
@@ -120,27 +118,22 @@ namespace WebEngine
     TextureCube() {};
     ~TextureCube();
 
-    glm::uvec2 GetSize() const override { return glm::uvec2(m_TextureProps.Width, m_TextureProps.Height); }
+    WGPUTextureView GetReadView(int layer = 0) override { return m_ReadViews[layer]; }
+    WGPUTextureView GetWriteView(int layer = 0) override { return m_WriteViews[layer]; }
 
     uint32_t GetWidth() const override { return GetSize().x; }
     uint32_t GetHeight() const override { return GetSize().y; }
     uint32_t GetMipLevelCount() const override { return 15; }
+    glm::uvec2 GetSize() const override { return glm::uvec2(m_TextureProps.Width, m_TextureProps.Height); }
 
     TextureFormat GetFormat() const override { return m_TextureProps.Format; }
     TextureType GetType() const override { return TextureType::TextureDimCube; }
-
     const TextureProps& GetSpec() { return m_TextureProps; }
 
-    WGPUTextureView GetView() override { return m_View; }
-    WGPUTextureView GetReadableView(int layer = 0) override { return m_ReadViews[layer]; }
-    WGPUTextureView GetWriteableView(int layer = 0) override { return m_WriteViews[layer]; }
-
-    WGPUTexture m_TextureBuffer = NULL;
-
-    WGPUTextureView m_View;
-    ;
     std::vector<WGPUTextureView> m_ReadViews;
     std::vector<WGPUTextureView> m_WriteViews;
+
+    WGPUTexture m_TextureBuffer = NULL;
 
    private:
     TextureProps m_TextureProps;

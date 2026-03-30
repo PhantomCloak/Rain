@@ -31,10 +31,12 @@ target_compile_options(WebEngine PRIVATE
   $<$<CXX_COMPILER_ID:GNU>:-Wno-changes-meaning>
 )
 
+option(USE_GPU_COMPRESSION "Upload KTX2 textures as compressed blocks using device-supported format (BC7/ETC2/ASTC). Requires the corresponding WebGPU device feature to be available at runtime." OFF)
 
 target_compile_definitions(WebEngine PRIVATE
   RESOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Resources"
   $<IF:$<BOOL:${EMSCRIPTEN}>,IMGUI_IMPL_WEBGPU_BACKEND_WGPU,IMGUI_IMPL_WEBGPU_BACKEND_DAWN>
+  $<$<BOOL:${USE_GPU_COMPRESSION}>:USE_GPU_COMPRESSION>
 )
 
 include(cmake/ThirdParty.cmake)
@@ -46,6 +48,7 @@ target_link_libraries(WebEngine PRIVATE
   Jolt
   glm
   ozz_animation_offline
+  ktx_read
 )
 
 if(EMSCRIPTEN)
@@ -53,7 +56,7 @@ if(EMSCRIPTEN)
     -sUSE_GLFW=3
     -sUSE_WEBGPU=1
     -sUSE_ZLIB=1
-    #-sASYNCIFY=1
+    -sASYNCIFY=1
     -sALLOW_MEMORY_GROWTH=0
     -sINITIAL_MEMORY=512mb
     -sWASM_BIGINT=1

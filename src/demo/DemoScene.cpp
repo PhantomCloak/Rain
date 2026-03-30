@@ -9,12 +9,12 @@ namespace WebEngine
   {
     Scene::Init();
 
-    auto testModel = ResourceManager::LoadMeshSource("Resources/test2/untitled.gltf");
-    auto boxModel = ResourceManager::LoadMeshSource("Resources/box.gltf");
-    auto weaponModel = ResourceManager::LoadMeshSource("Resources/assault_rifle_pbr/scene.gltf");
+    const auto testModel = ResourceManager::LoadMeshSource("Resources/Kachujin/Kachujin.glb");
+    const auto boxModel = ResourceManager::LoadMeshSource("Resources/box/box.gltf");
+    const auto weaponModel = ResourceManager::LoadMeshSource("Resources/assault_rifle_pbr/assault_rifle_pbr.glb");
 
-    Entity modelEntity = CreateEntity("bump");
-    Entity floorEntity = CreateEntity("box");
+    Entity modelEntity = CreateEntity("character");
+    Entity floorEntity = CreateEntity("floor");
     Entity weaponEntity = CreateEntity("weapon");
 
     modelEntity.Transform().Translation = glm::vec3(0, -0.0, 0);
@@ -67,7 +67,7 @@ namespace WebEngine
   {
     Scene::Init();
 
-    auto boxModel = ResourceManager::LoadMeshSource("Resources/box.gltf");
+    const auto boxModel = ResourceManager::LoadMeshSource("Resources/box/box.gltf");
     m_BallMesh = boxModel;
 
     Entity floorEntity = CreateEntity("floor");
@@ -112,4 +112,14 @@ namespace WebEngine
       }
     }
   }
+
+  void DemoSceneSponza::Init()
+  {
+    Scene::Init();
+    const auto sponzaModel = ResourceManager::LoadMeshSource("Resources/Sponza/Sponza-KTX-Draco.glb");
+    Entity preview = CreateEntity("Model");
+    preview.Transform().Scale = glm::vec3(5.0f);
+    BuildMeshEntityHierarchy(preview, sponzaModel);
+  }
+
 }  // namespace WebEngine

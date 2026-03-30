@@ -17,6 +17,7 @@ void WebEngine::OSXWindow::Init(const WindowProps& props)
   // WebEngine::Log::Init();
   // RN_CORE_INFO("Creating window {0} ({1}, {2})", props.Title, props.Width, props.Height);
 
+  glfwInitHint(GLFW_COCOA_CHDIR_RESOURCES, GLFW_FALSE);
   bool success = glfwInit();
   // RN_CORE_ASSERT(success, "Could not initialize GLFW!");
 
