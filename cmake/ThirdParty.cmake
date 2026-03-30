@@ -26,6 +26,7 @@ add_subdirectory(vendor/ozz-animation     SYSTEM)
 add_subdirectory(vendor/spdlog            SYSTEM)
 add_subdirectory(vendor/flecs             SYSTEM)
 add_subdirectory(vendor/glm               SYSTEM)
+add_subdirectory(vendor/KTX-Software      SYSTEM)
 
 target_include_directories(assimp PRIVATE "${CMAKE_BINARY_DIR}")
 target_compile_options(assimp PRIVATE

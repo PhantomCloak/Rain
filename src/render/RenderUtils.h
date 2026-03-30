@@ -294,5 +294,7 @@ namespace WebEngine {
   class TextureUtils {
    public:
     static uint32_t GetBytesPerPixel(TextureFormat format);
+    static bool IsBlockCompressed(TextureFormat format);
+    static uint32_t GetBytesPerBlock(TextureFormat format);
   };
 }  // namespace WebEngine

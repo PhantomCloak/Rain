@@ -1,4 +1,5 @@
 #include "Mesh.h"
+#include <cstring>
 #include <glm/gtx/matrix_decompose.hpp>
 #include <iostream>
 #include <limits>
@@ -8,6 +9,7 @@
 #include "core/Log.h"
 #include "io/filesystem.h"
 #include "render/ShaderManager.h"
+#include "render/TextureImporter.h"
 
 namespace WebEngine
 {
@@ -28,7 +30,7 @@ namespace WebEngine
     }
   }
 
-  TextureProps GetTexturePropsFromAssimp(aiMaterial* aiMat, aiTextureType texType, int texIndex = 0)
+  TextureProps GetTexturePropsFromAssimp(const aiMaterial* aiMat, aiTextureType texType, int texIndex = 0)
   {
     TextureProps props = {};
     props.CreateSampler = true;
@@ -54,6 +56,59 @@ namespace WebEngine
     return props;
   }
 
+  static const uint8_t KTX2_MAGIC[12] = {
+      0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A};
+
+  static bool IsKTX2(const uint8_t* data, size_t size)
+  {
+    return size >= 12 && memcmp(data, KTX2_MAGIC, 12) == 0;
+  }
+
+  static Ref<Texture2D> LoadEmbeddedKTXTexture(
+      const aiScene* scene,
+      int embIndex,
+      const std::string& name,
+      const TextureProps& baseProps)
+  {
+    if (embIndex < 0 || embIndex >= static_cast<int>(scene->mNumTextures))
+    {
+      return nullptr;
+    }
+
+    const aiTexture* embTex = scene->mTextures[embIndex];
+    if (embTex->mHeight != 0)  // mHeight==0 means compressed blob; mHeight>0 is raw pixels
+    {
+      return nullptr;
+    }
+
+    const auto* rawBytes = reinterpret_cast<const uint8_t*>(embTex->pcData);
+    const size_t byteCount = static_cast<size_t>(embTex->mWidth);
+
+    if (!IsKTX2(rawBytes, byteCount))
+    {
+      RN_LOG_ERR("Embedded texture '{}' is not KTX2, skipping.", name);
+      return nullptr;
+    }
+
+    KTXImportResult ktxResult = TextureImporter::ImportKTXFromMemory(rawBytes, byteCount);
+
+    if (!ktxResult)
+    {
+      RN_LOG_ERR("KTX2 decode failed for embedded texture '{}'.", name);
+      return nullptr;
+    }
+
+    TextureProps props = baseProps;
+    props.Width = ktxResult.baseWidth;
+    props.Height = ktxResult.baseHeight;
+    props.Format = ktxResult.format;
+    props.DebugName = name;
+
+    auto texture = Texture2D::CreateFromKTX(props, ktxResult);
+    WebEngine::ResourceManager::RegisterTexture(name, texture);
+    return texture;
+  }
+
   glm::mat4 convertToGLM(const aiMatrix4x4& from)
   {
     glm::mat4 to;
@@ -76,6 +131,42 @@ namespace WebEngine
     to[3][3] = from.d4;
 
     return to;
+  }
+
+  Ref<Texture2D> ExtractAssimpTexture(const aiScene* aiScene, const aiMaterial* aiMaterial, const std::string& assetPath, int textureSlotIndex, aiTextureType aiTexType)
+  {
+    aiString texturePath;
+    if (aiMaterial->GetTexture(aiTexType, textureSlotIndex, &texturePath) != aiReturn_SUCCESS)
+    {
+      std::cout << "An error occured while loading texture" << '\n';
+      return {};
+    }
+
+    const std::string textNameId = aiMaterial->GetName().C_Str() + std::string(texturePath.C_Str());
+
+    if (WebEngine::ResourceManager::IsTextureExist(textNameId))
+    {
+      return WebEngine::ResourceManager::GetTexture(textNameId);
+    }
+
+    const char* texPathStr = texturePath.C_Str();
+    const bool bIsEmbeddedTexture = texPathStr[0] == '*';
+
+    TextureProps texProps = GetTexturePropsFromAssimp(aiMaterial, aiTexType, textureSlotIndex);
+
+    if (bIsEmbeddedTexture)
+    {
+      int embIndex = std::atoi(texPathStr + 1);
+      std::string embName = aiMaterial->GetName().C_Str() + std::string("_emb_diff_") + std::to_string(embIndex);
+
+      return LoadEmbeddedKTXTexture(aiScene, embIndex, embName, texProps);
+    }
+    else
+    {
+      std::string path = FileSys::GetFileName(texPathStr);
+      std::string rootPath = FileSys::GetParentDirectory(assetPath);
+      return WebEngine::ResourceManager::LoadTexture(textNameId, rootPath + "/" + path, texProps);
+    }
   }
 
   MeshSource::MeshSource(std::string path)
@@ -126,16 +217,6 @@ namespace WebEngine
       ai_real metallicFactor = 0.0f;
       ai_real roughnessFactor = 0.8f;
 
-      // if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor) != AI_SUCCESS)
-      //{
-      // metallicFactor = 0.5f;  // Fallback if not specified
-      //}
-
-      // if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) != AI_SUCCESS)
-      //{
-      // roughnessFactor = 0.5f;  // Fallback if not specified
-      //}
-
       std::string aiMatName(aiMat->GetName().C_Str());
       static auto defaultShader = ShaderManager::GetShader("SH_DefaultBasicBatch");
 
@@ -144,85 +225,39 @@ namespace WebEngine
       material->Set("Roughness", roughnessFactor);
       material->Set("Ao", 0.5f);
 
-      for (int j = 0; j < aiMat->GetTextureCount(aiTextureType_DIFFUSE); j++)
+      assert(aiMat->GetTextureCount(aiTextureType_DIFFUSE) <= 1);
+      assert(aiMat->GetTextureCount(aiTextureType_NORMALS) <= 1);
+      assert(aiMat->GetTextureCount(aiTextureType_METALNESS) <= 1);
+
+      if (aiMat->GetTextureCount(aiTextureType_DIFFUSE) > 0)
       {
-        aiString texturePath;
-        if (aiMat->GetTexture(aiTextureType_DIFFUSE, j, &texturePath) != aiReturn_SUCCESS)
+        if (const auto texture = ExtractAssimpTexture(scene, aiMat, path, 0, aiTextureType_DIFFUSE); texture != nullptr)
         {
-          std::cout << "An error occured while loading texture" << std::endl;
-          continue;
+          material->Set("u_AlbedoTex", texture);
+          material->Set("u_TextureSampler", texture->Sampler);
         }
-
-        std::string textureName = FileSys::GetFileName(texturePath.C_Str());
-        RN_LOG("Texture Name: {}", textureName);
-
-        Ref<Texture2D> matTexture;
-        if (WebEngine::ResourceManager::IsTextureExist(textureName))
-        {
-          matTexture = WebEngine::ResourceManager::GetTexture(textureName);
-        }
-        else
-        {
-          TextureProps texProps = GetTexturePropsFromAssimp(aiMat, aiTextureType_DIFFUSE, j);
-          matTexture = WebEngine::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str(), texProps);
-        }
-
-        material->Set("u_AlbedoTex", matTexture);
-        material->Set("u_TextureSampler", matTexture->Sampler);
       }
 
       if (aiMat->GetTextureCount(aiTextureType_NORMALS) > 0)
       {
-        aiString texturePath;
-        if (aiMat->GetTexture(aiTextureType_NORMALS, 0, &texturePath) != aiReturn_SUCCESS)
+        if (const auto texture = ExtractAssimpTexture(scene, aiMat, path, 0, aiTextureType_NORMALS); texture != nullptr)
         {
-          std::cout << "An error occured while loading texture" << std::endl;
-          continue;
+          material->Set("u_NormalTex", texture);
+          material->Set("UseNormalMap", true);
         }
-
-        std::string textureName = FileSys::GetFileName(texturePath.C_Str());
-
-        Ref<Texture2D> matTexture;
-        if (WebEngine::ResourceManager::IsTextureExist(textureName))
-        {
-          matTexture = WebEngine::ResourceManager::GetTexture(textureName);
-        }
-        else
-        {
-          TextureProps texProps = GetTexturePropsFromAssimp(aiMat, aiTextureType_NORMALS, 0);
-          matTexture = WebEngine::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str(), texProps);
-        }
-
-        material->Set("u_NormalTex", matTexture);
-        material->Set("UseNormalMap", true);
       }
       else
       {
         material->Set("UseNormalMap", false);
       }
 
+      // TODO: Implement the case where metallic not exist
       if (aiMat->GetTextureCount(aiTextureType_METALNESS) > 0)
       {
-        aiString texturePath;
-        if (aiMat->GetTexture(aiTextureType_METALNESS, 0, &texturePath) != aiReturn_SUCCESS)
+        if (const auto texture = ExtractAssimpTexture(scene, aiMat, path, 0, aiTextureType_METALNESS); texture != nullptr)
         {
-          std::cout << "An error occured while loading texture" << std::endl;
-          continue;
+          material->Set("u_MetallicTex", texture);
         }
-
-        std::string textureName = FileSys::GetFileName(texturePath.C_Str());
-
-        Ref<Texture2D> matTexture;
-        if (WebEngine::ResourceManager::IsTextureExist(textureName))
-        {
-          matTexture = WebEngine::ResourceManager::GetTexture(textureName);
-        }
-        else
-        {
-          TextureProps texProps = GetTexturePropsFromAssimp(aiMat, aiTextureType_METALNESS, 0);
-          matTexture = WebEngine::ResourceManager::LoadTexture(textureName, fileDirectory + "/" + texturePath.C_Str(), texProps);
-        }
-        material->Set("u_MetallicTex", matTexture);
       }
 
       material->Bake();

@@ -9,7 +9,6 @@
 #include "imgui.h"
 #include "ImGuizmo.h"
 #include "Application.h"
-#include "core/Log.h"
 #include "render/ResourceManager.h"
 #include <glm/gtc/type_ptr.hpp>
 
@@ -200,6 +199,14 @@ namespace WebEngine
           m_Scene = std::make_unique<DemoSceneDefault>("Test Scene");
           m_Scene->Init();
         }
+        if (ImGui::MenuItem("Sponza"))
+        {
+          m_Scene->Cleanup();
+          m_Scene.reset();
+
+          m_Scene = std::make_unique<DemoSceneSponza>("Test Scene");
+          m_Scene->Init();
+        }
         ImGui::EndMenu();
       }
       ImGui::EndMainMenuBar();
@@ -238,7 +245,7 @@ namespace WebEngine
     auto texture = m_ViewportRenderer->GetLastPassImage();
     if (texture)
     {
-      WGPUTextureView textureView = texture->GetReadableView(0);
+      WGPUTextureView textureView = texture->GetReadView(0);
       if (textureView)
       {
         ImVec2 area = ImGui::GetContentRegionAvail();
@@ -308,8 +315,8 @@ namespace WebEngine
             UUID closestEntity = 0;
 
             auto meshEntities = m_Scene->GetAllEntitiesWithComponent<MeshComponent>();
-            RN_LOG("Viewport click: ray=({:.2f},{:.2f},{:.2f})->({:.2f},{:.2f},{:.2f}), entities={}",
-                   rayOrigin.x, rayOrigin.y, rayOrigin.z, rayDir.x, rayDir.y, rayDir.z, meshEntities.size());
+            // RN_LOG("Viewport click: ray=({:.2f},{:.2f},{:.2f})->({:.2f},{:.2f},{:.2f}), entities={}",
+            //        rayOrigin.x, rayOrigin.y, rayOrigin.z, rayDir.x, rayDir.y, rayDir.z, meshEntities.size());
 
             for (const auto& entity : meshEntities)
             {
@@ -390,7 +397,7 @@ namespace WebEngine
     std::unordered_set<UUID> childEntities;
     for (auto& entity : entities)
     {
-      for (UUID childId : entity.Children())
+      for (const UUID& childId : entity.Children())
       {
         childEntities.insert(childId);
       }
@@ -443,7 +450,7 @@ namespace WebEngine
 
     if (hasChildren && opened)
     {
-      for (UUID childId : children)
+      for (const UUID& childId : children)
       {
         Entity childEntity = m_Scene->TryGetEntityWithUUID(childId);
         if (childEntity)

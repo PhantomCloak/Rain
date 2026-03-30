@@ -61,6 +61,21 @@ namespace WebEngine
     return texture;
   }
 
+  std::shared_ptr<Texture2D> WebEngine::ResourceManager::LoadTextureFromMemory(
+      const std::string& id, const TextureProps& props, Buffer imageData)
+  {
+    auto texture = Texture2D::CreateFromMemory(props, imageData);
+    m_LoadedTextures[id] = texture;
+    RN_LOG("Embedded KTX2 texture '{}' loaded ({}x{})", id, props.Width, props.Height);
+    return texture;
+  }
+
+  void WebEngine::ResourceManager::RegisterTexture(const std::string& id, const std::shared_ptr<Texture2D>& texture)
+  {
+    m_LoadedTextures[id] = texture;
+    RN_LOG("Texture '{}' registered ({}x{})", id, texture->GetWidth(), texture->GetHeight());
+  }
+
   std::shared_ptr<Texture2D> WebEngine::ResourceManager::GetTexture(const std::string& id)
   {
     if (m_LoadedTextures.find(id) == m_LoadedTextures.end())

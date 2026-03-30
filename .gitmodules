@@ -28,3 +28,6 @@
 [submodule "vendor/ozz-animation"]
 	path = vendor/ozz-animation
 	url = https://github.com/guillaumeblanc/ozz-animation.git
+[submodule "vendor/KTX-Software"]
+	path = vendor/KTX-Software
+	url = https://github.com/KhronosGroup/KTX-Software.git

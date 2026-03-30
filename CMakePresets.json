@@ -34,7 +34,10 @@
                 "ASSIMP_BUILD_SIB_IMPORTER": "TRUE",
                 "ASSIMP_BUILD_OBJ_IMPORTER": "TRUE",
                 "CMAKE_CXX_EXTENSIONS": "OFF",
-                "FLECS_SHARED": "OFF"
+                "FLECS_SHARED": "OFF",
+                "USE_GPU_COMPRESSION": "ON",
+                "KTX_FEATURE_TESTS": "OFF",
+                "KTX_FEATURE_TOOLS": "OFF"
             }
         },
         {

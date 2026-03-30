@@ -23,4 +23,11 @@ namespace WebEngine
     Ref<MeshSource> m_BallMesh;
     int m_BallCounter = 0;
   };
+
+  class DemoSceneSponza : public Scene
+  {
+   public:
+    DemoSceneSponza(std::string sceneName = "Untitled Scene") : Scene(std::move(sceneName)) {}
+    void Init() override;
+  };
 }  // namespace WebEngine

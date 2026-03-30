@@ -86,7 +86,7 @@ namespace WebEngine
   Ref<Texture2D> RenderWGPU::GetWhiteTexture()
   {
     static auto whiteTexture = WebEngine::ResourceManager::GetTexture("T_Default");
-    RN_ASSERT(whiteTexture->GetReadableView() != 0, "Material: Default texture couldn't found.");
+    RN_ASSERT(whiteTexture->GetReadView() != 0, "Material: Default texture couldn't found.");
     return whiteTexture;
   }
 
@@ -133,8 +133,8 @@ namespace WebEngine
       wgpuComputePassEncoderSetPipeline(computePass, pipeline);
 
       WGPUBindGroupEntry bindGroupEntries[2] = {
-          {.binding = 0, .textureView = input->GetReadableView(mipLevel - 1)},
-          {.binding = 1, .textureView = input->GetWriteableView(mipLevel)}};
+          {.binding = 0, .textureView = input->GetReadView(mipLevel - 1)},
+          {.binding = 1, .textureView = input->GetWriteView(mipLevel)}};
 
       WGPUBindGroupDescriptor bindGroupDesc = {};
       bindGroupDesc.layout = bindGroupLayouts[0];
@@ -204,7 +204,7 @@ namespace WebEngine
 
       WGPUBindGroupEntry bindGroupEntries[2] = {
           {.binding = 0, .textureView = inputView},
-          {.binding = 1, .textureView = input->GetWriteableView(mipLevel)}};
+          {.binding = 1, .textureView = input->GetWriteView(mipLevel)}};
 
       WGPUBindGroupDescriptor bindGroupDesc = {};
       ZERO_INIT(bindGroupDesc);
@@ -323,8 +323,8 @@ namespace WebEngine
     for (uint32_t mipLevel = 0; mipLevel < mipCount; ++mipLevel)
     {
       WGPUBindGroupEntry bindGroupEntries[4] = {
-          {.binding = 0, .textureView = input->GetReadableView(0)},  // Cube view with full mip chain for mip-filtered importance sampling
-          {.binding = 1, .textureView = output->GetWriteableView(mipLevel)},
+          {.binding = 0, .textureView = input->GetReadView(0)},  // Cube view with full mip chain for mip-filtered importance sampling
+          {.binding = 1, .textureView = output->GetWriteView(mipLevel)},
           {.binding = 2, .sampler = *sampler->GetNativeSampler()},
           {.binding = 3, .buffer = uniformBuffer->Buffer, .offset = 0, .size = sizeof(PrefilterUniform)}};
 
@@ -384,8 +384,8 @@ namespace WebEngine
     const auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
 
     WGPUBindGroupEntry bindGroupEntries[3] = {
-        {.binding = 0, .textureView = output->GetWriteableView(0)},
-        {.binding = 1, .textureView = input->GetReadableView(0)},
+        {.binding = 0, .textureView = output->GetWriteView(0)},
+        {.binding = 1, .textureView = input->GetReadView(0)},
         {.binding = 2, .sampler = *sampler->GetNativeSampler()}};
 
     WGPUBindGroupDescriptor bindGroupDesc = {};
@@ -451,7 +451,7 @@ namespace WebEngine
         ZERO_INIT(colorAttachment);
 
         colorAttachment.nextInChain = nullptr;
-        colorAttachment.view = renderFrameBuffer->GetAttachment(i)->GetReadableView();
+        colorAttachment.view = renderFrameBuffer->GetAttachment(i)->GetReadView();
         colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
         colorAttachment.resolveTarget = renderFrameBuffer->m_FrameBufferSpec.SwapChainTarget ? Application::Get()->GetSwapChain()->GetSurfaceTextureView() : nullptr;
         colorAttachment.loadOp = renderFrameBuffer->m_FrameBufferSpec.ClearColorOnLoad
@@ -485,7 +485,7 @@ namespace WebEngine
       depthAttachment.stencilReadOnly = true;
 
       int layerNum = renderFrameBuffer->m_FrameBufferSpec.ExistingImageLayers.empty() ? 0 : renderFrameBuffer->m_FrameBufferSpec.ExistingImageLayers[0] + 1;
-      depthAttachment.view = renderFrameBuffer->GetDepthAttachment()->GetReadableView(layerNum);
+      depthAttachment.view = renderFrameBuffer->GetDepthAttachment()->GetReadView(layerNum);
 
       passDesc.depthStencilAttachment = &depthAttachment;
     }
@@ -665,8 +665,8 @@ namespace WebEngine
     auto pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
 
     WGPUBindGroupEntry bindGroupEntries[3] = {
-        {.binding = 0, .textureView = outputCubemap->GetWriteableView(0)},
-        {.binding = 1, .textureView = equirectTexture->GetReadableView(0)},
+        {.binding = 0, .textureView = outputCubemap->GetWriteView(0)},
+        {.binding = 1, .textureView = equirectTexture->GetReadView(0)},
         {.binding = 2, .sampler = *sampler->GetNativeSampler()}};
     WGPUBindGroupDescriptor bindGroupDesc = {};
     bindGroupDesc.layout = bindGroupLayout;
@@ -1019,8 +1019,7 @@ namespace WebEngine
             console.error("[WebGPU] Device lost — reason:", info.reason, "message:", info.message);
           });
           console.log("[WebGPU] Error listeners attached");
-        }
-      }, self->m_Device);
+        } }, self->m_Device);
 #endif
       self->Initialize();
     }

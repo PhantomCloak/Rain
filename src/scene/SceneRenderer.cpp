@@ -295,7 +295,7 @@ namespace WebEngine
     shadowDepthTextureSpec.Width = 1024;
     shadowDepthTextureSpec.Height = 1024;
     shadowDepthTextureSpec.Format = TextureFormat::Depth24Plus;
-    shadowDepthTextureSpec.layers = m_NumOfCascades;
+    shadowDepthTextureSpec.Layers = m_NumOfCascades;
 
     shadowDepthTextureSpec.DebugName = "ShadowMap";
     m_ShadowDepthTexture = Texture2D::Create(shadowDepthTextureSpec);
