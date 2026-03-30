@@ -640,6 +640,13 @@ namespace WebEngine
 
   void SceneRenderer::SetViewportSize(int height, int width)
   {
+    if (m_ViewportWidth == (uint32_t)width && m_ViewportHeight == (uint32_t)height)
+    {
+      RN_LOG("SetViewportSize skipped (same size {}x{})", width, height);
+      return;
+    }
+
+    RN_LOG("SetViewportSize {}x{} -> {}x{}", m_ViewportWidth, m_ViewportHeight, width, height);
     m_ViewportWidth = width;
     m_ViewportHeight = height;
 

@@ -250,6 +250,8 @@ namespace WebEngine
       return;
     }
 
+    RN_LOG("BindingManager '{}' invalidated, recreating bind groups", m_BindingSpec.Name);
+
     for (const auto& [index, inputs] : m_InvalidatedInputs)
     {
       for (const auto& [location, input] : inputs)
