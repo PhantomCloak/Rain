@@ -32,6 +32,7 @@ jobs:
           git submodule update --init --recursive vendor/flecs
           git submodule update --init --recursive vendor/stb
           git submodule update --init --recursive vendor/JoltPhysics
+          git submodule update --init --recursive vendor/KTX-Software
       - name: emscripten
         uses: mymindstorm/setup-emsdk@v14
         with:
