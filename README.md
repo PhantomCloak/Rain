@@ -34,6 +34,7 @@ Built on **WebGPU**, running natively via [Dawn](https://dawn.googlesource.com/d
 - **GPU skeletal animation** — bone matrices in a storage buffer, 4-weight per-vertex blending in the vertex shader; animation runtime via Ozz-Animation
 - **Dynamic material uniforms** — scalar and vector properties set by name, offsets resolved via shader reflection and written directly into the GPU uniform buffer
 - **Modular render pass** — each pass independently declares its framebuffer, bind groups, and pipeline, with live shader hot-reload
+- **Draco & KTX2 Support** — supports draco compressed vertex format and KTX supercompressed textures
 
 ## Building the engine
 For Linux check `./setup_deps.sh` and windows `./setup_deps.ps1`.
