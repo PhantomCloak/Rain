@@ -35,6 +35,10 @@ target_compile_options(assimp PRIVATE
   $<$<CXX_COMPILER_ID:Clang>:-Wimplicit-const-int-float-conversion>
 )
 
+if(EMSCRIPTEN)
+  target_compile_definitions(assimp PRIVATE ASSIMP_BUILD_NO_GLTF1_IMPORTER)
+endif()
+
 if(NOT EMSCRIPTEN)
   add_subdirectory(vendor/dawn SYSTEM)
 
