@@ -21,11 +21,13 @@ struct VertexOutput {
 	@location(6) WorldNormal: vec3f,
 	@location(7) WorldTangent: vec3f,
 	@location(8) WorldBitangent: vec3f,
-   @location(9)  ShadowCoord0: vec3f,
-  @location(10) ShadowCoord1: vec3f,
-  @location(11) ShadowCoord2: vec3f,
-  @location(12) ShadowCoord3: vec3f,
+	@location(9)  ShadowCoord0: vec3f,
+	@location(10) ShadowCoord1: vec3f,
+#if DESKTOP_PLATFORM
+	@location(11) ShadowCoord2: vec3f,
+	@location(12) ShadowCoord3: vec3f,
 	@location(13) Barycentric: vec3f,
+#endif
 };
 
 struct SceneData {
@@ -92,15 +94,19 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
 
     let shadowCoords0 = u_ShadowData.ShadowViewProjection[0] * worldPos;
     let shadowCoords1 = u_ShadowData.ShadowViewProjection[1] * worldPos;
+#if DESKTOP_PLATFORM
     let shadowCoords2 = u_ShadowData.ShadowViewProjection[2] * worldPos;
     let shadowCoords3 = u_ShadowData.ShadowViewProjection[3] * worldPos;
+#endif
 
     out.ShadowCoord0 = shadowCoords0.xyz / shadowCoords0.w;
     out.ShadowCoord1 = shadowCoords1.xyz / shadowCoords1.w;
+#if DESKTOP_PLATFORM
     out.ShadowCoord2 = shadowCoords2.xyz / shadowCoords2.w;
     out.ShadowCoord3 = shadowCoords3.xyz / shadowCoords3.w;
+#endif
 
-		out.FragPos = (u_Scene.cameraViewMatrix * vec4f(out.WorldPosition, 1.0)).xyz;
+    out.FragPos = (u_Scene.cameraViewMatrix * vec4f(out.WorldPosition, 1.0)).xyz;
 
     return out;
 }
@@ -125,6 +131,7 @@ fn GeometrySmith(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, roughness: f32) -> f3
 	return ggx1 * ggx2;
 }
 
+#if DESKTOP_PLATFORM
 fn getNormalFromMap(normalMap: texture_2d<f32>, defaultSampler: sampler, TexCoords: vec2<f32>, WorldPos: vec3<f32>, Normal: vec3<f32>) -> vec3<f32> {
     let tangentNormal = textureSample(normalMap, defaultSampler, TexCoords).xyz * 2.0 - 1.0;
 
@@ -140,6 +147,7 @@ fn getNormalFromMap(normalMap: texture_2d<f32>, defaultSampler: sampler, TexCoor
 
     return normalize(TBN * tangentNormal);
 }
+#endif
 
 fn GaSchlickG1(cosTheta: f32, k: f32) -> f32 {
     return cosTheta / (cosTheta * (1.0 - k) + k);
@@ -196,7 +204,7 @@ fn CalculateDirLights(F0: vec3<f32>, View: vec3<f32>, Normal: vec3<f32>, NdotV:f
 	return result;
 }
 
-
+#if DESKTOP_PLATFORM
 fn RotateVectorAboutY(angle: f32, vec: vec3<f32>) -> vec3<f32> {
     let rad = radians(angle);
 
@@ -208,12 +216,17 @@ fn RotateVectorAboutY(angle: f32, vec: vec3<f32>) -> vec3<f32> {
 
     return rotationMatrix * vec;
 }
+#endif
 
 // Shadows
 fn sampleShadow(in: VertexOutput, cascadeIndex: u32, bias: f32) -> f32 {
     let shadowCoords = GetShadowMapCoords(in, cascadeIndex);
     let projCoords = shadowCoords.xy * vec2(0.5, -0.5) + vec2(0.5);
+#if DESKTOP_PLATFORM
     let texelSize: vec2<f32> = vec2(1.0 / 4096.0);
+#elif MOBILE_PLATFORM
+    let texelSize: vec2<f32> = vec2(1.0 / 1024.0);
+#endif
     let halfKernelWidth: i32 = 1;
 
     var shadow: f32 = 0.0;
@@ -222,7 +235,6 @@ fn sampleShadow(in: VertexOutput, cascadeIndex: u32, bias: f32) -> f32 {
     for (var x: i32 = -halfKernelWidth; x <= halfKernelWidth; x = x + 1) {
         for (var y: i32 = -halfKernelWidth; y <= halfKernelWidth; y = y + 1) {
             let offset = vec2<f32>(f32(x), f32(y)) * texelSize;
-            //let sampleCoords = projCoords + offset;
 			let sampleCoords = clamp(projCoords + offset, vec2(0.0), vec2(1.0));
 
             let inBoundsX = step(0.0, sampleCoords.x) * (1.0 - step(1.0, sampleCoords.x));
@@ -272,6 +284,16 @@ fn IBL(F0: vec3<f32>, Lr: vec3<f32>, Normal: vec3<f32>, NdotV: f32, Albedo: vec3
     return kd * diffuseIBL + specularIBL;
 }
 
+fn acesFilm(x: vec3<f32>) -> vec3<f32> {
+    let a = 2.51;
+    let b = 0.03;
+    let c = 2.43;
+    let d = 0.59;
+    let e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(1.0, 1.0, 1.0));
+}
+
+#if DESKTOP_PLATFORM
 struct FragmentOutput {
     @location(0) color: vec4<f32>,
     @location(1) brightness: vec4<f32>,
@@ -279,6 +301,10 @@ struct FragmentOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput  {
+#elif MOBILE_PLATFORM
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+#endif
 
 	// Sample PBR Resources
 	let Albedo = textureSample(u_AlbedoTex, u_TextureSampler, in.Uv).rgb * uMaterial.Ao;
@@ -304,7 +330,6 @@ fn fs_main(in: VertexOutput) -> FragmentOutput  {
 	let View = normalize(u_Scene.CameraPosition - in.WorldPosition.xyz);
 	let NdotV = max(dot(Normal, View), 0.0);
 	let Lr = 2.0 * NdotV * Normal - View;
-	//let Lr = normalize(2.0 * dot(Normal, View) * Normal - View);
 	let FO = mix(Fdielectric, Albedo, Metalness);
 
 	let lightDir = normalize(u_Scene.LightDirection);
@@ -315,7 +340,11 @@ fn fs_main(in: VertexOutput) -> FragmentOutput  {
 	let bias = max(MIN_BIAS * (1.0 - dot(Normal, lightDir)), MIN_BIAS);
 
 	let viewDepth = -in.FragPos.z;
+#if DESKTOP_PLATFORM
 	let SHADOW_MAP_CASCADE_COUNT = 4u;
+#elif MOBILE_PLATFORM
+	let SHADOW_MAP_CASCADE_COUNT = 2u;
+#endif
 	var layer = 0u;
 	for (var i = 0u; i < SHADOW_MAP_CASCADE_COUNT - 1u; i = i + 1u) {
 		if (viewDepth > u_ShadowData.CascadeDistances[i]) {
@@ -323,6 +352,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput  {
 		}
 	}
 
+#if DESKTOP_PLATFORM
 	// Debug cascade visualization colors
 	let cascadeColors = array<vec3f, 4>(
 			vec3f(1.0, 0.0, 0.0),  // Red for cascade 0
@@ -334,18 +364,12 @@ fn fs_main(in: VertexOutput) -> FragmentOutput  {
 //#ifdef DEBUG_CASCADES
 	//return vec4f(cascadeColors[layer], 1.0);
 //#endif
+#endif
 
 	// Final Color
 	var shadowScale = sampleShadow(in, layer, bias);
 
-//var shadowScale = PCSS_DirectionalLight(
-//    u_ShadowMap, 
-//    layer, 
-//    GetShadowMapCoords(in, layer),
-//    10.0f  // Or whatever uniform holds your light size
-//);
 	shadowScale = 1.0 - clamp(1.0 - shadowScale, 0.0f, 1.0f);
-	//shadowScale = 1.0;
 	var lightContribution = CalculateDirLights(FO,
 			View,
 			Normal,
@@ -362,11 +386,20 @@ fn fs_main(in: VertexOutput) -> FragmentOutput  {
 			Roughness,
 			Metalness);
 
+#if DESKTOP_PLATFORM
    var out: FragmentOutput;
    out.color = vec4f(iblContribution + lightContribution, 1.0);
    out.brightness = vec4f(1.0f, 0.0f, 0.0f, 1.0f);
 
 return out;
+#elif MOBILE_PLATFORM
+	// Mobile: inline tonemap to SDR since framebuffer is RGBA8
+	let hdrColor = iblContribution + lightContribution;
+	let exposure = 0.84;
+	let sdrColor = acesFilm(hdrColor * exposure);
+
+	return vec4f(sdrColor, 1.0);
+#endif
 }
 
 fn GetShadowMapCoords(
@@ -376,21 +409,15 @@ fn GetShadowMapCoords(
     switch (cascade) {
         case 0: { return in.ShadowCoord0; }
         case 1: { return in.ShadowCoord1; }
+#if DESKTOP_PLATFORM
         case 2: { return in.ShadowCoord2; }
         case 3: { return in.ShadowCoord3; }
+#endif
         default: { return vec3<f32>(0.0); }
     }
 }
 
-fn acesFilm(x: vec3<f32>) -> vec3<f32> {
-    let a = 2.51;
-    let b = 0.03;
-    let c = 2.43;
-    let d = 0.59;
-    let e = 0.14;
-    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(1.0, 1.0, 1.0));
-}
-
+#if DESKTOP_PLATFORM
 fn SearchRegionRadiusUV(zWorld: f32) -> f32 {
     let light_zNear = 0.0;  // 0.01 gives artifacts? maybe because of ortho proj?
     let lightRadiusUV = 0.05;
@@ -495,7 +522,7 @@ fn FindBlockerDistance_DirectionalLight(shadowMap: texture_depth_2d_array, casca
     var avgBlockerDistance = 0.0;
     let searchWidth = SearchRegionRadiusUV(shadowCoords.z);
     let projCoords = shadowCoords.xy * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5);  // Fixed coordinate transform
-    
+
     for (var i = 0; i < numBlockerSearchSamples; i++) {
         let offset = SamplePoisson(i) * searchWidth;
         let z = textureSampleLevel(
@@ -505,7 +532,7 @@ fn FindBlockerDistance_DirectionalLight(shadowMap: texture_depth_2d_array, casca
             cascade,
             0
         );
-        
+
         if (z < (shadowCoords.z - bias)) {
             blockers += 1;
             avgBlockerDistance += z;
@@ -522,7 +549,7 @@ fn PCF_DirectionalLight(shadowMap: texture_depth_2d_array, cascade: u32, shadowC
     let numPCFSamples = 64;
     var sum = 0.0;
     let projCoords = shadowCoords.xy * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5);  // Fixed coordinate transform
-    
+
     for (var i = 0; i < numPCFSamples; i++) {
         let offset = SamplePoisson(i) * uvRadius;
         let z = textureSampleLevel(
@@ -534,7 +561,7 @@ fn PCF_DirectionalLight(shadowMap: texture_depth_2d_array, cascade: u32, shadowC
         );
         sum += step(shadowCoords.z - bias, z);
     }
-    
+
     return sum / f32(numPCFSamples);
 }
 
@@ -550,3 +577,4 @@ fn PCSS_DirectionalLight(shadowMap: texture_depth_2d_array, cascade: u32, shadow
     uvRadius = min(uvRadius, 0.002);
     return PCF_DirectionalLight(shadowMap, cascade, shadowCoords, uvRadius) * 1.0f;
 }
+#endif

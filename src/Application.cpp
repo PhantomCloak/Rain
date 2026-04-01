@@ -19,6 +19,7 @@
 #include "physics/Physics.h"
 #include "render/Render.h"
 #include "render/ResourceManager.h"
+#include "render/WGSLPreprocessor.h"
 
 #if __EMSCRIPTEN__
 #include <emscripten.h>
@@ -35,6 +36,22 @@ namespace WebEngine
   void Application::OnStart()
   {
     WebEngine::Log::Init();
+
+#if __EMSCRIPTEN__
+    bool isMobile = EM_ASM_INT({
+      return / Android | iPhone | iPad | iPod | Mobile / i.test(navigator.userAgent) ? 1 : 0;
+    });
+    if (isMobile)
+    {
+      WGSLPreprocessor::Define("MOBILE_PLATFORM");
+    }
+    else
+    {
+      WGSLPreprocessor::Define("DESKTOP_PLATFORM");
+    }
+#else
+    WGSLPreprocessor::Define("DESKTOP_PLATFORM");
+#endif
 
     RN_LOG("=== Rain Engine Starting ===");
     RN_LOG("OS: {}", SysInfo::OSName());

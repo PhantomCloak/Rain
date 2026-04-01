@@ -25,8 +25,10 @@ struct VertexOutput {
     @location(6) WorldBitangent: vec3f,
     @location(7) ShadowCoord0: vec3f,
     @location(8) ShadowCoord1: vec3f,
+#if DESKTOP_PLATFORM
     @location(9) ShadowCoord2: vec3f,
     @location(10) ShadowCoord3: vec3f,
+#endif
 };
 
 struct SceneData {
@@ -106,13 +108,17 @@ fn vs_main(in: VertexInput, instance: InstanceInput) -> VertexOutput {
     // Shadow coordinates
     let shadowCoords0 = u_ShadowData.ShadowViewProjection[0] * worldPos;
     let shadowCoords1 = u_ShadowData.ShadowViewProjection[1] * worldPos;
+#if DESKTOP_PLATFORM
     let shadowCoords2 = u_ShadowData.ShadowViewProjection[2] * worldPos;
     let shadowCoords3 = u_ShadowData.ShadowViewProjection[3] * worldPos;
+#endif
 
     out.ShadowCoord0 = shadowCoords0.xyz / shadowCoords0.w;
     out.ShadowCoord1 = shadowCoords1.xyz / shadowCoords1.w;
+#if DESKTOP_PLATFORM
     out.ShadowCoord2 = shadowCoords2.xyz / shadowCoords2.w;
     out.ShadowCoord3 = shadowCoords3.xyz / shadowCoords3.w;
+#endif
 
     out.FragPos = (u_Scene.cameraViewMatrix * vec4f(out.WorldPosition, 1.0)).xyz;
 
@@ -130,6 +136,7 @@ fn GeometrySchlickGGX(NdotV: f32, roughness: f32) -> f32 {
     return nom / denom;
 }
 
+#if DESKTOP_PLATFORM
 fn GeometrySmith(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, roughness: f32) -> f32 {
     let NdotV = max(dot(N, V), 0.0);
     let NdotL = max(dot(N, L), 0.0);
@@ -138,6 +145,7 @@ fn GeometrySmith(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, roughness: f32) -> f3
 
     return ggx1 * ggx2;
 }
+#endif
 
 fn GaSchlickG1(cosTheta: f32, k: f32) -> f32 {
     return cosTheta / (cosTheta * (1.0 - k) + k);
@@ -193,6 +201,7 @@ fn CalculateDirLights(F0: vec3<f32>, View: vec3<f32>, Normal: vec3<f32>, NdotV: 
     return result;
 }
 
+#if DESKTOP_PLATFORM
 fn RotateVectorAboutY(angle: f32, vec: vec3<f32>) -> vec3<f32> {
     let rad = radians(angle);
 
@@ -204,14 +213,17 @@ fn RotateVectorAboutY(angle: f32, vec: vec3<f32>) -> vec3<f32> {
 
     return rotationMatrix * vec;
 }
+#endif
 
 // Shadow Functions
 fn GetShadowMapCoords(in: VertexOutput, cascade: u32) -> vec3<f32> {
     switch (cascade) {
         case 0: { return in.ShadowCoord0; }
         case 1: { return in.ShadowCoord1; }
+#if DESKTOP_PLATFORM
         case 2: { return in.ShadowCoord2; }
         case 3: { return in.ShadowCoord3; }
+#endif
         default: { return vec3<f32>(0.0); }
     }
 }
@@ -219,7 +231,11 @@ fn GetShadowMapCoords(in: VertexOutput, cascade: u32) -> vec3<f32> {
 fn sampleShadow(in: VertexOutput, cascadeIndex: u32, bias: f32) -> f32 {
     let shadowCoords = GetShadowMapCoords(in, cascadeIndex);
     let projCoords = shadowCoords.xy * vec2(0.5, -0.5) + vec2(0.5);
+#if DESKTOP_PLATFORM
     let texelSize: vec2<f32> = vec2(1.0 / 4096.0);
+#elif MOBILE_PLATFORM
+    let texelSize: vec2<f32> = vec2(1.0 / 1024.0);
+#endif
     let halfKernelWidth: i32 = 1;
 
     var shadow: f32 = 0.0;
@@ -266,7 +282,11 @@ fn IBL(F0: vec3<f32>, Lr: vec3<f32>, Normal: vec3<f32>, NdotV: f32, Albedo: vec3
     let specularIrradiance: vec3<f32> = textureSampleLevel(
         u_radianceMap,
         u_radianceMapSampler,
+#if DESKTOP_PLATFORM
         RotateVectorAboutY(0.0, Lr),
+#elif MOBILE_PLATFORM
+        Lr,
+#endif
         Roughness * f32(envRadianceTexLevels)
     ).rgb;
 
@@ -296,8 +316,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 
     // Cook our variables
     let Fdielectric = vec3(0.04);
-    var Lo = vec3(0.0);
-
     var Normal = normalize(in.WorldNormal);
 
     if (uMaterial.UseNormalMap == 1) {
@@ -321,7 +339,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let bias = max(MIN_BIAS * (1.0 - dot(Normal, lightDir)), MIN_BIAS);
 
     let viewDepth = -in.FragPos.z;
+#if DESKTOP_PLATFORM
     let SHADOW_MAP_CASCADE_COUNT = 4u;
+#elif MOBILE_PLATFORM
+    let SHADOW_MAP_CASCADE_COUNT = 2u;
+#endif
     var layer = 0u;
     for (var i = 0u; i < SHADOW_MAP_CASCADE_COUNT - 1u; i = i + 1u) {
         if (viewDepth > u_ShadowData.CascadeDistances[i]) {
@@ -334,24 +356,21 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     shadowScale = 1.0 - clamp(1.0 - shadowScale, 0.0f, 1.0f);
 
     var lightContribution = CalculateDirLights(
-        FO,
-        View,
-        Normal,
-        NdotV,
-        Albedo,
-        Roughness,
-        Metalness
+        FO, View, Normal, NdotV, Albedo, Roughness, Metalness
     ) * shadowScale;
 
     let iblContribution = IBL(
-        FO,
-        Lr,
-        Normal,
-        NdotV,
-        Albedo,
-        Roughness,
-        Metalness
+        FO, Lr, Normal, NdotV, Albedo, Roughness, Metalness
     );
 
+#if DESKTOP_PLATFORM
     return vec4f(iblContribution + lightContribution, 1.0);
+#elif MOBILE_PLATFORM
+    // Mobile: inline tonemap to SDR since framebuffer is RGBA8
+    let hdrColor = iblContribution + lightContribution;
+    let exposure = 0.84;
+    let sdrColor = acesFilm(hdrColor * exposure);
+
+    return vec4f(sdrColor, 1.0);
+#endif
 }

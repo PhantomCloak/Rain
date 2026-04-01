@@ -1,5 +1,9 @@
 @group(0) @binding(0) var inputCubemapTexture: texture_cube<f32>;
+#if DESKTOP_PLATFORM
 @group(0) @binding(1) var outputCubemapTexture: texture_storage_2d_array<rgba16float, write>;
+#elif MOBILE_PLATFORM
+@group(0) @binding(1) var outputCubemapTexture: texture_storage_2d_array<rgba8unorm, write>;
+#endif
 @group(0) @binding(2) var textureSampler: sampler;
 @group(0) @binding(3) var<uniform> ud_uniforms: Uniforms;
 
@@ -10,7 +14,11 @@ struct Uniforms {
 }
 
 const MIN_ROUGHNESS = 0.002025;
+#if DESKTOP_PLATFORM
 const SAMPLE_COUNT = 128u;
+#elif MOBILE_PLATFORM
+const SAMPLE_COUNT = 256u;
+#endif
 
 fn D_GGX(NoH: f32, roughness: f32) -> f32 {
     let a = NoH * roughness;
@@ -77,6 +85,7 @@ fn maxComponent(v: vec3f) -> f32 {
     return max(v.x, max(v.y, v.z));
 }
 
+#if DESKTOP_PLATFORM
 /**
  * Compute the u/v weights corresponding to the bilinear mix of samples
  * returned by textureGather for a 2D array texture.
@@ -147,7 +156,7 @@ fn sampleCubeMap(cubemapTexture: texture_cube<f32>, direction: vec3f) -> vec4f {
     );
 
     let w = textureGatherWeights_cubef(cubemapTexture, direction);
-    
+
     return vec4f(
         mix(mix(samples[0].w, samples[0].z, w.x), mix(samples[0].x, samples[0].y, w.x), w.y),
         mix(mix(samples[1].w, samples[1].z, w.x), mix(samples[1].x, samples[1].y, w.x), w.y),
@@ -205,6 +214,13 @@ fn cubeMapUVLFromDirection(direction: vec3f) -> CubeMapUVL {
     );
 }
 
+// Struct for UV and face index
+struct CubeMapUVL {
+    uv: vec2f,
+    layer: u32,
+}
+#endif
+
 /**
  * lod is linearly mapped from 0.0 at MIP level #0 to 1.0 at MIP level #mipLevelCount-1
  * alpha = perceptualRoughness²
@@ -233,12 +249,6 @@ fn getCubeMapTexCoord(imageSize: vec2f, id: vec3u) -> vec3f {
     }
 
     return normalize(ret);
-}
-
-// Struct for UV and face index
-struct CubeMapUVL {
-    uv: vec2f,
-    layer: u32,
 }
 
 const TOF = 0.5 / f32(0x80000000u);

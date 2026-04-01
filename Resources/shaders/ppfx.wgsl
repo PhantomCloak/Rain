@@ -9,8 +9,12 @@ struct VertexOutput {
 };
 
 @group(0) @binding(0) var renderTexture: texture_2d<f32>;
+#if DESKTOP_PLATFORM
 @group(0) @binding(1) var brightnessTexture: texture_2d<f32>;
 @group(0) @binding(2) var textureSampler: sampler;
+#elif MOBILE_PLATFORM
+@group(0) @binding(1) var textureSampler: sampler;
+#endif
 
 @vertex
 fn vs_main(input : VertexInput) -> VertexOutput {
@@ -20,6 +24,7 @@ fn vs_main(input : VertexInput) -> VertexOutput {
     return output;
 }
 
+#if DESKTOP_PLATFORM
 fn acesFilm(x: vec3<f32>) -> vec3<f32> {
     let a = 2.51;
     let b = 0.03;
@@ -28,9 +33,11 @@ fn acesFilm(x: vec3<f32>) -> vec3<f32> {
     let e = 0.14;
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0, 0.0, 0.0), vec3<f32>(1.0, 1.0, 1.0));
 }
+#endif
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+#if DESKTOP_PLATFORM
     let textureColor = textureSample(renderTexture, textureSampler, in.uv).rgb;
     let brightness = textureSample(brightnessTexture, textureSampler, in.uv).rgb;
 
@@ -39,4 +46,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let tonemapped = acesFilm(exposed);
 
     return vec4<f32>(tonemapped, 1.0);
+#elif MOBILE_PLATFORM
+    // Mobile: passthrough — tonemapping already applied in PBR/skybox shaders
+    let color = textureSample(renderTexture, textureSampler, in.uv).rgb;
+    return vec4<f32>(color, 1.0);
+#endif
 }
