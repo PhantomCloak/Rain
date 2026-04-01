@@ -39,7 +39,7 @@ namespace WebEngine
 
 #if __EMSCRIPTEN__
     bool isMobile = EM_ASM_INT({
-      return / Android | iPhone | iPad | iPod | Mobile / i.test(navigator.userAgent) ? 1 : 0;
+      return new RegExp("Android|iPhone|iPad|iPod|Mobile", "i").test(navigator.userAgent) ? 1 : 0;
     });
     if (isMobile)
     {
