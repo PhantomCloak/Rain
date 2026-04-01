@@ -4,6 +4,7 @@ target_include_directories(WebEngine SYSTEM PRIVATE
   vendor/stb
   vendor/imgui
   vendor/ImGuizmo
+  vendor/miniz
 )
 
 if(EMSCRIPTEN)

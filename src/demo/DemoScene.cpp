@@ -67,50 +67,50 @@ namespace WebEngine
   {
     Scene::Init();
 
-    const auto boxModel = ResourceManager::LoadMeshSource("Resources/box/box.gltf");
-    m_BallMesh = boxModel;
+    //const auto boxModel = ResourceManager::LoadMeshSource("Resources/box/box.gltf");
+    //m_BallMesh = boxModel;
 
-    Entity floorEntity = CreateEntity("floor");
-    floorEntity.Transform().Translation = glm::vec3(0.0f, -0.5f, 0.0f);
-    floorEntity.Transform().Scale = glm::vec3(50.0f, 1.0f, 50.0f);
-    BuildMeshEntityHierarchy(floorEntity, boxModel);
-    auto& floorRb = floorEntity.AddComponent<RigidBodyComponent>();
-    floorRb.BodyType = EBodyType::Static;
-    auto& floorCollider = floorEntity.AddComponent<BoxColliderComponent>();
-    floorCollider.Size = glm::vec3(50.0f, 1.0f, 50.0f);
-    m_PhysicsScene->CreateBody(floorEntity);
+    //Entity floorEntity = CreateEntity("floor");
+    //floorEntity.Transform().Translation = glm::vec3(0.0f, -0.5f, 0.0f);
+    //floorEntity.Transform().Scale = glm::vec3(50.0f, 1.0f, 50.0f);
+    //BuildMeshEntityHierarchy(floorEntity, boxModel);
+    //auto& floorRb = floorEntity.AddComponent<RigidBodyComponent>();
+    //floorRb.BodyType = EBodyType::Static;
+    //auto& floorCollider = floorEntity.AddComponent<BoxColliderComponent>();
+    //floorCollider.Size = glm::vec3(50.0f, 1.0f, 50.0f);
+    //m_PhysicsScene->CreateBody(floorEntity);
 
-    float boxScale = 1.0f;
-    float boxActualSize = boxScale * 2.0f;
-    float startY = boxScale;
-    int layers = 5;
+    //float boxScale = 1.0f;
+    //float boxActualSize = boxScale * 2.0f;
+    //float startY = boxScale;
+    //int layers = 5;
 
-    for (int layer = 0; layer < layers; layer++)
-    {
-      int boxesInRow = layers - layer;
-      float offsetX = -(boxesInRow - 1) * boxActualSize * 0.5f;
-      float offsetZ = -(boxesInRow - 1) * boxActualSize * 0.5f;
-      float y = startY + layer * boxActualSize;
+    //for (int layer = 0; layer < layers; layer++)
+    //{
+    //  int boxesInRow = layers - layer;
+    //  float offsetX = -(boxesInRow - 1) * boxActualSize * 0.5f;
+    //  float offsetZ = -(boxesInRow - 1) * boxActualSize * 0.5f;
+    //  float y = startY + layer * boxActualSize;
 
-      for (int x = 0; x < boxesInRow; x++)
-      {
-        for (int z = 0; z < boxesInRow; z++)
-        {
-          std::string name = "box_" + std::to_string(layer) + "_" + std::to_string(x) + "_" + std::to_string(z);
-          Entity box = CreateEntity(name);
-          box.Transform().Translation = glm::vec3(offsetX + x * boxActualSize, y, offsetZ + z * boxActualSize);
-          BuildMeshEntityHierarchy(box, boxModel);
+    //  for (int x = 0; x < boxesInRow; x++)
+    //  {
+    //    for (int z = 0; z < boxesInRow; z++)
+    //    {
+    //      std::string name = "box_" + std::to_string(layer) + "_" + std::to_string(x) + "_" + std::to_string(z);
+    //      Entity box = CreateEntity(name);
+    //      box.Transform().Translation = glm::vec3(offsetX + x * boxActualSize, y, offsetZ + z * boxActualSize);
+    //      BuildMeshEntityHierarchy(box, boxModel);
 
-          auto& rb = box.AddComponent<RigidBodyComponent>();
-          rb.BodyType = EBodyType::Dynamic;
-          rb.Mass = 10.0f;
-          auto& boxCollider = box.AddComponent<BoxColliderComponent>();
-          boxCollider.Size = glm::vec3(boxScale);
+    //      auto& rb = box.AddComponent<RigidBodyComponent>();
+    //      rb.BodyType = EBodyType::Dynamic;
+    //      rb.Mass = 10.0f;
+    //      auto& boxCollider = box.AddComponent<BoxColliderComponent>();
+    //      boxCollider.Size = glm::vec3(boxScale);
 
-          m_PhysicsScene->CreateBody(box);
-        }
-      }
-    }
+    //      m_PhysicsScene->CreateBody(box);
+    //    }
+    //  }
+    //}
   }
 
   void DemoSceneSponza::Init()

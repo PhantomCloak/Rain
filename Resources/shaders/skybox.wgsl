@@ -44,6 +44,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     
     // Set alpha to 1.0
     color.a = 1.0;
-    
+    color.r = 0.0;
+    color.g = 0.0;
+    color.b = 0.0;
+
     return color;
 }

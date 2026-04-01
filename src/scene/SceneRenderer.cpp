@@ -614,7 +614,10 @@ namespace WebEngine
     m_PpfxPass->Set("textureSampler", ppfxSampler);
     m_PpfxPass->Bake();
 
-    // auto renderContext = m_Renderer->GetRenderContext();
+    // Vector tile renderer
+    m_VectorTileRenderer = std::make_unique<VectorTileRenderer>();
+    m_VectorTileRenderer->Init(m_CompositeFramebuffer);
+    m_VectorTileRenderer->LoadTile("Resources/monaco-latest/14/8529/5974.pbf");
   }
 
   void SceneRenderer::PreRender()
@@ -823,6 +826,14 @@ namespace WebEngine
         // RenderDebug::FlushDrawList();
       }
 #endif
+
+      // Vector tile rendering
+      if (m_VectorTileRenderer)
+      {
+        WGPURenderPassEncoder passEncoder = m_CompositePass->GetRenderPassEncoder();
+        glm::mat4 viewProjection = Cam.Projection * Cam.ViewMatrix;
+        m_VectorTileRenderer->Render(passEncoder, viewProjection);
+      }
 
       m_Renderer->EndRenderPass(m_CompositePass);
     }

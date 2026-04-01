@@ -7,6 +7,7 @@
 #include "render/Render.h"
 #include "render/Render2D.h"
 #include "render/RenderPass.h"
+#include "map/VectorTileRenderer.h"
 
 namespace WebEngine
 {
@@ -201,5 +202,8 @@ namespace WebEngine
 
     void RenderSkeletalMeshes(Ref<RenderPass> passEncoder);
     void RenderSkeletalShadows(Ref<RenderPass> renderPass, int cascadeIndex);
+
+    // Vector tile rendering
+    std::unique_ptr<VectorTileRenderer> m_VectorTileRenderer;
   };
 }  // namespace WebEngine

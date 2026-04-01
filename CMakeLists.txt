@@ -18,6 +18,12 @@ file(GLOB IMGUI_SOURCES
   "vendor/ImGuizmo/*.cpp"
 )
 list(APPEND SOURCES ${IMGUI_SOURCES})
+list(APPEND SOURCES
+  "vendor/miniz/miniz.c"
+  "vendor/miniz/miniz_tdef.c"
+  "vendor/miniz/miniz_tinfl.c"
+  "vendor/miniz/miniz_zip.c"
+)
 
 if(APPLE)
   list(APPEND SOURCES "src/platform/osx/macos_window.mm")
@@ -69,6 +75,13 @@ if(EMSCRIPTEN)
   )
   set_target_properties(WebEngine PROPERTIES SUFFIX ".html")
 endif()
+
+add_custom_command(TARGET WebEngine POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_CURRENT_SOURCE_DIR}/Resources
+    $<TARGET_FILE_DIR:WebEngine>/Resources
+  COMMENT "Copying Resources to output directory"
+)
 
 if(NOT EMSCRIPTEN)
   target_link_libraries(WebEngine PRIVATE
