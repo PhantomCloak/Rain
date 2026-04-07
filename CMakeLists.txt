@@ -1,7 +1,7 @@
 
 cmake_minimum_required(VERSION 3.19...3.25)
 
-if(APPLE)
+if(APPLE AND NOT CMAKE_TOOLCHAIN_FILE MATCHES "Emscripten")
   project(WebEngine VERSION 0.1.0 LANGUAGES CXX C OBJC OBJCXX)
 else()
   project(WebEngine VERSION 0.1.0 LANGUAGES CXX C)
@@ -19,7 +19,7 @@ file(GLOB IMGUI_SOURCES
 )
 list(APPEND SOURCES ${IMGUI_SOURCES})
 
-if(APPLE)
+if(APPLE AND NOT EMSCRIPTEN)
   list(APPEND SOURCES "src/platform/osx/macos_window.mm")
   list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/render/glfw3webgpu.c")
   set_source_files_properties("vendor/imgui/backends/imgui_impl_wgpu.cpp" PROPERTIES LANGUAGE OBJCXX)
