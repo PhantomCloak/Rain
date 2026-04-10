@@ -47,6 +47,14 @@ target_compile_definitions(WebEngine PRIVATE
 
 include(cmake/ThirdParty.cmake)
 
+# SQLite is used by the map renderer to read .mbtiles tile archives. On
+# Emscripten this would need to be vendored and built from source; guard the
+# dependency so desktop builds keep using the system package while the wasm
+# build path remains untouched until it's needed there.
+if(NOT EMSCRIPTEN)
+  find_package(SQLite3 REQUIRED)
+endif()
+
 target_link_libraries(WebEngine PRIVATE
   assimp
   flecs_static
@@ -56,6 +64,10 @@ target_link_libraries(WebEngine PRIVATE
   ozz_animation_offline
   ktx_read
 )
+
+if(NOT EMSCRIPTEN)
+  target_link_libraries(WebEngine PRIVATE SQLite::SQLite3)
+endif()
 
 if(EMSCRIPTEN)
   target_link_options(WebEngine PRIVATE
