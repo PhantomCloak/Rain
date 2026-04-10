@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 #include <vector>
 
 #include "imgui.h"
@@ -40,6 +41,7 @@ namespace WebEngine
 
    private:
     void UpdateEditorCamera(float dt);
+    void UpdateMapCamera(float dt);
 
     void RenderLogViewer();
     void FilterLogs(const std::vector<LogEntry>& logs);
@@ -75,5 +77,18 @@ namespace WebEngine
     EditorCamera m_EditorCamera;
     glm::vec2 m_LastMousePos = {0.0f, 0.0f};
     bool m_RightMouseDown = false;
+
+    // Map mode
+    bool m_MapMode = false;
+    float m_MapWorldX = 0.0f;
+    float m_MapWorldZ = 0.0f;
+    float m_MapViewSize = 50.0f;
+    int m_MapZoom = 14;
+    int m_MapCenterTX = 8529;
+    int m_MapCenterTY = 5974;
+    int m_MapTileRadius = 10;
+    std::string m_TileBasePath = "Resources/turkey";
+    bool m_MapDragging = false;
+    glm::vec2 m_MapDragLastPos = {0.0f, 0.0f};
   };
 }  // namespace WebEngine

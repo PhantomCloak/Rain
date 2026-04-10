@@ -10,7 +10,9 @@
 #include "ImGuizmo.h"
 #include "Application.h"
 #include "render/ResourceManager.h"
+#include "map/MapProjection.h"
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace WebEngine
 {
@@ -158,13 +160,128 @@ namespace WebEngine
     m_EditorCamera.Position += m_EditorCamera.Velocity * dt;
   }
 
+  void EditorLayer::UpdateMapCamera(float dt)
+  {
+    ImVec2 mousePos = ImGui::GetMousePos();
+
+    // Pan with left mouse button drag
+    bool leftDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+    if (leftDown && m_ViewportFocused)
+    {
+      if (m_MapDragging)
+      {
+        float dx = mousePos.x - m_MapDragLastPos.x;
+        float dy = mousePos.y - m_MapDragLastPos.y;
+
+        // Convert screen pixels to world units
+        float viewportW = m_ViewportBoundsMax.x - m_ViewportBoundsMin.x;
+        if (viewportW > 1.0f)
+        {
+          float pixelsToWorld = m_MapViewSize / viewportW;
+          m_MapWorldX -= dx * pixelsToWorld;
+          m_MapWorldZ += dy * pixelsToWorld;
+        }
+      }
+      m_MapDragLastPos = {mousePos.x, mousePos.y};
+      m_MapDragging = true;
+    }
+    else
+    {
+      m_MapDragging = false;
+    }
+
+    // Zoom: scroll changes tile zoom level and reloads tiles
+    if (m_ViewportFocused)
+    {
+      float scroll = ImGui::GetIO().MouseWheel;
+      if (scroll != 0.0f)
+      {
+        // Compute current lat/lon from camera world position + loaded center tile
+        glm::dvec2 centerLL = MapProjection::TileCenterToLatLon(m_MapCenterTX, m_MapCenterTY, m_MapZoom);
+        // Offset from center tile in degrees (approximate)
+        double degsPerTile = 360.0 / (double)(1 << m_MapZoom);
+        double camLon = centerLL.y + (double)m_MapWorldX / MapProjection::TILE_WORLD_SIZE * degsPerTile;
+        double camLat = centerLL.x - (double)m_MapWorldZ / MapProjection::TILE_WORLD_SIZE * (-degsPerTile);
+
+        int newZoom = m_MapZoom + (scroll > 0 ? 1 : -1);
+        newZoom = glm::clamp(newZoom, 0, 14);
+
+        if (newZoom != m_MapZoom)
+        {
+          m_MapZoom = newZoom;
+
+          // Compute new center tile at the new zoom level for the same lat/lon
+          glm::ivec2 newCenter = MapProjection::LatLonToTile(camLat, camLon, m_MapZoom);
+          m_MapCenterTX = newCenter.x;
+          m_MapCenterTY = newCenter.y;
+          m_MapWorldX = 0.0f;
+          m_MapWorldZ = 0.0f;
+
+          // Adjust view size: fewer tiles at lower zoom, more at higher
+          m_MapViewSize = MapProjection::TILE_WORLD_SIZE * 5.0f;
+
+          m_ViewportRenderer->ReloadMapTiles(m_TileBasePath, m_MapZoom, m_MapCenterTX, m_MapCenterTY, m_MapTileRadius);
+        }
+      }
+    }
+
+    // Recenter tile grid when camera pans far from the loaded center
+    float distFromCenter = std::sqrt(m_MapWorldX * m_MapWorldX + m_MapWorldZ * m_MapWorldZ);
+    if (distFromCenter > MapProjection::TILE_WORLD_SIZE * 3.0f)
+    {
+      glm::ivec2 tileOff = MapProjection::WorldToTileOffset(m_MapWorldX, m_MapWorldZ);
+
+      m_MapWorldX -= (float)tileOff.x * MapProjection::TILE_WORLD_SIZE;
+      m_MapWorldZ += (float)tileOff.y * MapProjection::TILE_WORLD_SIZE;
+
+      m_MapCenterTX += tileOff.x;
+      m_MapCenterTY += tileOff.y;
+
+      m_ViewportRenderer->ReloadMapTiles(m_TileBasePath, m_MapZoom, m_MapCenterTX, m_MapCenterTY, m_MapTileRadius);
+    }
+  }
+
   void EditorLayer::OnUpdate(float dt)
   {
-    UpdateEditorCamera(dt);
-    m_Scene->EditorCameraPosition = m_EditorCamera.Position;
-    m_Scene->EditorCameraForward = m_EditorCamera.GetForward();
-    m_Scene->OnUpdate();
-    m_Scene->OnRender(m_ViewportRenderer, m_EditorCamera.GetViewMatrix());
+    if (m_MapMode)
+    {
+      UpdateMapCamera(dt);
+
+      m_ViewportRenderer->SetScene(m_Scene.get());
+
+      // Orthographic top-down camera with equirectangular projection
+      float aspect = 16.0f / 9.0f;
+      float halfW = m_MapViewSize * 0.5f;
+      float halfH = halfW / aspect;
+
+      // Build orthographic projection with [0,1] depth range (WebGPU).
+      // Flip left/right so screen-right = east (+X), screen-up = north (+Z).
+      float left = halfW, right = -halfW, bottom = -halfH, top = halfH;
+      float nearZ = 0.1f, farZ = 500.0f;
+      glm::mat4 proj(0.0f);
+      proj[0][0] = 2.0f / (right - left);
+      proj[1][1] = 2.0f / (top - bottom);
+      proj[2][2] = -1.0f / (farZ - nearZ);
+      proj[3][0] = -(right + left) / (right - left);
+      proj[3][1] = -(top + bottom) / (top - bottom);
+      proj[3][2] = -nearZ / (farZ - nearZ);
+      proj[3][3] = 1.0f;
+
+      glm::vec3 eye(m_MapWorldX, 200.0f, m_MapWorldZ);
+      glm::vec3 target(m_MapWorldX, 0.0f, m_MapWorldZ);
+      glm::mat4 view = glm::lookAt(eye, target, glm::vec3(0.0f, 0.0f, 1.0f));
+
+      m_ViewportRenderer->BeginScene({view, proj, 0.1f, 500.0f});
+      m_ViewportRenderer->EndScene();
+    }
+    else
+    {
+      UpdateEditorCamera(dt);
+      m_Scene->EditorCameraPosition = m_EditorCamera.Position;
+      m_Scene->EditorCameraForward = m_EditorCamera.GetForward();
+      m_Scene->OnUpdate();
+      m_Scene->OnRender(m_ViewportRenderer, m_EditorCamera.GetViewMatrix());
+    }
   }
 
   void EditorLayer::OnRenderImGui()
@@ -207,6 +324,18 @@ namespace WebEngine
           m_Scene = std::make_unique<DemoSceneSponza>("Test Scene");
           m_Scene->Init();
         }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Map View", nullptr, m_MapMode))
+        {
+          m_MapMode = !m_MapMode;
+          if (m_MapMode)
+          {
+            // Reset map camera to tile grid center
+            m_MapWorldX = 0.0f;
+            m_MapWorldZ = 0.0f;
+            m_MapViewSize = 50.0f;
+          }
+        }
         ImGui::EndMenu();
       }
       ImGui::EndMainMenuBar();
@@ -222,7 +351,7 @@ namespace WebEngine
     }
 
     bool rightMouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Right);
-    if (m_ViewportFocused && !ImGuizmo::IsUsing() && !rightMouseDown)
+    if (!m_MapMode && m_ViewportFocused && !ImGuizmo::IsUsing() && !rightMouseDown)
     {
       if (ImGui::IsKeyPressed(ImGuiKey_T))
       {
@@ -285,10 +414,11 @@ namespace WebEngine
         m_ViewportBoundsMin = {imagePos.x, imagePos.y};
         m_ViewportBoundsMax = {imagePos.x + imageSize.x, imagePos.y + imageSize.y};
 
-        RenderGizmo();
+        if (!m_MapMode)
+          RenderGizmo();
 
         // Viewport click-to-select via CPU ray-OBB picking
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered() && !ImGuizmo::IsOver() && !rightMouseDown)
+        if (!m_MapMode && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered() && !ImGuizmo::IsOver() && !rightMouseDown)
         {
           ImVec2 mousePos = ImGui::GetMousePos();
           float mx = mousePos.x - m_ViewportBoundsMin.x;
@@ -383,8 +513,23 @@ namespace WebEngine
 
     ImGui::End();
 
-    RenderEntityList();
-    RenderPropertyPanel();
+    if (m_MapMode)
+    {
+      // Map info overlay
+      ImGui::Begin("Map Info");
+      glm::dvec2 centerLatLon = MapProjection::TileCenterToLatLon(m_MapCenterTX, m_MapCenterTY, m_MapZoom);
+      ImGui::Text("Lat/Lon: %.4f, %.4f", centerLatLon.x, centerLatLon.y);
+      ImGui::Text("Zoom: %d  Tile: %d/%d", m_MapZoom, m_MapCenterTX, m_MapCenterTY);
+      ImGui::Separator();
+      ImGui::Text("Pan: left-click drag");
+      ImGui::Text("Zoom: scroll wheel (changes tile zoom %d..14)", 0);
+      ImGui::End();
+    }
+    else
+    {
+      RenderEntityList();
+      RenderPropertyPanel();
+    }
     RenderLogViewer();
   }
 

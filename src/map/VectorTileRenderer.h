@@ -24,10 +24,12 @@ namespace WebEngine
    public:
     void Init(Ref<Framebuffer> targetFramebuffer);
     void LoadTile(const std::string& path);
+    void LoadTileGrid(const std::string& basePath, int zoom, int centerX, int centerY, int radius = 1);
     void Render(WGPURenderPassEncoder passEncoder, const glm::mat4& viewProjection);
 
    private:
-    void BuildGeometry(const MVTTile& tile);
+    void AppendTileGeometry(const MVTTile& tile, glm::vec2 worldOffset, std::vector<TileVertex>& vertices);
+    void UploadGeometry(const std::vector<TileVertex>& vertices);
     void CreatePipeline(Ref<Framebuffer> targetFramebuffer);
 
     static glm::vec4 GetLayerColor(const std::string& layerName);

@@ -1,6 +1,7 @@
 #include "map/VectorTileRenderer.h"
 #include "map/VectorTile.h"
 #include "core/Log.h"
+#include "io/filesystem.h"
 #include "render/RenderContext.h"
 #include "render/RenderUtils.h"
 #include "render/ShaderManager.h"
@@ -219,6 +220,8 @@ namespace WebEngine
     RN_LOG("VectorTileRenderer pipeline created ({} color targets)", colorTargetCount);
   }
 
+  static constexpr float TILE_WORLD_SIZE = 10.0f;
+
   void VectorTileRenderer::LoadTile(const std::string& path)
   {
     MVTTile tile = ParseMVTFile(path);
@@ -228,19 +231,77 @@ namespace WebEngine
       return;
     }
 
-    BuildGeometry(tile);
+    std::vector<TileVertex> vertices;
+    AppendTileGeometry(tile, {0.0f, 0.0f}, vertices);
+    UploadGeometry(vertices);
     m_Ready = true;
   }
 
-  void VectorTileRenderer::BuildGeometry(const MVTTile& tile)
+  void VectorTileRenderer::LoadTileGrid(const std::string& basePath, int zoom, int centerX, int centerY, int radius)
   {
     std::vector<TileVertex> vertices;
+    int tilesLoaded = 0;
+
+    for (int tx = centerX - radius; tx <= centerX + radius; tx++)
+    {
+      for (int ty = centerY - radius; ty <= centerY + radius; ty++)
+      {
+        std::string tilePath = basePath + "/" + std::to_string(zoom) + "/"
+                             + std::to_string(tx) + "/" + std::to_string(ty) + ".pbf";
+
+        if (!FileSys::IsFileExist(tilePath))
+          continue;
+
+        MVTTile tile = ParseMVTFile(tilePath);
+        if (tile.layers.empty())
+          continue;
+
+        int dx = tx - centerX;
+        int dy = ty - centerY;
+        glm::vec2 offset = {
+            (float)dx * TILE_WORLD_SIZE,
+            (float)(-dy) * TILE_WORLD_SIZE
+        };
+
+        AppendTileGeometry(tile, offset, vertices);
+        tilesLoaded++;
+        RN_LOG("  Loaded tile {}/{}/{}.pbf (offset: {}, {})", zoom, tx, ty, offset.x, offset.y);
+      }
+    }
+
+    if (tilesLoaded == 0)
+    {
+      RN_LOG_ERR("VectorTileRenderer: No tiles found in grid around {}/{}/{}", zoom, centerX, centerY);
+      return;
+    }
+
+    UploadGeometry(vertices);
+    m_Ready = true;
+    RN_LOG("VectorTileRenderer: Loaded {} tiles total", tilesLoaded);
+  }
+
+  void VectorTileRenderer::AppendTileGeometry(const MVTTile& tile, glm::vec2 worldOffset, std::vector<TileVertex>& vertices)
+  {
+    // Add tile border (bright yellow rectangle)
+    float half = TILE_WORLD_SIZE * 0.5f;
+    glm::vec4 borderColor = {1.0f, 1.0f, 0.0f, 1.0f};
+    glm::vec3 corners[4] = {
+        {worldOffset.x - half, 0.1f, worldOffset.y - half},
+        {worldOffset.x + half, 0.1f, worldOffset.y - half},
+        {worldOffset.x + half, 0.1f, worldOffset.y + half},
+        {worldOffset.x - half, 0.1f, worldOffset.y + half},
+    };
+    for (int i = 0; i < 4; i++)
+    {
+      vertices.push_back({corners[i], borderColor});
+      vertices.push_back({corners[(i + 1) % 4], borderColor});
+    }
 
     for (const auto& layer : tile.layers)
     {
       glm::vec4 color = GetLayerColor(layer.name);
       float extent = (float)layer.extent;
-      float scale = 100.0f / extent;
+      float scale = TILE_WORLD_SIZE / extent;
 
       for (const auto& feature : layer.features)
       {
@@ -251,16 +312,15 @@ namespace WebEngine
         {
           for (size_t i = 0; i + 1 < ring.size(); i++)
           {
-            // Map tile coords to world space: X→X, Y→-Z, on XZ plane at Y=0
             glm::vec3 p0 = {
-                (ring[i].x - extent * 0.5f) * scale,
+                (ring[i].x - extent * 0.5f) * scale + worldOffset.x,
                 0.0f,
-                (extent * 0.5f - ring[i].y) * scale};
+                (extent * 0.5f - ring[i].y) * scale + worldOffset.y};
 
             glm::vec3 p1 = {
-                (ring[i + 1].x - extent * 0.5f) * scale,
+                (ring[i + 1].x - extent * 0.5f) * scale + worldOffset.x,
                 0.0f,
-                (extent * 0.5f - ring[i + 1].y) * scale};
+                (extent * 0.5f - ring[i + 1].y) * scale + worldOffset.y};
 
             vertices.push_back({p0, color});
             vertices.push_back({p1, color});
@@ -268,7 +328,10 @@ namespace WebEngine
         }
       }
     }
+  }
 
+  void VectorTileRenderer::UploadGeometry(const std::vector<TileVertex>& vertices)
+  {
     m_VertexCount = (uint32_t)vertices.size();
     if (m_VertexCount == 0)
     {

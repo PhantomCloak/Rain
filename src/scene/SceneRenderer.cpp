@@ -617,7 +617,7 @@ namespace WebEngine
     // Vector tile renderer
     m_VectorTileRenderer = std::make_unique<VectorTileRenderer>();
     m_VectorTileRenderer->Init(m_CompositeFramebuffer);
-    m_VectorTileRenderer->LoadTile("Resources/monaco-latest/14/8529/5974.pbf");
+    m_VectorTileRenderer->LoadTileGrid("Resources/monaco-latest", 14, 8529, 5974, 10);
   }
 
   void SceneRenderer::PreRender()
@@ -664,6 +664,14 @@ namespace WebEngine
   {
     // return m_LitPass->GetOutput(0);
     return m_PpfxPass->GetOutput(0);
+  }
+
+  void SceneRenderer::ReloadMapTiles(const std::string& basePath, int zoom, int centerX, int centerY, int radius)
+  {
+    if (m_VectorTileRenderer)
+    {
+      m_VectorTileRenderer->LoadTileGrid(basePath, zoom, centerX, centerY, radius);
+    }
   }
 
 #ifndef __EMSCRIPTEN__
