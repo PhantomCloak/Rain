@@ -614,10 +614,10 @@ namespace WebEngine
     m_PpfxPass->Set("textureSampler", ppfxSampler);
     m_PpfxPass->Bake();
 
-    // Vector tile renderer
+    // Vector tile renderer (initial tile load is driven by EditorLayer,
+    // which owns the base path and view state).
     m_VectorTileRenderer = std::make_unique<VectorTileRenderer>();
     m_VectorTileRenderer->Init(m_CompositeFramebuffer);
-    m_VectorTileRenderer->LoadTileGrid("Resources/monaco-latest", 14, 8529, 5974, 10);
   }
 
   void SceneRenderer::PreRender()
@@ -666,11 +666,13 @@ namespace WebEngine
     return m_PpfxPass->GetOutput(0);
   }
 
-  void SceneRenderer::ReloadMapTiles(const std::string& basePath, int zoom, int centerX, int centerY, int radius)
+  void SceneRenderer::ReloadMapTiles(const MBTilesReader& source, int zoom,
+                                     int minTX, int minTY, int maxTX, int maxTY,
+                                     int refTX, int refTY)
   {
     if (m_VectorTileRenderer)
     {
-      m_VectorTileRenderer->LoadTileGrid(basePath, zoom, centerX, centerY, radius);
+      m_VectorTileRenderer->LoadTileRect(source, zoom, minTX, minTY, maxTX, maxTY, refTX, refTY);
     }
   }
 

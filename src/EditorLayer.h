@@ -6,6 +6,7 @@
 #include "ImGuizmo.h"
 #include "engine/ImGuiLogSink.h"
 #include "engine/Layer.h"
+#include "map/MBTiles.h"
 #include "scene/Scene.h"
 #include "scene/SceneRenderer.h"
 
@@ -42,6 +43,10 @@ namespace WebEngine
    private:
     void UpdateEditorCamera(float dt);
     void UpdateMapCamera(float dt);
+    void ScanAvailableZooms();
+    int SnapToAvailableZoom(int desiredZoom, int direction) const;
+    void ComputeVisibleTileRect(int& minTX, int& minTY, int& maxTX, int& maxTY) const;
+    void RefreshVisibleTiles(bool force = false);
 
     void RenderLogViewer();
     void FilterLogs(const std::vector<LogEntry>& logs);
@@ -83,11 +88,22 @@ namespace WebEngine
     float m_MapWorldX = 0.0f;
     float m_MapWorldZ = 0.0f;
     float m_MapViewSize = 50.0f;
-    int m_MapZoom = 14;
-    int m_MapCenterTX = 8529;
-    int m_MapCenterTY = 5974;
-    int m_MapTileRadius = 10;
-    std::string m_TileBasePath = "Resources/turkey";
+    int m_MapZoom = 12;
+    int m_MapCenterTX = 2357;
+    int m_MapCenterTY = 1573;
+    std::string m_TileDbPath = "Resources/turkey.mbtiles";
+    MBTilesReader m_TileSource;
+    std::vector<int> m_AvailableZooms;  // sorted ascending; populated by ScanAvailableZooms
+
+    // Cache of what's currently uploaded to the GPU so RefreshVisibleTiles can
+    // skip no-op reloads. Sentinel: m_LoadedZoom == -1 means nothing loaded.
+    int m_LoadedZoom = -1;
+    int m_LoadedMinTX = 0;
+    int m_LoadedMinTY = 0;
+    int m_LoadedMaxTX = -1;
+    int m_LoadedMaxTY = -1;
+    int m_LoadedRefTX = 0;
+    int m_LoadedRefTY = 0;
     bool m_MapDragging = false;
     glm::vec2 m_MapDragLastPos = {0.0f, 0.0f};
   };

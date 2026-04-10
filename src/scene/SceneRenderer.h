@@ -131,7 +131,9 @@ namespace WebEngine
     void SetScene(Scene* scene);
     void SetViewportSize(int height, int width);
     Ref<Texture2D> GetLastPassImage();
-    void ReloadMapTiles(const std::string& basePath, int zoom, int centerX, int centerY, int radius);
+    void ReloadMapTiles(const MBTilesReader& source, int zoom,
+                        int minTX, int minTY, int maxTX, int maxTY,
+                        int refTX, int refTY);
 
     static SceneRenderer* instance;
 

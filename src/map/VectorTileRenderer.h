@@ -12,6 +12,7 @@
 namespace WebEngine
 {
   struct MVTTile;
+  class MBTilesReader;
 
   struct TileVertex
   {
@@ -23,8 +24,13 @@ namespace WebEngine
   {
    public:
     void Init(Ref<Framebuffer> targetFramebuffer);
-    void LoadTile(const std::string& path);
-    void LoadTileGrid(const std::string& basePath, int zoom, int centerX, int centerY, int radius = 1);
+    // Load every tile inside [minTX..maxTX] x [minTY..maxTY] (inclusive). Tile
+    // world positions are computed relative to (refTX, refTY) so the tile whose
+    // coords match (ref, ref) sits at world origin — the caller picks the
+    // reference to line up with its camera.
+    void LoadTileRect(const MBTilesReader& source, int zoom,
+                      int minTX, int minTY, int maxTX, int maxTY,
+                      int refTX, int refTY);
     void Render(WGPURenderPassEncoder passEncoder, const glm::mat4& viewProjection);
 
    private:

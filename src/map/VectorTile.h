@@ -48,4 +48,7 @@ namespace WebEngine
 
   MVTTile ParseMVTFile(const std::string& path);
   MVTTile ParseMVTFromMemory(const uint8_t* data, size_t size);
+  // Parses an MVT tile from an on-disk representation: handles gzip-wrapped
+  // bytes (as stored by tippecanoe/tilemaker/mbtiles) and raw protobuf.
+  MVTTile ParseMVTFromBytes(const uint8_t* data, size_t size);
 }

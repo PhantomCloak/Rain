@@ -451,6 +451,20 @@ namespace WebEngine
     return decompressed;
   }
 
+  MVTTile ParseMVTFromBytes(const uint8_t* data, size_t size)
+  {
+    if (!data || size == 0)
+      return {};
+
+    auto decompressed = DecompressGzip(data, size);
+    if (decompressed.empty())
+    {
+      RN_LOG_ERR("ParseMVTFromBytes: decompression produced no output ({} input bytes)", size);
+      return {};
+    }
+    return ParseMVTFromMemory(decompressed.data(), decompressed.size());
+  }
+
   MVTTile ParseMVTFile(const std::string& path)
   {
     auto compressed = ReadBinaryFile(path);
@@ -460,24 +474,15 @@ namespace WebEngine
       return {};
     }
 
-    auto decompressed = DecompressGzip(compressed.data(), compressed.size());
-    if (decompressed.empty())
+    auto tile = ParseMVTFromBytes(compressed.data(), compressed.size());
+    if (tile.layers.empty())
     {
-      RN_LOG_ERR("Failed to decompress MVT file: {}", path);
+      RN_LOG_ERR("Failed to parse MVT file: {}", path);
       return {};
     }
 
-    RN_LOG("MVT file loaded: {} ({} bytes compressed, {} bytes decompressed)",
-             path, compressed.size(), decompressed.size());
-
-    auto tile = ParseMVTFromMemory(decompressed.data(), decompressed.size());
-
-    RN_LOG("Parsed {} layers:", tile.layers.size());
-    for (auto& layer : tile.layers)
-    {
-      RN_LOG("  Layer '{}': {} features, extent={}", layer.name, layer.features.size(), layer.extent);
-    }
-
+    RN_LOG("MVT file loaded: {} ({} bytes on disk, {} layers)",
+             path, compressed.size(), tile.layers.size());
     return tile;
   }
 }

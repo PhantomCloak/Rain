@@ -1,7 +1,7 @@
 #include "map/VectorTileRenderer.h"
+#include "map/MBTiles.h"
 #include "map/VectorTile.h"
 #include "core/Log.h"
-#include "io/filesystem.h"
 #include "render/RenderContext.h"
 #include "render/RenderUtils.h"
 #include "render/ShaderManager.h"
@@ -222,42 +222,51 @@ namespace WebEngine
 
   static constexpr float TILE_WORLD_SIZE = 10.0f;
 
-  void VectorTileRenderer::LoadTile(const std::string& path)
+  void VectorTileRenderer::LoadTileRect(const MBTilesReader& source, int zoom,
+                                        int minTX, int minTY, int maxTX, int maxTY,
+                                        int refTX, int refTY)
   {
-    MVTTile tile = ParseMVTFile(path);
-    if (tile.layers.empty())
+    if (!source.IsOpen())
     {
-      RN_LOG_ERR("VectorTileRenderer: No layers found in tile");
+      RN_LOG_ERR("VectorTileRenderer: tile source is not open");
+      return;
+    }
+
+    // Clamp the requested rect to the valid tile range for this zoom so we
+    // don't waste sqlite queries on coordinates outside the pyramid.
+    const int maxIndex = (1 << zoom) - 1;
+    minTX = std::max(minTX, 0);
+    minTY = std::max(minTY, 0);
+    maxTX = std::min(maxTX, maxIndex);
+    maxTY = std::min(maxTY, maxIndex);
+
+    if (minTX > maxTX || minTY > maxTY)
+    {
+      RN_LOG_ERR("VectorTileRenderer: empty tile rect at zoom {}", zoom);
+      m_VertexCount = 0;
+      m_Ready = false;
       return;
     }
 
     std::vector<TileVertex> vertices;
-    AppendTileGeometry(tile, {0.0f, 0.0f}, vertices);
-    UploadGeometry(vertices);
-    m_Ready = true;
-  }
-
-  void VectorTileRenderer::LoadTileGrid(const std::string& basePath, int zoom, int centerX, int centerY, int radius)
-  {
-    std::vector<TileVertex> vertices;
     int tilesLoaded = 0;
+    int tilesQueried = 0;
 
-    for (int tx = centerX - radius; tx <= centerX + radius; tx++)
+    for (int tx = minTX; tx <= maxTX; tx++)
     {
-      for (int ty = centerY - radius; ty <= centerY + radius; ty++)
+      for (int ty = minTY; ty <= maxTY; ty++)
       {
-        std::string tilePath = basePath + "/" + std::to_string(zoom) + "/"
-                             + std::to_string(tx) + "/" + std::to_string(ty) + ".pbf";
-
-        if (!FileSys::IsFileExist(tilePath))
+        tilesQueried++;
+        auto bytes = source.ReadTile(zoom, tx, ty);
+        if (bytes.empty())
           continue;
 
-        MVTTile tile = ParseMVTFile(tilePath);
+        MVTTile tile = ParseMVTFromBytes(bytes.data(), bytes.size());
         if (tile.layers.empty())
           continue;
 
-        int dx = tx - centerX;
-        int dy = ty - centerY;
+        int dx = tx - refTX;
+        int dy = ty - refTY;
         glm::vec2 offset = {
             (float)dx * TILE_WORLD_SIZE,
             (float)(-dy) * TILE_WORLD_SIZE
@@ -265,19 +274,22 @@ namespace WebEngine
 
         AppendTileGeometry(tile, offset, vertices);
         tilesLoaded++;
-        RN_LOG("  Loaded tile {}/{}/{}.pbf (offset: {}, {})", zoom, tx, ty, offset.x, offset.y);
       }
     }
 
     if (tilesLoaded == 0)
     {
-      RN_LOG_ERR("VectorTileRenderer: No tiles found in grid around {}/{}/{}", zoom, centerX, centerY);
+      RN_LOG_ERR("VectorTileRenderer: No tiles found in rect z={} x=[{}..{}] y=[{}..{}] ({} queried)",
+                 zoom, minTX, maxTX, minTY, maxTY, tilesQueried);
+      m_VertexCount = 0;
+      m_Ready = false;
       return;
     }
 
     UploadGeometry(vertices);
     m_Ready = true;
-    RN_LOG("VectorTileRenderer: Loaded {} tiles total", tilesLoaded);
+    RN_LOG("VectorTileRenderer: Loaded {}/{} tiles at zoom {} rect x=[{}..{}] y=[{}..{}]",
+           tilesLoaded, tilesQueried, zoom, minTX, maxTX, minTY, maxTY);
   }
 
   void VectorTileRenderer::AppendTileGeometry(const MVTTile& tile, glm::vec2 worldOffset, std::vector<TileVertex>& vertices)
