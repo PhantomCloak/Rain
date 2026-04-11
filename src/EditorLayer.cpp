@@ -42,6 +42,24 @@ namespace WebEngine
     return glm::lookAt(Position, Position + GetForward(), glm::vec3(0.0f, 1.0f, 0.0f));
   }
 
+  glm::dvec2 MapView::CamTilePos() const
+  {
+    const double tileSize = MapProjection::TILE_WORLD_SIZE;
+    return {
+        (double)CenterTX + 0.5 + (double)WorldX / tileSize,
+        (double)CenterTY + 0.5 - (double)WorldZ / tileSize};
+  }
+
+  glm::dvec2 MapView::CamLatLon() const
+  {
+    const glm::dvec2 t = CamTilePos();
+    const double n = (double)(1 << Zoom);
+    const double lon = t.x / n * 360.0 - 180.0;
+    const double latRad = std::atan(std::sinh(glm::pi<double>() * (1.0 - 2.0 * t.y / n)));
+    const double lat = latRad * 180.0 / glm::pi<double>();
+    return {lat, lon};
+  }
+
   static bool RayIntersectsOBB(const glm::vec3& rayOrigin, const glm::vec3& rayDir, const glm::mat4& modelMatrix, const glm::vec3& aabbMin, const glm::vec3& aabbMax, float& outDistance)
   {
     glm::mat4 invModel = glm::inverse(modelMatrix);
@@ -108,7 +126,7 @@ namespace WebEngine
     ScanAvailableZooms();
     if (!m_AvailableZooms.empty())
     {
-      m_MapZoom = SnapToAvailableZoom(m_MapZoom, 0);
+      m_Map.Zoom = SnapToAvailableZoom(m_Map.Zoom, 0);
     }
     RefreshVisibleTiles(true);
   }
@@ -161,38 +179,35 @@ namespace WebEngine
     return (desiredZoom - lower <= higher - desiredZoom) ? lower : higher;
   }
 
-  void EditorLayer::ComputeVisibleTileRect(int& minTX, int& minTY, int& maxTX, int& maxTY) const
+  TileRect EditorLayer::ComputeVisibleTileRect() const
   {
     // Ortho camera footprint in world units. The map projection flips the
     // X axis on screen but the visible X range is still symmetric around the
     // camera, so we don't need to mirror here.
-    const float aspect = 16.0f / 9.0f;
-    const float halfW = m_MapViewSize * 0.5f;
+    constexpr float aspect = 16.0f / 9.0f;
+    const float halfW = m_Map.ViewSize * 0.5f;
     const float halfH = halfW / aspect;
 
-    const float tileSize = MapProjection::TILE_WORLD_SIZE;
-
-    // Camera position in absolute fractional tile space. (+0.5 because tile
-    // (T,T) is centered at world origin when ref = T.)
-    const double camTileX = (double)m_MapCenterTX + 0.5 + (double)m_MapWorldX / tileSize;
-    const double camTileY = (double)m_MapCenterTY + 0.5 - (double)m_MapWorldZ / tileSize;
-
+    const double tileSize = MapProjection::TILE_WORLD_SIZE;
+    const glm::dvec2 camTile = m_Map.CamTilePos();
     const double halfTilesW = (double)halfW / tileSize;
     const double halfTilesH = (double)halfH / tileSize;
 
     // One-tile margin so tiles entering the viewport are already uploaded by
     // the time they become visible.
-    minTX = (int)std::floor(camTileX - halfTilesW) - 1;
-    maxTX = (int)std::floor(camTileX + halfTilesW) + 1;
-    minTY = (int)std::floor(camTileY - halfTilesH) - 1;
-    maxTY = (int)std::floor(camTileY + halfTilesH) + 1;
+    TileRect rect;
+    rect.MinTX = (int)std::floor(camTile.x - halfTilesW) - 1;
+    rect.MaxTX = (int)std::floor(camTile.x + halfTilesW) + 1;
+    rect.MinTY = (int)std::floor(camTile.y - halfTilesH) - 1;
+    rect.MaxTY = (int)std::floor(camTile.y + halfTilesH) + 1;
 
     // Clamp to valid tile range for this zoom.
-    const int maxIndex = (1 << m_MapZoom) - 1;
-    minTX = glm::clamp(minTX, 0, maxIndex);
-    maxTX = glm::clamp(maxTX, 0, maxIndex);
-    minTY = glm::clamp(minTY, 0, maxIndex);
-    maxTY = glm::clamp(maxTY, 0, maxIndex);
+    const int maxIndex = (1 << m_Map.Zoom) - 1;
+    rect.MinTX = glm::clamp(rect.MinTX, 0, maxIndex);
+    rect.MaxTX = glm::clamp(rect.MaxTX, 0, maxIndex);
+    rect.MinTY = glm::clamp(rect.MinTY, 0, maxIndex);
+    rect.MaxTY = glm::clamp(rect.MaxTY, 0, maxIndex);
+    return rect;
   }
 
   void EditorLayer::RefreshVisibleTiles(bool force)
@@ -200,29 +215,25 @@ namespace WebEngine
     if (!m_TileSource.IsOpen())
       return;
 
-    int minTX, minTY, maxTX, maxTY;
-    ComputeVisibleTileRect(minTX, minTY, maxTX, maxTY);
+    const TileRect rect = ComputeVisibleTileRect();
 
+    // Skip no-op reloads: same zoom, same visible rect, same reference tile.
     if (!force &&
-        m_LoadedZoom == m_MapZoom &&
-        m_LoadedMinTX == minTX && m_LoadedMinTY == minTY &&
-        m_LoadedMaxTX == maxTX && m_LoadedMaxTY == maxTY &&
-        m_LoadedRefTX == m_MapCenterTX && m_LoadedRefTY == m_MapCenterTY)
+        m_LoadedZoom == m_Map.Zoom &&
+        m_LoadedRect == rect &&
+        m_LoadedRefTX == m_Map.CenterTX && m_LoadedRefTY == m_Map.CenterTY)
     {
       return;
     }
 
-    m_ViewportRenderer->ReloadMapTiles(m_TileSource, m_MapZoom,
-                                       minTX, minTY, maxTX, maxTY,
-                                       m_MapCenterTX, m_MapCenterTY);
+    m_ViewportRenderer->ReloadMapTiles(m_TileSource, m_Map.Zoom,
+                                       rect.MinTX, rect.MinTY, rect.MaxTX, rect.MaxTY,
+                                       m_Map.CenterTX, m_Map.CenterTY);
 
-    m_LoadedZoom = m_MapZoom;
-    m_LoadedMinTX = minTX;
-    m_LoadedMinTY = minTY;
-    m_LoadedMaxTX = maxTX;
-    m_LoadedMaxTY = maxTY;
-    m_LoadedRefTX = m_MapCenterTX;
-    m_LoadedRefTY = m_MapCenterTY;
+    m_LoadedZoom = m_Map.Zoom;
+    m_LoadedRect = rect;
+    m_LoadedRefTX = m_Map.CenterTX;
+    m_LoadedRefTY = m_Map.CenterTY;
   }
 
   void EditorLayer::OnDeattach()
@@ -286,148 +297,120 @@ namespace WebEngine
     m_EditorCamera.Position += m_EditorCamera.Velocity * dt;
   }
 
-  void EditorLayer::UpdateMapCamera(float dt)
+  void EditorLayer::UpdateMapCamera()
   {
-    ImVec2 mousePos = ImGui::GetMousePos();
+    const ImVec2 mouse = ImGui::GetMousePos();
+    const bool leftDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+    PanMapCamera({mouse.x, mouse.y}, leftDown);
 
-    // Pan with left mouse button drag
-    bool leftDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
-    if (leftDown && m_ViewportFocused)
-    {
-      if (m_MapDragging)
-      {
-        float dx = mousePos.x - m_MapDragLastPos.x;
-        float dy = mousePos.y - m_MapDragLastPos.y;
-
-        // Convert screen pixels to world units
-        float viewportW = m_ViewportBoundsMax.x - m_ViewportBoundsMin.x;
-        if (viewportW > 1.0f)
-        {
-          float pixelsToWorld = m_MapViewSize / viewportW;
-          m_MapWorldX -= dx * pixelsToWorld;
-          m_MapWorldZ += dy * pixelsToWorld;
-        }
-      }
-      m_MapDragLastPos = {mousePos.x, mousePos.y};
-      m_MapDragging = true;
-    }
-    else
-    {
-      m_MapDragging = false;
-    }
-
-    // Zoom: scroll scales the orthographic view size for continuous (smooth)
-    // zoom, and only swaps to a different tile LOD when the view drifts outside
-    // a comfort range. Missing zoom levels are skipped via SnapToAvailableZoom.
     if (m_ViewportFocused)
     {
-      float scroll = ImGui::GetIO().MouseWheel;
+      const float scroll = ImGui::GetIO().MouseWheel;
       if (scroll != 0.0f)
-      {
-        // Continuous-tile-space cursor: where the camera currently points, in
-        // fractional tile coordinates of the CURRENT zoom. Using this avoids
-        // the equirectangular drift of the previous lat/lon approximation when
-        // we cross zoom levels.
-        double camTileX = (double)m_MapCenterTX + 0.5 + (double)m_MapWorldX / MapProjection::TILE_WORLD_SIZE;
-        double camTileY = (double)m_MapCenterTY + 0.5 - (double)m_MapWorldZ / MapProjection::TILE_WORLD_SIZE;
-        double n = (double)(1 << m_MapZoom);
-        double camLon = camTileX / n * 360.0 - 180.0;
-        double camLatRad = std::atan(std::sinh(glm::pi<double>() * (1.0 - 2.0 * camTileY / n)));
-        double camLat = camLatRad * 180.0 / glm::pi<double>();
-
-        // Smooth view-size zoom. Scroll up (toward the user) shrinks the view
-        // size → camera sees less world → visual zoom-in.
-        constexpr float kZoomStep = 0.8f;
-        float mult = (scroll > 0.0f) ? kZoomStep : (1.0f / kZoomStep);
-        m_MapViewSize *= mult;
-        m_MapViewSize = glm::clamp(m_MapViewSize, 0.1f, 10000.0f);
-
-        // Comfort range for the current LOD: each tile is TILE_WORLD_SIZE wide,
-        // so a comfortable view shows ~2..12 tiles before we want a new LOD.
-        const float minView = MapProjection::TILE_WORLD_SIZE * 2.0f;
-        const float maxView = MapProjection::TILE_WORLD_SIZE * 12.0f;
-
-        int desiredZoom = m_MapZoom;
-        if (m_MapViewSize < minView)
-          desiredZoom = m_MapZoom + 1;  // want finer tiles
-        else if (m_MapViewSize > maxView)
-          desiredZoom = m_MapZoom - 1;  // want coarser tiles
-
-        int targetZoom = SnapToAvailableZoom(desiredZoom, scroll > 0.0f ? +1 : -1);
-
-        if (targetZoom != m_MapZoom)
-        {
-          int dz = targetZoom - m_MapZoom;
-          // Preserve visual scale across the LOD switch: at zoom Z+1 the same
-          // physical distance spans 2x as many world units, so V_new = V_old * 2^dz.
-          m_MapViewSize *= std::pow(2.0f, (float)dz);
-          // Across a multi-level gap the physical-scale rescale can leave the
-          // view outside the comfort range; clamp so the result is always
-          // something reasonable to look at.
-          m_MapViewSize = glm::clamp(m_MapViewSize, minView, maxView);
-
-          m_MapZoom = targetZoom;
-
-          glm::ivec2 newCenter = MapProjection::LatLonToTile(camLat, camLon, m_MapZoom);
-          m_MapCenterTX = newCenter.x;
-          m_MapCenterTY = newCenter.y;
-          m_MapWorldX = 0.0f;
-          m_MapWorldZ = 0.0f;
-        }
-      }
+        ZoomMapCamera(scroll);
     }
 
-    // Rebase the world origin to the tile under the camera whenever it drifts
-    // more than a few tiles away. This keeps m_MapWorldX/Z bounded for float
-    // precision; RefreshVisibleTiles picks up the ref change and reloads.
-    float distFromCenter = std::sqrt(m_MapWorldX * m_MapWorldX + m_MapWorldZ * m_MapWorldZ);
-    if (distFromCenter > MapProjection::TILE_WORLD_SIZE * 3.0f)
-    {
-      glm::ivec2 tileOff = MapProjection::WorldToTileOffset(m_MapWorldX, m_MapWorldZ);
-
-      m_MapWorldX -= (float)tileOff.x * MapProjection::TILE_WORLD_SIZE;
-      m_MapWorldZ += (float)tileOff.y * MapProjection::TILE_WORLD_SIZE;
-
-      m_MapCenterTX += tileOff.x;
-      m_MapCenterTY += tileOff.y;
-    }
+    RebaseMapOrigin();
 
     // Single source of truth for what's on the GPU: compute the visible rect
     // from the current camera state and reload only if it actually changed.
     RefreshVisibleTiles();
   }
 
+  void EditorLayer::PanMapCamera(const glm::vec2& mousePos, bool leftMouseDown)
+  {
+    // Only drag while the viewport is focused; losing focus ends the drag.
+    if (!leftMouseDown || !m_ViewportFocused)
+    {
+      m_MapDragging = false;
+      return;
+    }
+
+    if (m_MapDragging)
+    {
+      const float dx = mousePos.x - m_MapDragLastPos.x;
+      const float dy = mousePos.y - m_MapDragLastPos.y;
+
+      // Convert screen pixels to world units.
+      const float viewportW = m_ViewportBoundsMax.x - m_ViewportBoundsMin.x;
+      if (viewportW > 1.0f)
+      {
+        const float pixelsToWorld = m_Map.ViewSize / viewportW;
+        m_Map.WorldX -= dx * pixelsToWorld;
+        m_Map.WorldZ += dy * pixelsToWorld;
+      }
+    }
+    m_MapDragLastPos = mousePos;
+    m_MapDragging = true;
+  }
+
+  void EditorLayer::ZoomMapCamera(float scrollDelta)
+  {
+    // Capture the lat/lon under the cursor BEFORE we change zoom so we can
+    // re-center on the same world point afterwards. Using fractional tile
+    // coordinates of the current zoom avoids the equirectangular drift of a
+    // naive lat/lon approximation when we cross zoom levels.
+    const glm::dvec2 camLatLon = m_Map.CamLatLon();
+
+    // Smooth view-size zoom. Scroll up (toward the user) shrinks the view
+    // size → camera sees less world → visual zoom-in.
+    constexpr float kZoomStep = 0.8f;
+    const float mult = (scrollDelta > 0.0f) ? kZoomStep : (1.0f / kZoomStep);
+    m_Map.ViewSize = glm::clamp(m_Map.ViewSize * mult, 0.1f, 10000.0f);
+
+    // Comfort range for the current LOD: each tile is TILE_WORLD_SIZE wide,
+    // so a comfortable view shows ~2..12 tiles before we want a new LOD.
+    const float minView = MapProjection::TILE_WORLD_SIZE * 2.0f;
+    const float maxView = MapProjection::TILE_WORLD_SIZE * 12.0f;
+
+    int desiredZoom = m_Map.Zoom;
+    if (m_Map.ViewSize < minView)      desiredZoom = m_Map.Zoom + 1;  // want finer tiles
+    else if (m_Map.ViewSize > maxView) desiredZoom = m_Map.Zoom - 1;  // want coarser tiles
+
+    const int targetZoom = SnapToAvailableZoom(desiredZoom, scrollDelta > 0.0f ? +1 : -1);
+    if (targetZoom == m_Map.Zoom)
+      return;
+
+    // Preserve visual scale across the LOD switch: at zoom Z+1 the same
+    // physical distance spans 2x as many world units, so V_new = V_old * 2^dz.
+    const int dz = targetZoom - m_Map.Zoom;
+    m_Map.ViewSize *= std::pow(2.0f, (float)dz);
+    // Across a multi-level gap the rescale can land outside the comfort range;
+    // clamp so the result is always something reasonable to look at.
+    m_Map.ViewSize = glm::clamp(m_Map.ViewSize, minView, maxView);
+    m_Map.Zoom = targetZoom;
+
+    // Re-center on the same lat/lon the cursor was over.
+    const glm::ivec2 newCenter = MapProjection::LatLonToTile(camLatLon.x, camLatLon.y, m_Map.Zoom);
+    m_Map.CenterTX = newCenter.x;
+    m_Map.CenterTY = newCenter.y;
+    m_Map.WorldX = 0.0f;
+    m_Map.WorldZ = 0.0f;
+  }
+
+  void EditorLayer::RebaseMapOrigin()
+  {
+    // Rebase the world origin to the tile under the camera whenever it drifts
+    // more than a few tiles away. This keeps WorldX/Z bounded for float
+    // precision; RefreshVisibleTiles picks up the ref change and reloads.
+    const float dist = std::sqrt(m_Map.WorldX * m_Map.WorldX + m_Map.WorldZ * m_Map.WorldZ);
+    if (dist <= MapProjection::TILE_WORLD_SIZE * 3.0f)
+      return;
+
+    const glm::ivec2 tileOff = MapProjection::WorldToTileOffset(m_Map.WorldX, m_Map.WorldZ);
+    m_Map.WorldX -= (float)tileOff.x * MapProjection::TILE_WORLD_SIZE;
+    m_Map.WorldZ += (float)tileOff.y * MapProjection::TILE_WORLD_SIZE;
+    m_Map.CenterTX += tileOff.x;
+    m_Map.CenterTY += tileOff.y;
+  }
+
   void EditorLayer::OnUpdate(float dt)
   {
     if (m_MapMode)
     {
-      UpdateMapCamera(dt);
-
+      UpdateMapCamera();
       m_ViewportRenderer->SetScene(m_Scene.get());
-
-      // Orthographic top-down camera with equirectangular projection
-      float aspect = 16.0f / 9.0f;
-      float halfW = m_MapViewSize * 0.5f;
-      float halfH = halfW / aspect;
-
-      // Build orthographic projection with [0,1] depth range (WebGPU).
-      // Flip left/right so screen-right = east (+X), screen-up = north (+Z).
-      float left = halfW, right = -halfW, bottom = -halfH, top = halfH;
-      float nearZ = 0.1f, farZ = 500.0f;
-      glm::mat4 proj(0.0f);
-      proj[0][0] = 2.0f / (right - left);
-      proj[1][1] = 2.0f / (top - bottom);
-      proj[2][2] = -1.0f / (farZ - nearZ);
-      proj[3][0] = -(right + left) / (right - left);
-      proj[3][1] = -(top + bottom) / (top - bottom);
-      proj[3][2] = -nearZ / (farZ - nearZ);
-      proj[3][3] = 1.0f;
-
-      glm::vec3 eye(m_MapWorldX, 200.0f, m_MapWorldZ);
-      glm::vec3 target(m_MapWorldX, 0.0f, m_MapWorldZ);
-      glm::mat4 view = glm::lookAt(eye, target, glm::vec3(0.0f, 0.0f, 1.0f));
-
-      m_ViewportRenderer->BeginScene({view, proj, 0.1f, 500.0f});
+      m_ViewportRenderer->BeginScene(BuildMapSceneCamera());
       m_ViewportRenderer->EndScene();
     }
     else
@@ -438,6 +421,35 @@ namespace WebEngine
       m_Scene->OnUpdate();
       m_Scene->OnRender(m_ViewportRenderer, m_EditorCamera.GetViewMatrix());
     }
+  }
+
+  SceneCamera EditorLayer::BuildMapSceneCamera() const
+  {
+    // Top-down orthographic camera looking straight down.
+    constexpr float aspect = 16.0f / 9.0f;
+    constexpr float nearZ = 0.1f;
+    constexpr float farZ = 500.0f;
+
+    const float halfW = m_Map.ViewSize * 0.5f;
+    const float halfH = halfW / aspect;
+
+    // Ortho projection with [0,1] depth (WebGPU). Left/right are swapped so
+    // that screen-right = east (+X) and screen-up = north (+Z).
+    const float left = halfW, right = -halfW, bottom = -halfH, top = halfH;
+    glm::mat4 proj(0.0f);
+    proj[0][0] = 2.0f / (right - left);
+    proj[1][1] = 2.0f / (top - bottom);
+    proj[2][2] = -1.0f / (farZ - nearZ);
+    proj[3][0] = -(right + left) / (right - left);
+    proj[3][1] = -(top + bottom) / (top - bottom);
+    proj[3][2] = -nearZ / (farZ - nearZ);
+    proj[3][3] = 1.0f;
+
+    const glm::vec3 eye(m_Map.WorldX, 200.0f, m_Map.WorldZ);
+    const glm::vec3 target(m_Map.WorldX, 0.0f, m_Map.WorldZ);
+    const glm::mat4 view = glm::lookAt(eye, target, glm::vec3(0.0f, 0.0f, 1.0f));
+
+    return {view, proj, nearZ, farZ};
   }
 
   void EditorLayer::OnRenderImGui()
@@ -487,9 +499,9 @@ namespace WebEngine
           if (m_MapMode)
           {
             // Reset map camera to tile grid center
-            m_MapWorldX = 0.0f;
-            m_MapWorldZ = 0.0f;
-            m_MapViewSize = 50.0f;
+            m_Map.WorldX = 0.0f;
+            m_Map.WorldZ = 0.0f;
+            m_Map.ViewSize = 50.0f;
           }
         }
         ImGui::EndMenu();
@@ -673,9 +685,9 @@ namespace WebEngine
     {
       // Map info overlay
       ImGui::Begin("Map Info");
-      glm::dvec2 centerLatLon = MapProjection::TileCenterToLatLon(m_MapCenterTX, m_MapCenterTY, m_MapZoom);
+      glm::dvec2 centerLatLon = MapProjection::TileCenterToLatLon(m_Map.CenterTX, m_Map.CenterTY, m_Map.Zoom);
       ImGui::Text("Lat/Lon: %.4f, %.4f", centerLatLon.x, centerLatLon.y);
-      ImGui::Text("Zoom: %d  Tile: %d/%d", m_MapZoom, m_MapCenterTX, m_MapCenterTY);
+      ImGui::Text("Zoom: %d  Tile: %d/%d", m_Map.Zoom, m_Map.CenterTX, m_Map.CenterTY);
       ImGui::Separator();
       ImGui::Text("Pan: left-click drag");
       ImGui::Text("Zoom: scroll wheel (changes tile zoom %d..14)", 0);

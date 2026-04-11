@@ -1,5 +1,7 @@
 #include "map/VectorTileRenderer.h"
+#include <string>
 #include "map/MBTiles.h"
+#include "map/MapProjection.h"
 #include "map/VectorTile.h"
 #include "core/Log.h"
 #include "render/RenderContext.h"
@@ -8,126 +10,187 @@
 
 namespace WebEngine
 {
-  struct TileUniforms
+  // ---------------------------------------------------------------------------
+  // Shader sources
+  //
+  // The vertex stage and fragment input are identical for every variant — only
+  // the fragment *output* changes based on how many color attachments the
+  // target framebuffer has. BuildShaderSource() glues the common part with the
+  // right fragment tail instead of maintaining two near-identical shaders.
+  // ---------------------------------------------------------------------------
+
+  namespace
   {
-    glm::mat4 viewProjectionMatrix;
-  };
+    static const char* SHADER_COMMON = R"(
+      struct Uniforms {
+        viewProjectionMatrix: mat4x4<f32>,
+      }
 
-  static const char* TILE_SHADER = R"(
-    struct Uniforms {
-      viewProjectionMatrix: mat4x4<f32>,
+      struct VertexInput {
+        @location(0) position: vec3<f32>,
+        @location(1) color: vec4<f32>,
+      }
+
+      struct VertexOutput {
+        @builtin(position) position: vec4<f32>,
+        @location(0) color: vec4<f32>,
+      }
+
+      @group(0) @binding(0) var<uniform> uniforms: Uniforms;
+
+      @vertex
+      fn vs_main(input: VertexInput) -> VertexOutput {
+        var output: VertexOutput;
+        output.position = uniforms.viewProjectionMatrix * vec4<f32>(input.position, 1.0);
+        output.color = input.color;
+        return output;
+      }
+
+      struct FragmentInput {
+        @location(0) color: vec4<f32>,
+      }
+    )";
+
+    static const char* SHADER_FRAGMENT_SINGLE = R"(
+      @fragment
+      fn fs_main(input: FragmentInput) -> @location(0) vec4<f32> {
+        return input.color;
+      }
+    )";
+
+    // Desktop composite framebuffer has two color attachments (lit + brightness).
+    static const char* SHADER_FRAGMENT_DUAL = R"(
+      struct FragmentOutput {
+        @location(0) color0: vec4<f32>,
+        @location(1) color1: vec4<f32>,
+      }
+
+      @fragment
+      fn fs_main(input: FragmentInput) -> FragmentOutput {
+        var output: FragmentOutput;
+        output.color0 = input.color;
+        output.color1 = input.color;
+        return output;
+      }
+    )";
+
+    std::string BuildShaderSource(int colorTargetCount)
+    {
+      std::string src = SHADER_COMMON;
+      src += (colorTargetCount >= 2) ? SHADER_FRAGMENT_DUAL : SHADER_FRAGMENT_SINGLE;
+      return src;
     }
 
-    struct VertexInput {
-      @location(0) position: vec3<f32>,
-      @location(1) color: vec4<f32>,
+    // Must match the Uniforms struct in WGSL above.
+    struct TileUniforms
+    {
+      glm::mat4 viewProjectionMatrix;
+    };
+
+    // ---------------------------------------------------------------------------
+    // Geometry helpers
+    // ---------------------------------------------------------------------------
+
+    constexpr float BORDER_HEIGHT = 0.1f;
+    const glm::vec4 BORDER_COLOR = {1.0f, 1.0f, 0.0f, 1.0f};
+
+    glm::vec4 LookupLayerColor(const std::string& name)
+    {
+      if (name == "water")                            return {0.2f, 0.4f, 0.8f, 1.0f};
+      if (name == "waterway")                         return {0.3f, 0.5f, 0.9f, 1.0f};
+      if (name == "transportation" || name == "road") return {0.7f, 0.7f, 0.7f, 1.0f};
+      if (name == "building")                         return {0.9f, 0.5f, 0.2f, 1.0f};
+      if (name == "landuse" || name == "landcover")   return {0.3f, 0.7f, 0.3f, 1.0f};
+      if (name == "boundary" || name == "admin")      return {0.7f, 0.3f, 0.7f, 1.0f};
+      if (name == "place")                            return {1.0f, 1.0f, 0.3f, 1.0f};
+      if (name == "park")                             return {0.2f, 0.6f, 0.2f, 1.0f};
+      return {0.8f, 0.8f, 0.8f, 1.0f};
     }
 
-    struct VertexOutput {
-      @builtin(position) position: vec4<f32>,
-      @location(0) color: vec4<f32>,
+    void AppendLine(std::vector<TileVertex>& verts,
+                    const glm::vec3& a, const glm::vec3& b, const glm::vec4& color)
+    {
+      verts.push_back({a, color});
+      verts.push_back({b, color});
     }
 
-    @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-
-    @vertex
-    fn vs_main(input: VertexInput) -> VertexOutput {
-      var output: VertexOutput;
-      output.position = uniforms.viewProjectionMatrix * vec4<f32>(input.position, 1.0);
-      output.color = input.color;
-      return output;
+    // Yellow square matching the tile footprint — keeps empty tiles visible
+    // and makes tile seams obvious at a glance.
+    void AppendTileBorder(std::vector<TileVertex>& verts, glm::vec2 worldOffset)
+    {
+      const float half = MapProjection::TILE_WORLD_SIZE * 0.5f;
+      const glm::vec3 corners[4] = {
+          {worldOffset.x - half, BORDER_HEIGHT, worldOffset.y - half},
+          {worldOffset.x + half, BORDER_HEIGHT, worldOffset.y - half},
+          {worldOffset.x + half, BORDER_HEIGHT, worldOffset.y + half},
+          {worldOffset.x - half, BORDER_HEIGHT, worldOffset.y + half},
+      };
+      for (int i = 0; i < 4; i++)
+      {
+        AppendLine(verts, corners[i], corners[(i + 1) % 4], BORDER_COLOR);
+      }
     }
 
-    struct FragmentInput {
-      @location(0) color: vec4<f32>,
+    // MVT ring coordinates are integers in [0, extent]. Convert to world space,
+    // centered on the tile, with world +X=east and +Z=north. MVT Y grows south
+    // so we flip it here.
+    glm::vec3 TileLocalToWorld(glm::vec2 local, float extent, glm::vec2 worldOffset)
+    {
+      const float scale = MapProjection::TILE_WORLD_SIZE / extent;
+      return {
+          (local.x - extent * 0.5f) * scale + worldOffset.x,
+          0.0f,
+          (extent * 0.5f - local.y) * scale + worldOffset.y};
     }
 
-    @fragment
-    fn fs_main(input: FragmentInput) -> @location(0) vec4<f32> {
-      return input.color;
+    void AppendTileFeatures(std::vector<TileVertex>& verts,
+                            const MVTTile& tile, glm::vec2 worldOffset)
+    {
+      for (const auto& layer : tile.layers)
+      {
+        const glm::vec4 color = LookupLayerColor(layer.name);
+        const float extent = (float)layer.extent;
+
+        for (const auto& feature : layer.features)
+        {
+          // Points have nothing to draw as line segments.
+          if (feature.type == MVTGeomType::Point)
+            continue;
+
+          for (const auto& ring : feature.rings)
+          {
+            for (size_t i = 0; i + 1 < ring.size(); i++)
+            {
+              const glm::vec3 a = TileLocalToWorld(ring[i],     extent, worldOffset);
+              const glm::vec3 b = TileLocalToWorld(ring[i + 1], extent, worldOffset);
+              AppendLine(verts, a, b, color);
+            }
+          }
+        }
+      }
     }
-  )";
+  }  // namespace
 
-  // Shader variant for desktop (2 color targets)
-  static const char* TILE_SHADER_DUAL = R"(
-    struct Uniforms {
-      viewProjectionMatrix: mat4x4<f32>,
-    }
+  // ---------------------------------------------------------------------------
+  // VectorTileRenderer
+  // ---------------------------------------------------------------------------
 
-    struct VertexInput {
-      @location(0) position: vec3<f32>,
-      @location(1) color: vec4<f32>,
-    }
-
-    struct VertexOutput {
-      @builtin(position) position: vec4<f32>,
-      @location(0) color: vec4<f32>,
-    }
-
-    @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-
-    @vertex
-    fn vs_main(input: VertexInput) -> VertexOutput {
-      var output: VertexOutput;
-      output.position = uniforms.viewProjectionMatrix * vec4<f32>(input.position, 1.0);
-      output.color = input.color;
-      return output;
-    }
-
-    struct FragmentInput {
-      @location(0) color: vec4<f32>,
-    }
-
-    struct FragmentOutput {
-      @location(0) color0: vec4<f32>,
-      @location(1) color1: vec4<f32>,
-    }
-
-    @fragment
-    fn fs_main(input: FragmentInput) -> FragmentOutput {
-      var output: FragmentOutput;
-      output.color0 = input.color;
-      output.color1 = input.color;
-      return output;
-    }
-  )";
-
-  glm::vec4 VectorTileRenderer::GetLayerColor(const std::string& layerName)
-  {
-    if (layerName == "water") return {0.2f, 0.4f, 0.8f, 1.0f};
-    if (layerName == "waterway") return {0.3f, 0.5f, 0.9f, 1.0f};
-    if (layerName == "transportation" || layerName == "road") return {0.7f, 0.7f, 0.7f, 1.0f};
-    if (layerName == "building") return {0.9f, 0.5f, 0.2f, 1.0f};
-    if (layerName == "landuse" || layerName == "landcover") return {0.3f, 0.7f, 0.3f, 1.0f};
-    if (layerName == "boundary" || layerName == "admin") return {0.7f, 0.3f, 0.7f, 1.0f};
-    if (layerName == "place") return {1.0f, 1.0f, 0.3f, 1.0f};
-    if (layerName == "park") return {0.2f, 0.6f, 0.2f, 1.0f};
-    return {0.8f, 0.8f, 0.8f, 1.0f};
-  }
-
-  void VectorTileRenderer::Init(Ref<Framebuffer> targetFramebuffer)
+  void VectorTileRenderer::Init(const Ref<Framebuffer>& targetFramebuffer)
   {
     CreatePipeline(targetFramebuffer);
   }
 
-  void VectorTileRenderer::CreatePipeline(Ref<Framebuffer> targetFramebuffer)
+  void VectorTileRenderer::CreatePipeline(const Ref<Framebuffer>& targetFramebuffer)
   {
     const auto device = RenderContext::GetDevice();
     const auto& fboSpec = targetFramebuffer->m_FrameBufferSpec;
-    int colorTargetCount = (int)fboSpec.ColorFormats.size();
+    const int colorTargetCount = (int)fboSpec.ColorFormats.size();
 
-    // Choose shader based on color target count
-    const char* shaderSource = (colorTargetCount >= 2) ? TILE_SHADER_DUAL : TILE_SHADER;
-    m_Shader = ShaderManager::LoadShaderFromString("VectorTileShader", shaderSource);
+    // 1. Shader — picks the fragment variant that matches the target FBO.
+    m_Shader = ShaderManager::LoadShaderFromString(
+        "VectorTileShader", BuildShaderSource(colorTargetCount));
 
-    // Pipeline layout
-    WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
-    pipelineLayoutDesc.label = RenderUtils::MakeLabel("VectorTile Pipeline Layout");
-    pipelineLayoutDesc.bindGroupLayoutCount = 1;
-    pipelineLayoutDesc.bindGroupLayouts = &m_Shader->GetLayout(0);
-    WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
-
-    // Vertex attributes: position (vec3) + color (vec4)
+    // 2. Vertex buffer layout — interleaved position (vec3) + color (vec4).
     WGPUVertexAttribute attributes[2] = {};
     attributes[0].format = WGPUVertexFormat_Float32x3;
     attributes[0].offset = 0;
@@ -142,16 +205,7 @@ namespace WebEngine
     vertexBufferLayout.attributeCount = 2;
     vertexBufferLayout.attributes = attributes;
 
-    // Render pipeline descriptor
-    WGPURenderPipelineDescriptor pipelineDesc = {};
-    pipelineDesc.label = RenderUtils::MakeLabel("VectorTile Render Pipeline");
-    pipelineDesc.layout = pipelineLayout;
-    pipelineDesc.vertex.module = m_Shader->GetNativeShaderModule();
-    pipelineDesc.vertex.entryPoint = RenderUtils::MakeLabel("vs_main");
-    pipelineDesc.vertex.bufferCount = 1;
-    pipelineDesc.vertex.buffers = &vertexBufferLayout;
-
-    // Color targets matching composite framebuffer
+    // 3. Color targets — one per FBO color attachment, no blending.
     std::vector<WGPUColorTargetState> colorTargets(colorTargetCount);
     for (int i = 0; i < colorTargetCount; i++)
     {
@@ -165,9 +219,9 @@ namespace WebEngine
     fragmentState.entryPoint = RenderUtils::MakeLabel("fs_main");
     fragmentState.targetCount = colorTargetCount;
     fragmentState.targets = colorTargets.data();
-    pipelineDesc.fragment = &fragmentState;
 
-    // Depth stencil
+    // 4. Depth/stencil — depth test against the scene depth so 3D objects
+    //    above y=0 can occlude the tiles.
     WGPUDepthStencilState depthStencilState = {};
     depthStencilState.format = WGPUTextureFormat_Depth24Plus;
     depthStencilState.stencilReadMask = 0xFFFFFFFF;
@@ -183,14 +237,28 @@ namespace WebEngine
     depthStencilState.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
     depthStencilState.stencilFront.passOp = WGPUStencilOperation_Keep;
     depthStencilState.stencilBack = depthStencilState.stencilFront;
-    pipelineDesc.depthStencil = &depthStencilState;
 
-    // Primitive: line list
+    // 5. Pipeline layout comes from the shader's bind group 0 (uniform buffer).
+    WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
+    pipelineLayoutDesc.label = RenderUtils::MakeLabel("VectorTile Pipeline Layout");
+    pipelineLayoutDesc.bindGroupLayoutCount = 1;
+    pipelineLayoutDesc.bindGroupLayouts = &m_Shader->GetLayout(0);
+    WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
+
+    // 6. Render pipeline.
+    WGPURenderPipelineDescriptor pipelineDesc = {};
+    pipelineDesc.label = RenderUtils::MakeLabel("VectorTile Render Pipeline");
+    pipelineDesc.layout = pipelineLayout;
+    pipelineDesc.vertex.module = m_Shader->GetNativeShaderModule();
+    pipelineDesc.vertex.entryPoint = RenderUtils::MakeLabel("vs_main");
+    pipelineDesc.vertex.bufferCount = 1;
+    pipelineDesc.vertex.buffers = &vertexBufferLayout;
+    pipelineDesc.fragment = &fragmentState;
+    pipelineDesc.depthStencil = &depthStencilState;
     pipelineDesc.primitive.topology = WGPUPrimitiveTopology_LineList;
     pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
     pipelineDesc.primitive.frontFace = WGPUFrontFace_CCW;
     pipelineDesc.primitive.cullMode = WGPUCullMode_None;
-
     pipelineDesc.multisample.count = 1;
     pipelineDesc.multisample.mask = ~0u;
     pipelineDesc.multisample.alphaToCoverageEnabled = false;
@@ -198,12 +266,11 @@ namespace WebEngine
     m_Pipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
     wgpuPipelineLayoutRelease(pipelineLayout);
 
-    // Uniform buffer
+    // 7. Uniform buffer + bind group (single binding: the uniforms).
     m_UniformBuffer = GPUAllocator::GAlloc("VectorTile Uniforms",
                                            WGPUBufferUsage_Uniform | WGPUBufferUsage_CopyDst,
                                            sizeof(TileUniforms));
 
-    // Bind group
     WGPUBindGroupEntry bindGroupEntry = {};
     bindGroupEntry.binding = 0;
     bindGroupEntry.buffer = m_UniformBuffer->Buffer;
@@ -220,8 +287,6 @@ namespace WebEngine
     RN_LOG("VectorTileRenderer pipeline created ({} color targets)", colorTargetCount);
   }
 
-  static constexpr float TILE_WORLD_SIZE = 10.0f;
-
   void VectorTileRenderer::LoadTileRect(const MBTilesReader& source, int zoom,
                                         int minTX, int minTY, int maxTX, int maxTY,
                                         int refTX, int refTY)
@@ -232,8 +297,8 @@ namespace WebEngine
       return;
     }
 
-    // Clamp the requested rect to the valid tile range for this zoom so we
-    // don't waste sqlite queries on coordinates outside the pyramid.
+    // Clamp to the valid tile range for this zoom so we don't waste sqlite
+    // queries on coordinates outside the pyramid.
     const int maxIndex = (1 << zoom) - 1;
     minTX = std::max(minTX, 0);
     minTY = std::max(minTY, 0);
@@ -257,6 +322,7 @@ namespace WebEngine
       for (int ty = minTY; ty <= maxTY; ty++)
       {
         tilesQueried++;
+
         auto bytes = source.ReadTile(zoom, tx, ty);
         if (bytes.empty())
           continue;
@@ -265,14 +331,14 @@ namespace WebEngine
         if (tile.layers.empty())
           continue;
 
-        int dx = tx - refTX;
-        int dy = ty - refTY;
-        glm::vec2 offset = {
-            (float)dx * TILE_WORLD_SIZE,
-            (float)(-dy) * TILE_WORLD_SIZE
-        };
+        // Tile (tx, ty) sits at (tx - refTX, -(ty - refTY)) tiles from world
+        // origin — Y is negated because MVT y grows southward.
+        const glm::vec2 offset = {
+            (float)(tx - refTX) * MapProjection::TILE_WORLD_SIZE,
+            (float)(refTY - ty) * MapProjection::TILE_WORLD_SIZE};
 
-        AppendTileGeometry(tile, offset, vertices);
+        AppendTileBorder(vertices, offset);
+        AppendTileFeatures(vertices, tile, offset);
         tilesLoaded++;
       }
     }
@@ -286,63 +352,13 @@ namespace WebEngine
       return;
     }
 
-    UploadGeometry(vertices);
+    UploadVertices(vertices);
     m_Ready = true;
     RN_LOG("VectorTileRenderer: Loaded {}/{} tiles at zoom {} rect x=[{}..{}] y=[{}..{}]",
            tilesLoaded, tilesQueried, zoom, minTX, maxTX, minTY, maxTY);
   }
 
-  void VectorTileRenderer::AppendTileGeometry(const MVTTile& tile, glm::vec2 worldOffset, std::vector<TileVertex>& vertices)
-  {
-    // Add tile border (bright yellow rectangle)
-    float half = TILE_WORLD_SIZE * 0.5f;
-    glm::vec4 borderColor = {1.0f, 1.0f, 0.0f, 1.0f};
-    glm::vec3 corners[4] = {
-        {worldOffset.x - half, 0.1f, worldOffset.y - half},
-        {worldOffset.x + half, 0.1f, worldOffset.y - half},
-        {worldOffset.x + half, 0.1f, worldOffset.y + half},
-        {worldOffset.x - half, 0.1f, worldOffset.y + half},
-    };
-    for (int i = 0; i < 4; i++)
-    {
-      vertices.push_back({corners[i], borderColor});
-      vertices.push_back({corners[(i + 1) % 4], borderColor});
-    }
-
-    for (const auto& layer : tile.layers)
-    {
-      glm::vec4 color = GetLayerColor(layer.name);
-      float extent = (float)layer.extent;
-      float scale = TILE_WORLD_SIZE / extent;
-
-      for (const auto& feature : layer.features)
-      {
-        if (feature.type == MVTGeomType::Point)
-          continue;
-
-        for (const auto& ring : feature.rings)
-        {
-          for (size_t i = 0; i + 1 < ring.size(); i++)
-          {
-            glm::vec3 p0 = {
-                (ring[i].x - extent * 0.5f) * scale + worldOffset.x,
-                0.0f,
-                (extent * 0.5f - ring[i].y) * scale + worldOffset.y};
-
-            glm::vec3 p1 = {
-                (ring[i + 1].x - extent * 0.5f) * scale + worldOffset.x,
-                0.0f,
-                (extent * 0.5f - ring[i + 1].y) * scale + worldOffset.y};
-
-            vertices.push_back({p0, color});
-            vertices.push_back({p1, color});
-          }
-        }
-      }
-    }
-  }
-
-  void VectorTileRenderer::UploadGeometry(const std::vector<TileVertex>& vertices)
+  void VectorTileRenderer::UploadVertices(const std::vector<TileVertex>& vertices)
   {
     m_VertexCount = (uint32_t)vertices.size();
     if (m_VertexCount == 0)
@@ -351,14 +367,14 @@ namespace WebEngine
       return;
     }
 
-    size_t dataSize = vertices.size() * sizeof(TileVertex);
+    const size_t dataSize = vertices.size() * sizeof(TileVertex);
     m_VertexBuffer = GPUAllocator::GAlloc("VectorTile Vertices",
                                           WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
                                           (int)dataSize);
     m_VertexBuffer->SetData(vertices.data(), (int)dataSize);
 
     RN_LOG("VectorTileRenderer: {} vertices ({} line segments), {:.1f} KB",
-             m_VertexCount, m_VertexCount / 2, dataSize / 1024.0f);
+           m_VertexCount, m_VertexCount / 2, dataSize / 1024.0f);
   }
 
   void VectorTileRenderer::Render(WGPURenderPassEncoder passEncoder, const glm::mat4& viewProjection)
@@ -370,11 +386,10 @@ namespace WebEngine
     uniforms.viewProjectionMatrix = viewProjection;
     m_UniformBuffer->SetData(&uniforms, sizeof(uniforms));
 
-    size_t vertexDataSize = m_VertexCount * sizeof(TileVertex);
-
+    const size_t vertexDataSize = m_VertexCount * sizeof(TileVertex);
     wgpuRenderPassEncoderSetPipeline(passEncoder, m_Pipeline);
     wgpuRenderPassEncoderSetBindGroup(passEncoder, 0, m_BindGroup, 0, nullptr);
     wgpuRenderPassEncoderSetVertexBuffer(passEncoder, 0, m_VertexBuffer->Buffer, 0, vertexDataSize);
     wgpuRenderPassEncoderDraw(passEncoder, m_VertexCount, 1, 0, 0);
   }
-}
+}  // namespace WebEngine

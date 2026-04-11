@@ -205,8 +205,9 @@ namespace WebEngine
 
     void RenderSkeletalMeshes(Ref<RenderPass> passEncoder);
     void RenderSkeletalShadows(Ref<RenderPass> renderPass, int cascadeIndex);
+    void RenderVectorTiles(Ref<RenderPass> renderPass);
 
     // Vector tile rendering
-    std::unique_ptr<VectorTileRenderer> m_VectorTileRenderer;
+    Ref<VectorTileRenderer> m_VectorTileRenderer;
   };
 }  // namespace WebEngine

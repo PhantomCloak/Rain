@@ -30,6 +30,38 @@ namespace WebEngine
     glm::mat4 GetViewMatrix() const;
   };
 
+  // Inclusive rectangle in tile coordinates.
+  struct TileRect
+  {
+    int MinTX = 0;
+    int MinTY = 0;
+    int MaxTX = -1;
+    int MaxTY = -1;
+
+    bool operator==(const TileRect& o) const
+    {
+      return MinTX == o.MinTX && MinTY == o.MinTY && MaxTX == o.MaxTX && MaxTY == o.MaxTY;
+    }
+  };
+
+  // Top-down orthographic camera for map mode. Position is expressed as a
+  // reference tile + an offset in world units, which keeps float precision
+  // stable as the camera pans across the globe.
+  struct MapView
+  {
+    float WorldX = 0.0f;
+    float WorldZ = 0.0f;
+    float ViewSize = 50.0f;
+    int Zoom = 12;
+    int CenterTX = 2357;
+    int CenterTY = 1573;
+
+    // Camera position in fractional tile coordinates of the current zoom.
+    glm::dvec2 CamTilePos() const;
+    // Camera position as lat/lon (WGS84 degrees).
+    glm::dvec2 CamLatLon() const;
+  };
+
   class EditorLayer : public Layer
   {
     virtual void OnAttach() override;
@@ -42,11 +74,19 @@ namespace WebEngine
 
    private:
     void UpdateEditorCamera(float dt);
-    void UpdateMapCamera(float dt);
+
+    // Map mode update pipeline: each step reads + writes m_Map and leaves it
+    // in a valid state for the next one.
+    void UpdateMapCamera();
+    void PanMapCamera(const glm::vec2& mousePos, bool leftMouseDown);
+    void ZoomMapCamera(float scrollDelta);
+    void RebaseMapOrigin();
+
     void ScanAvailableZooms();
     int SnapToAvailableZoom(int desiredZoom, int direction) const;
-    void ComputeVisibleTileRect(int& minTX, int& minTY, int& maxTX, int& maxTY) const;
+    TileRect ComputeVisibleTileRect() const;
     void RefreshVisibleTiles(bool force = false);
+    SceneCamera BuildMapSceneCamera() const;
 
     void RenderLogViewer();
     void FilterLogs(const std::vector<LogEntry>& logs);
@@ -84,13 +124,9 @@ namespace WebEngine
     bool m_RightMouseDown = false;
 
     // Map mode
-    bool m_MapMode = false;
-    float m_MapWorldX = 0.0f;
-    float m_MapWorldZ = 0.0f;
-    float m_MapViewSize = 50.0f;
-    int m_MapZoom = 12;
-    int m_MapCenterTX = 2357;
-    int m_MapCenterTY = 1573;
+    bool m_MapMode = true;
+    MapView m_Map;
+
     std::string m_TileDbPath = "Resources/turkey.mbtiles";
     MBTilesReader m_TileSource;
     std::vector<int> m_AvailableZooms;  // sorted ascending; populated by ScanAvailableZooms
@@ -98,12 +134,10 @@ namespace WebEngine
     // Cache of what's currently uploaded to the GPU so RefreshVisibleTiles can
     // skip no-op reloads. Sentinel: m_LoadedZoom == -1 means nothing loaded.
     int m_LoadedZoom = -1;
-    int m_LoadedMinTX = 0;
-    int m_LoadedMinTY = 0;
-    int m_LoadedMaxTX = -1;
-    int m_LoadedMaxTY = -1;
+    TileRect m_LoadedRect;
     int m_LoadedRefTX = 0;
     int m_LoadedRefTY = 0;
+
     bool m_MapDragging = false;
     glm::vec2 m_MapDragLastPos = {0.0f, 0.0f};
   };

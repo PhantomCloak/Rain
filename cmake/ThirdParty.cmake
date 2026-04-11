@@ -5,6 +5,7 @@ target_include_directories(WebEngine SYSTEM PRIVATE
   vendor/imgui
   vendor/ImGuizmo
   vendor/miniz
+  vendor/protozero/include
 )
 
 if(EMSCRIPTEN)

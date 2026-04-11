@@ -4,102 +4,16 @@
 #include <sstream>
 #include <miniz.h>
 #include "core/Log.h"
+#include <protozero/pbf_reader.hpp>
 
 namespace WebEngine
 {
-  // --- Protobuf wire format decoder ---
-
-  static uint64_t DecodeVarint(const uint8_t* data, size_t size, size_t& offset)
-  {
-    uint64_t result = 0;
-    int shift = 0;
-    while (offset < size)
-    {
-      uint8_t byte = data[offset++];
-      result |= (uint64_t)(byte & 0x7F) << shift;
-      if ((byte & 0x80) == 0)
-        return result;
-      shift += 7;
-    }
-    return result;
-  }
+  // --- Zigzag and MVT geometry command decoder (MVT-level, not protobuf-level) ---
 
   static int32_t ZigzagDecode(uint32_t n)
   {
     return (int32_t)((n >> 1) ^ (-(int32_t)(n & 1)));
   }
-
-  struct PBField
-  {
-    uint32_t fieldNumber;
-    uint32_t wireType;
-    // varint value (wire type 0)
-    uint64_t varintVal;
-    // length-delimited data (wire type 2)
-    const uint8_t* data;
-    size_t length;
-    // fixed32 (wire type 5)
-    uint32_t fixed32Val;
-    // fixed64 (wire type 1)
-    uint64_t fixed64Val;
-  };
-
-  static bool ReadField(const uint8_t* data, size_t size, size_t& offset, PBField& field)
-  {
-    if (offset >= size)
-      return false;
-
-    uint64_t tag = DecodeVarint(data, size, offset);
-    field.fieldNumber = (uint32_t)(tag >> 3);
-    field.wireType = (uint32_t)(tag & 0x7);
-    field.data = nullptr;
-    field.length = 0;
-    field.varintVal = 0;
-    field.fixed32Val = 0;
-    field.fixed64Val = 0;
-
-    switch (field.wireType)
-    {
-      case 0:  // varint
-        field.varintVal = DecodeVarint(data, size, offset);
-        break;
-      case 1:  // fixed64
-        if (offset + 8 > size) return false;
-        memcpy(&field.fixed64Val, data + offset, 8);
-        offset += 8;
-        break;
-      case 2:  // length-delimited
-      {
-        uint64_t len = DecodeVarint(data, size, offset);
-        if (offset + len > size) return false;
-        field.data = data + offset;
-        field.length = (size_t)len;
-        offset += (size_t)len;
-        break;
-      }
-      case 5:  // fixed32
-        if (offset + 4 > size) return false;
-        memcpy(&field.fixed32Val, data + offset, 4);
-        offset += 4;
-        break;
-      default:
-        return false;
-    }
-    return true;
-  }
-
-  static std::vector<uint32_t> DecodePackedUint32(const uint8_t* data, size_t length)
-  {
-    std::vector<uint32_t> result;
-    size_t offset = 0;
-    while (offset < length)
-    {
-      result.push_back((uint32_t)DecodeVarint(data, length, offset));
-    }
-    return result;
-  }
-
-  // --- Geometry command decoder ---
 
   static void DecodeGeometry(const std::vector<uint32_t>& geom, MVTFeature& feature)
   {
@@ -120,7 +34,6 @@ namespace WebEngine
           int32_t dy = ZigzagDecode(geom[i++]);
           cursorX += dx;
           cursorY += dy;
-          // Start a new ring
           feature.rings.push_back({});
           feature.rings.back().push_back(glm::vec2((float)cursorX, (float)cursorY));
         }
@@ -149,107 +62,87 @@ namespace WebEngine
     }
   }
 
-  // --- MVT Value parser ---
+  // --- Protobuf parsing via protozero ---
 
-  static MVTValue ParseValue(const uint8_t* data, size_t length)
+  static MVTValue ParseValue(protozero::pbf_reader msg)
   {
     MVTValue val;
     val.type = MVTValue::String;
-    size_t offset = 0;
-    PBField field;
 
-    while (ReadField(data, length, offset, field))
+    while (msg.next())
     {
-      switch (field.fieldNumber)
+      switch (msg.tag())
       {
         case 1:  // string_value
           val.type = MVTValue::String;
-          val.stringVal = std::string((const char*)field.data, field.length);
+          val.stringVal = msg.get_string();
           break;
         case 2:  // float_value
-        {
           val.type = MVTValue::Float;
-          float f;
-          memcpy(&f, &field.fixed32Val, 4);
-          val.numVal = f;
+          val.numVal = msg.get_float();
           break;
-        }
         case 3:  // double_value
-        {
           val.type = MVTValue::Double;
-          double d;
-          memcpy(&d, &field.fixed64Val, 8);
-          val.numVal = d;
+          val.numVal = msg.get_double();
           break;
-        }
         case 4:  // int_value
           val.type = MVTValue::Int;
-          val.numVal = (double)(int64_t)field.varintVal;
+          val.numVal = (double)msg.get_int64();
           break;
         case 5:  // uint_value
           val.type = MVTValue::UInt;
-          val.numVal = (double)field.varintVal;
+          val.numVal = (double)msg.get_uint64();
           break;
-        case 6:  // sint_value
+        case 6:  // sint_value (protozero handles zigzag decoding)
           val.type = MVTValue::SInt;
-          val.numVal = (double)ZigzagDecode((uint32_t)field.varintVal);
+          val.numVal = (double)msg.get_sint64();
           break;
         case 7:  // bool_value
           val.type = MVTValue::Bool;
-          val.boolVal = field.varintVal != 0;
+          val.boolVal = msg.get_bool();
           break;
+        default:
+          msg.skip();
       }
     }
     return val;
   }
 
-  std::string MVTValue::ToString() const
-  {
-    switch (type)
-    {
-      case String: return stringVal;
-      case Bool: return boolVal ? "true" : "false";
-      default:
-      {
-        std::ostringstream oss;
-        oss << numVal;
-        return oss.str();
-      }
-    }
-  }
-
-  // --- MVT Feature parser ---
-
-  static MVTFeature ParseFeature(const uint8_t* data, size_t length,
+  static MVTFeature ParseFeature(protozero::pbf_reader msg,
                                  const std::vector<std::string>& keys,
                                  const std::vector<MVTValue>& values)
   {
     MVTFeature feature;
-    size_t offset = 0;
-    PBField field;
     std::vector<uint32_t> tags;
     std::vector<uint32_t> geometry;
 
-    while (ReadField(data, length, offset, field))
+    while (msg.next())
     {
-      switch (field.fieldNumber)
+      switch (msg.tag())
       {
         case 1:  // id
-          feature.id = field.varintVal;
+          feature.id = msg.get_uint64();
           break;
-        case 2:  // tags (packed)
-          tags = DecodePackedUint32(field.data, field.length);
+        case 2:  // tags (packed uint32)
+          for (auto v : msg.get_packed_uint32())
+          {
+            tags.push_back(v);
+          }
           break;
         case 3:  // type
-          feature.type = (MVTGeomType)field.varintVal;
+          feature.type = (MVTGeomType)msg.get_uint32();
           break;
-        case 4:  // geometry (packed)
-          geometry = DecodePackedUint32(field.data, field.length);
+        case 4:  // geometry (packed uint32)
+          for (auto v : msg.get_packed_uint32())
+          {
+            geometry.push_back(v);
+          }
           break;
+        default:
+          msg.skip();
       }
     }
 
-    // Decode tags into key-value properties
     for (size_t i = 0; i + 1 < tags.size(); i += 2)
     {
       uint32_t keyIdx = tags[i];
@@ -260,78 +153,100 @@ namespace WebEngine
       }
     }
 
-    // Decode geometry commands
     DecodeGeometry(geometry, feature);
-
     return feature;
   }
 
-  // --- MVT Layer parser ---
-
-  static MVTLayer ParseLayer(const uint8_t* data, size_t length)
+  static MVTLayer ParseLayer(protozero::pbf_reader msg)
   {
     MVTLayer layer;
-    size_t offset = 0;
-    PBField field;
-
     std::vector<std::string> keys;
     std::vector<MVTValue> values;
 
-    // Raw feature data to parse after keys/values are collected
-    struct RawFeature { const uint8_t* data; size_t length; };
-    std::vector<RawFeature> rawFeatures;
+    // Collect raw feature views for deferred parsing (keys/values must be
+    // gathered from the whole layer message before features can be resolved).
+    std::vector<protozero::data_view> rawFeatureViews;
 
-    while (ReadField(data, length, offset, field))
+    while (msg.next())
     {
-      switch (field.fieldNumber)
+      switch (msg.tag())
       {
         case 1:  // name
-          layer.name = std::string((const char*)field.data, field.length);
+          layer.name = msg.get_string();
           break;
-        case 2:  // feature
-          rawFeatures.push_back({field.data, field.length});
+        case 2:  // feature (deferred — store view into original buffer)
+          rawFeatureViews.push_back(msg.get_view());
           break;
         case 3:  // keys
-          keys.emplace_back((const char*)field.data, field.length);
+          keys.push_back(msg.get_string());
           break;
         case 4:  // values
-          values.push_back(ParseValue(field.data, field.length));
+          values.push_back(ParseValue(msg.get_message()));
           break;
         case 5:  // extent
-          layer.extent = (uint32_t)field.varintVal;
+          layer.extent = msg.get_uint32();
           break;
         case 15:  // version
-          layer.version = (uint32_t)field.varintVal;
+          layer.version = msg.get_uint32();
           break;
+        default:
+          msg.skip();
       }
     }
 
-    // Now parse features with keys/values available
-    layer.features.reserve(rawFeatures.size());
-    for (auto& rf : rawFeatures)
+    layer.features.reserve(rawFeatureViews.size());
+    for (const auto& view : rawFeatureViews)
     {
-      layer.features.push_back(ParseFeature(rf.data, rf.length, keys, values));
+      protozero::pbf_reader feature_reader{view};
+      layer.features.push_back(ParseFeature(feature_reader, keys, values));
     }
 
     return layer;
   }
 
-  // --- MVT Tile parser ---
+  // --- MVT Value helpers ---
+
+  std::string MVTValue::ToString() const
+  {
+    switch (type)
+    {
+      case String:
+        return stringVal;
+      case Bool:
+        return boolVal ? "true" : "false";
+      default:
+      {
+        std::ostringstream oss;
+        oss << numVal;
+        return oss.str();
+      }
+    }
+  }
+
+  // --- Top-level tile parser ---
 
   MVTTile ParseMVTFromMemory(const uint8_t* data, size_t size)
   {
     MVTTile tile;
-    size_t offset = 0;
-    PBField field;
-
-    while (ReadField(data, size, offset, field))
+    try
     {
-      if (field.fieldNumber == 3 && field.wireType == 2)  // layer
+      protozero::pbf_reader tile_reader(reinterpret_cast<const char*>(data), size);
+      while (tile_reader.next())
       {
-        tile.layers.push_back(ParseLayer(field.data, field.length));
+        if (tile_reader.tag() == 3)  // layer
+        {
+          tile.layers.push_back(ParseLayer(tile_reader.get_message()));
+        }
+        else
+        {
+          tile_reader.skip();
+        }
       }
     }
-
+    catch (const protozero::exception& e)
+    {
+      RN_LOG_ERR("ParseMVTFromMemory: protobuf parse error: {}", e.what());
+    }
     return tile;
   }
 
@@ -370,18 +285,27 @@ namespace WebEngine
     size_t pos = headerSize;
     if (flags & 0x04)  // FEXTRA
     {
-      if (pos + 2 > compressedSize) return {};
+      if (pos + 2 > compressedSize)
+      {
+        return {};
+      }
       uint16_t extraLen = compressedData[pos] | (compressedData[pos + 1] << 8);
       pos += 2 + extraLen;
     }
     if (flags & 0x08)  // FNAME
     {
-      while (pos < compressedSize && compressedData[pos] != 0) pos++;
+      while (pos < compressedSize && compressedData[pos] != 0)
+      {
+        pos++;
+      }
       pos++;  // skip null terminator
     }
     if (flags & 0x10)  // FCOMMENT
     {
-      while (pos < compressedSize && compressedData[pos] != 0) pos++;
+      while (pos < compressedSize && compressedData[pos] != 0)
+      {
+        pos++;
+      }
       pos++;
     }
     if (flags & 0x02)  // FHCRC
@@ -389,7 +313,10 @@ namespace WebEngine
       pos += 2;
     }
 
-    if (pos >= compressedSize) return {};
+    if (pos >= compressedSize)
+    {
+      return {};
+    }
 
     // The uncompressed size is stored in the last 4 bytes of the gzip file
     uint32_t uncompressedSize = 0;
@@ -454,7 +381,9 @@ namespace WebEngine
   MVTTile ParseMVTFromBytes(const uint8_t* data, size_t size)
   {
     if (!data || size == 0)
+    {
       return {};
+    }
 
     auto decompressed = DecompressGzip(data, size);
     if (decompressed.empty())
@@ -482,7 +411,7 @@ namespace WebEngine
     }
 
     RN_LOG("MVT file loaded: {} ({} bytes on disk, {} layers)",
-             path, compressed.size(), tile.layers.size());
+           path, compressed.size(), tile.layers.size());
     return tile;
   }
-}
+}  // namespace WebEngine

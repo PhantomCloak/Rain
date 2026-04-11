@@ -2,12 +2,11 @@
 
 #include <webgpu/webgpu.h>
 #include <glm/glm.hpp>
-#include <string>
 #include <vector>
 #include "core/Ref.h"
+#include "render/Framebuffer.h"
 #include "render/GPUAllocator.h"
 #include "render/Shader.h"
-#include "render/Framebuffer.h"
 
 namespace WebEngine
 {
@@ -20,25 +19,27 @@ namespace WebEngine
     glm::vec4 color;
   };
 
+  // Renders vector-tile geometry as line segments. Tiles are fetched from an
+  // MBTiles archive, parsed as MVT, converted to line-list vertices, and
+  // uploaded into a single vertex buffer. Render() just issues the draw.
   class VectorTileRenderer
   {
    public:
-    void Init(Ref<Framebuffer> targetFramebuffer);
+    void Init(const Ref<Framebuffer>& targetFramebuffer);
+
     // Load every tile inside [minTX..maxTX] x [minTY..maxTY] (inclusive). Tile
-    // world positions are computed relative to (refTX, refTY) so the tile whose
-    // coords match (ref, ref) sits at world origin — the caller picks the
-    // reference to line up with its camera.
+    // world positions are computed relative to (refTX, refTY) so the tile at
+    // (ref, ref) sits at world origin — the caller picks the reference to line
+    // up with its camera.
     void LoadTileRect(const MBTilesReader& source, int zoom,
                       int minTX, int minTY, int maxTX, int maxTY,
                       int refTX, int refTY);
+
     void Render(WGPURenderPassEncoder passEncoder, const glm::mat4& viewProjection);
 
    private:
-    void AppendTileGeometry(const MVTTile& tile, glm::vec2 worldOffset, std::vector<TileVertex>& vertices);
-    void UploadGeometry(const std::vector<TileVertex>& vertices);
-    void CreatePipeline(Ref<Framebuffer> targetFramebuffer);
-
-    static glm::vec4 GetLayerColor(const std::string& layerName);
+    void CreatePipeline(const Ref<Framebuffer>& targetFramebuffer);
+    void UploadVertices(const std::vector<TileVertex>& vertices);
 
     Ref<Shader> m_Shader;
     WGPURenderPipeline m_Pipeline = nullptr;
@@ -48,4 +49,4 @@ namespace WebEngine
     uint32_t m_VertexCount = 0;
     bool m_Ready = false;
   };
-}
+}  // namespace WebEngine

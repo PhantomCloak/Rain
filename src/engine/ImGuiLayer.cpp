@@ -24,10 +24,10 @@ namespace WebEngine
     }
 
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.FontGlobalScale = 1.5f;
+    io.FontGlobalScale = 2.0f;
 
     ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(1.5f);
+    style.ScaleAllSizes(2.0f);
 
     ImGui_ImplGlfw_InitForOther(static_cast<GLFWwindow*>(Application::Get()->GetNativeWindow()), true);
 

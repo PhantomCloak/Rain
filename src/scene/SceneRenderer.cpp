@@ -616,7 +616,7 @@ namespace WebEngine
 
     // Vector tile renderer (initial tile load is driven by EditorLayer,
     // which owns the base path and view state).
-    m_VectorTileRenderer = std::make_unique<VectorTileRenderer>();
+    m_VectorTileRenderer = CreateRef<VectorTileRenderer>();
     m_VectorTileRenderer->Init(m_CompositeFramebuffer);
   }
 
@@ -837,13 +837,7 @@ namespace WebEngine
       }
 #endif
 
-      // Vector tile rendering
-      if (m_VectorTileRenderer)
-      {
-        WGPURenderPassEncoder passEncoder = m_CompositePass->GetRenderPassEncoder();
-        glm::mat4 viewProjection = Cam.Projection * Cam.ViewMatrix;
-        m_VectorTileRenderer->Render(passEncoder, viewProjection);
-      }
+      RenderVectorTiles(m_CompositePass);
 
       m_Renderer->EndRenderPass(m_CompositePass);
     }
@@ -959,6 +953,16 @@ namespace WebEngine
 
       m_Renderer->RenderSkeletalMesh(renderPass, m_SkeletalShadowPipeline[cascadeIndex]->GetPipeline(), cmd.Mesh, cmd.SubmeshIndex, cmd.Materials, m_SkeletalTransformBuffer, 1);
     }
+  }
+
+  void SceneRenderer::RenderVectorTiles(Ref<RenderPass> renderPass)
+  {
+    if (!m_VectorTileRenderer)
+      return;
+
+    WGPURenderPassEncoder passEncoder = renderPass->GetRenderPassEncoder();
+    const glm::mat4 viewProjection = Cam.Projection * Cam.ViewMatrix;
+    m_VectorTileRenderer->Render(passEncoder, viewProjection);
   }
 
   void SceneRenderer::EndScene()
