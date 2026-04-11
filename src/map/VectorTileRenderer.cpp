@@ -8,6 +8,30 @@
 #include "render/RenderUtils.h"
 #include "render/ShaderManager.h"
 
+// earcut.hpp declares the primary template `mapbox::util::nth<I, T>`. We
+// include it first, then add glm::vec2 specializations at that exact
+// namespace scope — earcut calls `mapbox::util::nth<...>::get(p)` by fully
+// qualified name, so the specializations must live in mapbox::util, not in
+// WebEngine.
+#include <mapbox/earcut.hpp>
+
+namespace mapbox
+{
+  namespace util
+  {
+    template <>
+    struct nth<0, glm::vec2>
+    {
+      static float get(const glm::vec2& p) { return p.x; }
+    };
+    template <>
+    struct nth<1, glm::vec2>
+    {
+      static float get(const glm::vec2& p) { return p.y; }
+    };
+  }  // namespace util
+}  // namespace mapbox
+
 namespace WebEngine
 {
   // ---------------------------------------------------------------------------
@@ -143,7 +167,129 @@ namespace WebEngine
           (extent * 0.5f - local.y) * scale + worldOffset.y};
     }
 
-    void AppendTileFeatures(std::vector<TileVertex>& verts,
+    // Shoelace / surveyor's formula over a closed MVT ring. MVT tile-local
+    // coordinates are y-down (screen convention), where the spec says
+    // signed_area > 0 → exterior ring, < 0 → interior (hole). Crucially this
+    // must run on the raw tile-local coords before TileLocalToWorld flips y,
+    // because that flip inverts the sign of the result.
+    //
+    // Accumulator is double to keep long thin rings from cancelling into noise.
+    // ClosePath duplicates ring.front() onto ring.back(), so walk [0, n-1)
+    // and close the loop modulo-style to avoid double-counting that vertex.
+    double SignedAreaTileLocal(const std::vector<glm::vec2>& ring)
+    {
+      const size_t n = ring.size();
+      if (n < 4)
+        return 0.0;
+
+      const size_t m = n - 1;  // skip duplicated closing vertex
+      double sum = 0.0;
+      for (size_t i = 0; i < m; i++)
+      {
+        const glm::vec2& a = ring[i];
+        const glm::vec2& b = ring[(i + 1) % m];
+        sum += (double)a.x * (double)b.y - (double)b.x * (double)a.y;
+      }
+      return 0.5 * sum;
+    }
+
+    // A single contiguous polygon: one outer ring followed by zero or more
+    // hole rings. Stored as pointers into the source MVTFeature::rings so we
+    // never copy the underlying vec2 data.
+    struct GroupedPolygon
+    {
+      const std::vector<glm::vec2>* outer = nullptr;
+      std::vector<const std::vector<glm::vec2>*> holes;
+    };
+
+    // Walk rings in source order and group them using the shoelace sign rule.
+    // The MVT spec guarantees interior rings appear after their containing
+    // exterior ring, so a single left-to-right pass is sufficient — no spatial
+    // tests needed. Rings with fewer than 4 points are degenerate and skipped.
+    // Holes that appear before any exterior ring are malformed and dropped.
+    std::vector<GroupedPolygon> GroupRings(const MVTFeature& feature)
+    {
+      std::vector<GroupedPolygon> polys;
+      for (const auto& ring : feature.rings)
+      {
+        if (ring.size() < 4)
+          continue;
+
+        const double area = SignedAreaTileLocal(ring);
+        if (area > 0.0)
+        {
+          GroupedPolygon g;
+          g.outer = &ring;
+          polys.push_back(std::move(g));
+        }
+        else if (area < 0.0 && !polys.empty())
+        {
+          polys.back().holes.push_back(&ring);
+        }
+        // area == 0 → collinear / degenerate, skip silently
+      }
+      return polys;
+    }
+
+    // Triangulate one grouped polygon via earcut and append the result to
+    // (fillVerts, fillIndices). Points are transformed to world space at
+    // insertion time. The earcut input is built without the duplicated
+    // closing vertex on each ring (earcut treats rings as implicitly closed;
+    // feeding it the duplicate creates degenerate triangles and can trip its
+    // internal asserts in debug builds).
+    void TriangulateAndAppend(const GroupedPolygon& poly,
+                              float extent,
+                              glm::vec2 worldOffset,
+                              const glm::vec4& color,
+                              std::vector<TileVertex>& fillVerts,
+                              std::vector<uint32_t>& fillIndices)
+    {
+      // Build earcut input: outer, then each hole, each with closing dup stripped.
+      std::vector<std::vector<glm::vec2>> earcutInput;
+      earcutInput.reserve(1 + poly.holes.size());
+      earcutInput.emplace_back(poly.outer->begin(), poly.outer->end() - 1);
+      for (const auto* hole : poly.holes)
+      {
+        earcutInput.emplace_back(hole->begin(), hole->end() - 1);
+      }
+
+      const std::vector<uint32_t> indices = mapbox::earcut<uint32_t>(earcutInput);
+      if (indices.empty() || (indices.size() % 3) != 0)
+      {
+        static bool warned = false;
+        if (!warned)
+        {
+          RN_LOG_ERR("VectorTileRenderer: earcut produced {} indices (not a multiple of 3) — skipping polygon; further failures suppressed",
+                     indices.size());
+          warned = true;
+        }
+        return;
+      }
+
+      // Append vertices in the same order as earcutInput so indices line up.
+      const uint32_t baseVertex = (uint32_t)fillVerts.size();
+      for (const auto& ring : earcutInput)
+      {
+        for (const auto& p : ring)
+        {
+          fillVerts.push_back({TileLocalToWorld(p, extent, worldOffset), color});
+        }
+      }
+
+      fillIndices.reserve(fillIndices.size() + indices.size());
+      for (const uint32_t idx : indices)
+      {
+        fillIndices.push_back(baseVertex + idx);
+      }
+    }
+
+    // Walk every feature in every layer and emit it into the appropriate
+    // output buffer: MVT Polygon features are ring-classified and triangulated
+    // into (fillVerts, fillIndices); LineString features become line segments
+    // in lineVerts. Point features are skipped.
+    void AppendTileFeatures(std::vector<TileVertex>& lineVerts,
+                            std::vector<TileVertex>& fillVerts,
+                            std::vector<uint32_t>& fillIndices,
                             const MVTTile& tile, glm::vec2 worldOffset)
     {
       for (const auto& layer : tile.layers)
@@ -153,17 +299,28 @@ namespace WebEngine
 
         for (const auto& feature : layer.features)
         {
-          // Points have nothing to draw as line segments.
           if (feature.type == MVTGeomType::Point)
             continue;
 
+          if (feature.type == MVTGeomType::Polygon)
+          {
+            const auto polys = GroupRings(feature);
+            for (const auto& poly : polys)
+            {
+              TriangulateAndAppend(poly, extent, worldOffset, color,
+                                   fillVerts, fillIndices);
+            }
+            continue;
+          }
+
+          // LineString (and anything else unknown) → line segments.
           for (const auto& ring : feature.rings)
           {
             for (size_t i = 0; i + 1 < ring.size(); i++)
             {
               const glm::vec3 a = TileLocalToWorld(ring[i],     extent, worldOffset);
               const glm::vec3 b = TileLocalToWorld(ring[i + 1], extent, worldOffset);
-              AppendLine(verts, a, b, color);
+              AppendLine(lineVerts, a, b, color);
             }
           }
         }
@@ -177,10 +334,10 @@ namespace WebEngine
 
   void VectorTileRenderer::Init(const Ref<Framebuffer>& targetFramebuffer)
   {
-    CreatePipeline(targetFramebuffer);
+    CreatePipelines(targetFramebuffer);
   }
 
-  void VectorTileRenderer::CreatePipeline(const Ref<Framebuffer>& targetFramebuffer)
+  void VectorTileRenderer::CreatePipelines(const Ref<Framebuffer>& targetFramebuffer)
   {
     const auto device = RenderContext::GetDevice();
     const auto& fboSpec = targetFramebuffer->m_FrameBufferSpec;
@@ -191,6 +348,7 @@ namespace WebEngine
         "VectorTileShader", BuildShaderSource(colorTargetCount));
 
     // 2. Vertex buffer layout — interleaved position (vec3) + color (vec4).
+    //    Shared by both pipelines.
     WGPUVertexAttribute attributes[2] = {};
     attributes[0].format = WGPUVertexFormat_Float32x3;
     attributes[0].offset = 0;
@@ -205,7 +363,7 @@ namespace WebEngine
     vertexBufferLayout.attributeCount = 2;
     vertexBufferLayout.attributes = attributes;
 
-    // 3. Color targets — one per FBO color attachment, no blending.
+    // 3. Color targets — one per FBO color attachment, no blending. Shared.
     std::vector<WGPUColorTargetState> colorTargets(colorTargetCount);
     for (int i = 0; i < colorTargetCount; i++)
     {
@@ -220,42 +378,49 @@ namespace WebEngine
     fragmentState.targetCount = colorTargetCount;
     fragmentState.targets = colorTargets.data();
 
-    // 4. Depth/stencil — depth test against the scene depth so 3D objects
-    //    above y=0 can occlude the tiles.
-    WGPUDepthStencilState depthStencilState = {};
-    depthStencilState.format = WGPUTextureFormat_Depth24Plus;
-    depthStencilState.stencilReadMask = 0xFFFFFFFF;
-    depthStencilState.stencilWriteMask = 0xFFFFFFFF;
-    depthStencilState.depthCompare = WGPUCompareFunction_Less;
+    // 4. Depth state templates. Fill writes depth (Less + write); lines use
+    //    LessEqual with depth write OFF so they sit on top of fills at the
+    //    same y with no z-fighting. See docs/vector-tile-parsing-and-rendering.md.
+    auto makeDepthState = [](WGPUCompareFunction compare, bool writeEnabled) {
+      WGPUDepthStencilState s = {};
+      s.format = WGPUTextureFormat_Depth24Plus;
+      s.stencilReadMask = 0xFFFFFFFF;
+      s.stencilWriteMask = 0xFFFFFFFF;
+      s.depthCompare = compare;
 #ifndef __EMSCRIPTEN__
-    depthStencilState.depthWriteEnabled = WGPUOptionalBool_True;
+      s.depthWriteEnabled = writeEnabled ? WGPUOptionalBool_True : WGPUOptionalBool_False;
 #else
-    depthStencilState.depthWriteEnabled = true;
+      s.depthWriteEnabled = writeEnabled;
 #endif
-    depthStencilState.stencilFront.compare = WGPUCompareFunction_Always;
-    depthStencilState.stencilFront.failOp = WGPUStencilOperation_Keep;
-    depthStencilState.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
-    depthStencilState.stencilFront.passOp = WGPUStencilOperation_Keep;
-    depthStencilState.stencilBack = depthStencilState.stencilFront;
+      s.stencilFront.compare = WGPUCompareFunction_Always;
+      s.stencilFront.failOp = WGPUStencilOperation_Keep;
+      s.stencilFront.depthFailOp = WGPUStencilOperation_Keep;
+      s.stencilFront.passOp = WGPUStencilOperation_Keep;
+      s.stencilBack = s.stencilFront;
+      return s;
+    };
+
+    WGPUDepthStencilState fillDepthState = makeDepthState(WGPUCompareFunction_Less, true);
+    WGPUDepthStencilState lineDepthState = makeDepthState(WGPUCompareFunction_LessEqual, false);
 
     // 5. Pipeline layout comes from the shader's bind group 0 (uniform buffer).
+    //    One layout object — both pipelines share it so a single SetBindGroup
+    //    before the two draws satisfies WebGPU's bind-group-compatibility rule.
     WGPUPipelineLayoutDescriptor pipelineLayoutDesc = {};
     pipelineLayoutDesc.label = RenderUtils::MakeLabel("VectorTile Pipeline Layout");
     pipelineLayoutDesc.bindGroupLayoutCount = 1;
     pipelineLayoutDesc.bindGroupLayouts = &m_Shader->GetLayout(0);
     WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &pipelineLayoutDesc);
 
-    // 6. Render pipeline.
+    // 6. Pipeline descriptor template — same shader/vertex/fragment/layout,
+    //    diverging only in primitive topology and depth state per pipeline.
     WGPURenderPipelineDescriptor pipelineDesc = {};
-    pipelineDesc.label = RenderUtils::MakeLabel("VectorTile Render Pipeline");
     pipelineDesc.layout = pipelineLayout;
     pipelineDesc.vertex.module = m_Shader->GetNativeShaderModule();
     pipelineDesc.vertex.entryPoint = RenderUtils::MakeLabel("vs_main");
     pipelineDesc.vertex.bufferCount = 1;
     pipelineDesc.vertex.buffers = &vertexBufferLayout;
     pipelineDesc.fragment = &fragmentState;
-    pipelineDesc.depthStencil = &depthStencilState;
-    pipelineDesc.primitive.topology = WGPUPrimitiveTopology_LineList;
     pipelineDesc.primitive.stripIndexFormat = WGPUIndexFormat_Undefined;
     pipelineDesc.primitive.frontFace = WGPUFrontFace_CCW;
     pipelineDesc.primitive.cullMode = WGPUCullMode_None;
@@ -263,7 +428,18 @@ namespace WebEngine
     pipelineDesc.multisample.mask = ~0u;
     pipelineDesc.multisample.alphaToCoverageEnabled = false;
 
-    m_Pipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
+    // Fill pipeline: triangles, depth Less + write.
+    pipelineDesc.label = RenderUtils::MakeLabel("VectorTile Fill Pipeline");
+    pipelineDesc.primitive.topology = WGPUPrimitiveTopology_TriangleList;
+    pipelineDesc.depthStencil = &fillDepthState;
+    m_FillPipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
+
+    // Line pipeline: line list, depth LessEqual, write off — overlays fills.
+    pipelineDesc.label = RenderUtils::MakeLabel("VectorTile Line Pipeline");
+    pipelineDesc.primitive.topology = WGPUPrimitiveTopology_LineList;
+    pipelineDesc.depthStencil = &lineDepthState;
+    m_LinePipeline = wgpuDeviceCreateRenderPipeline(device, &pipelineDesc);
+
     wgpuPipelineLayoutRelease(pipelineLayout);
 
     // 7. Uniform buffer + bind group (single binding: the uniforms).
@@ -284,7 +460,7 @@ namespace WebEngine
     bindGroupDesc.entries = &bindGroupEntry;
     m_BindGroup = wgpuDeviceCreateBindGroup(device, &bindGroupDesc);
 
-    RN_LOG("VectorTileRenderer pipeline created ({} color targets)", colorTargetCount);
+    RN_LOG("VectorTileRenderer pipelines created (fill+line, {} color targets)", colorTargetCount);
   }
 
   void VectorTileRenderer::LoadTileRect(const MBTilesReader& source, int zoom,
@@ -308,12 +484,15 @@ namespace WebEngine
     if (minTX > maxTX || minTY > maxTY)
     {
       RN_LOG_ERR("VectorTileRenderer: empty tile rect at zoom {}", zoom);
-      m_VertexCount = 0;
+      m_LineVertexCount = 0;
+      m_FillIndexCount = 0;
       m_Ready = false;
       return;
     }
 
-    std::vector<TileVertex> vertices;
+    std::vector<TileVertex> lineVerts;
+    std::vector<TileVertex> fillVerts;
+    std::vector<uint32_t> fillIndices;
     int tilesLoaded = 0;
     int tilesQueried = 0;
 
@@ -337,8 +516,8 @@ namespace WebEngine
             (float)(tx - refTX) * MapProjection::TILE_WORLD_SIZE,
             (float)(refTY - ty) * MapProjection::TILE_WORLD_SIZE};
 
-        AppendTileBorder(vertices, offset);
-        AppendTileFeatures(vertices, tile, offset);
+        AppendTileBorder(lineVerts, offset);
+        AppendTileFeatures(lineVerts, fillVerts, fillIndices, tile, offset);
         tilesLoaded++;
       }
     }
@@ -347,49 +526,100 @@ namespace WebEngine
     {
       RN_LOG_ERR("VectorTileRenderer: No tiles found in rect z={} x=[{}..{}] y=[{}..{}] ({} queried)",
                  zoom, minTX, maxTX, minTY, maxTY, tilesQueried);
-      m_VertexCount = 0;
+      m_LineVertexCount = 0;
+      m_FillIndexCount = 0;
       m_Ready = false;
       return;
     }
 
-    UploadVertices(vertices);
+    UploadGeometry(lineVerts, fillVerts, fillIndices);
     m_Ready = true;
     RN_LOG("VectorTileRenderer: Loaded {}/{} tiles at zoom {} rect x=[{}..{}] y=[{}..{}]",
            tilesLoaded, tilesQueried, zoom, minTX, maxTX, minTY, maxTY);
   }
 
-  void VectorTileRenderer::UploadVertices(const std::vector<TileVertex>& vertices)
+  void VectorTileRenderer::UploadGeometry(const std::vector<TileVertex>& lineVerts,
+                                          const std::vector<TileVertex>& fillVerts,
+                                          const std::vector<uint32_t>& fillIndices)
   {
-    m_VertexCount = (uint32_t)vertices.size();
-    if (m_VertexCount == 0)
+    m_LineVertexCount = (uint32_t)lineVerts.size();
+    m_FillIndexCount = (uint32_t)fillIndices.size();
+
+    // Line buffer (linestrings + tile borders).
+    if (!lineVerts.empty())
     {
-      RN_LOG("VectorTileRenderer: No geometry generated");
-      return;
+      const size_t lineSize = lineVerts.size() * sizeof(TileVertex);
+      m_LineVertexBuffer = GPUAllocator::GAlloc("VectorTile Line Vertices",
+                                                WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
+                                                (int)lineSize);
+      m_LineVertexBuffer->SetData(lineVerts.data(), (int)lineSize);
+    }
+    else
+    {
+      m_LineVertexBuffer = nullptr;
     }
 
-    const size_t dataSize = vertices.size() * sizeof(TileVertex);
-    m_VertexBuffer = GPUAllocator::GAlloc("VectorTile Vertices",
-                                          WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
-                                          (int)dataSize);
-    m_VertexBuffer->SetData(vertices.data(), (int)dataSize);
+    // Fill vertex + index buffers (triangulated polygons).
+    if (!fillVerts.empty() && !fillIndices.empty())
+    {
+      const size_t fillVertSize = fillVerts.size() * sizeof(TileVertex);
+      m_FillVertexBuffer = GPUAllocator::GAlloc("VectorTile Fill Vertices",
+                                                WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst,
+                                                (int)fillVertSize);
+      m_FillVertexBuffer->SetData(fillVerts.data(), (int)fillVertSize);
 
-    RN_LOG("VectorTileRenderer: {} vertices ({} line segments), {:.1f} KB",
-           m_VertexCount, m_VertexCount / 2, dataSize / 1024.0f);
+      // uint32 indices are inherently 4-byte aligned; WebGPU requires index
+      // buffer size to be a multiple of 4 and this satisfies it naturally.
+      const size_t fillIdxSize = fillIndices.size() * sizeof(uint32_t);
+      m_FillIndexBuffer = GPUAllocator::GAlloc("VectorTile Fill Indices",
+                                               WGPUBufferUsage_Index | WGPUBufferUsage_CopyDst,
+                                               (int)fillIdxSize);
+      m_FillIndexBuffer->SetData(fillIndices.data(), (int)fillIdxSize);
+    }
+    else
+    {
+      m_FillVertexBuffer = nullptr;
+      m_FillIndexBuffer = nullptr;
+    }
+
+    const double lineKB = (double)(lineVerts.size() * sizeof(TileVertex)) / 1024.0;
+    const double fillKB = (double)(fillVerts.size() * sizeof(TileVertex) + fillIndices.size() * sizeof(uint32_t)) / 1024.0;
+    RN_LOG("VectorTileRenderer: lines={} verts ({} segments, {:.1f} KB), fills={} tris / {} verts ({:.1f} KB)",
+           m_LineVertexCount, m_LineVertexCount / 2, lineKB,
+           m_FillIndexCount / 3, (uint32_t)fillVerts.size(), fillKB);
   }
 
   void VectorTileRenderer::Render(WGPURenderPassEncoder passEncoder, const glm::mat4& viewProjection)
   {
-    if (!m_Ready || m_VertexCount == 0)
+    if (!m_Ready || (m_LineVertexCount == 0 && m_FillIndexCount == 0))
       return;
 
     TileUniforms uniforms = {};
     uniforms.viewProjectionMatrix = viewProjection;
     m_UniformBuffer->SetData(&uniforms, sizeof(uniforms));
 
-    const size_t vertexDataSize = m_VertexCount * sizeof(TileVertex);
-    wgpuRenderPassEncoderSetPipeline(passEncoder, m_Pipeline);
+    // Both pipelines share the same bind-group layout at group 0, so one
+    // SetBindGroup call persists across the SetPipeline switch.
     wgpuRenderPassEncoderSetBindGroup(passEncoder, 0, m_BindGroup, 0, nullptr);
-    wgpuRenderPassEncoderSetVertexBuffer(passEncoder, 0, m_VertexBuffer->Buffer, 0, vertexDataSize);
-    wgpuRenderPassEncoderDraw(passEncoder, m_VertexCount, 1, 0, 0);
+
+    // Fills first — they write depth so the subsequent line pass (LessEqual,
+    // depthWrite=false) can overlay cleanly at the same y.
+    if (m_FillIndexCount > 0 && m_FillVertexBuffer && m_FillIndexBuffer)
+    {
+      wgpuRenderPassEncoderSetPipeline(passEncoder, m_FillPipeline);
+      wgpuRenderPassEncoderSetVertexBuffer(passEncoder, 0, m_FillVertexBuffer->Buffer,
+                                           0, m_FillVertexBuffer->Size);
+      wgpuRenderPassEncoderSetIndexBuffer(passEncoder, m_FillIndexBuffer->Buffer,
+                                          WGPUIndexFormat_Uint32, 0, m_FillIndexBuffer->Size);
+      wgpuRenderPassEncoderDrawIndexed(passEncoder, m_FillIndexCount, 1, 0, 0, 0);
+    }
+
+    if (m_LineVertexCount > 0 && m_LineVertexBuffer)
+    {
+      const size_t lineSize = m_LineVertexCount * sizeof(TileVertex);
+      wgpuRenderPassEncoderSetPipeline(passEncoder, m_LinePipeline);
+      wgpuRenderPassEncoderSetVertexBuffer(passEncoder, 0, m_LineVertexBuffer->Buffer, 0, lineSize);
+      wgpuRenderPassEncoderDraw(passEncoder, m_LineVertexCount, 1, 0, 0);
+    }
   }
 }  // namespace WebEngine

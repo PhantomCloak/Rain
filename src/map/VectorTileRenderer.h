@@ -19,9 +19,11 @@ namespace WebEngine
     glm::vec4 color;
   };
 
-  // Renders vector-tile geometry as line segments. Tiles are fetched from an
-  // MBTiles archive, parsed as MVT, converted to line-list vertices, and
-  // uploaded into a single vertex buffer. Render() just issues the draw.
+  // Renders vector-tile geometry. MVT polygon features are triangulated into
+  // filled regions via shoelace-based ring classification + earcut, while
+  // linestring features and tile borders are emitted as line segments. Two
+  // pipelines share a single shader / uniform buffer / bind group and differ
+  // only in primitive topology and depth state.
   class VectorTileRenderer
   {
    public:
@@ -38,15 +40,21 @@ namespace WebEngine
     void Render(WGPURenderPassEncoder passEncoder, const glm::mat4& viewProjection);
 
    private:
-    void CreatePipeline(const Ref<Framebuffer>& targetFramebuffer);
-    void UploadVertices(const std::vector<TileVertex>& vertices);
+    void CreatePipelines(const Ref<Framebuffer>& targetFramebuffer);
+    void UploadGeometry(const std::vector<TileVertex>& lineVerts,
+                        const std::vector<TileVertex>& fillVerts,
+                        const std::vector<uint32_t>& fillIndices);
 
     Ref<Shader> m_Shader;
-    WGPURenderPipeline m_Pipeline = nullptr;
+    WGPURenderPipeline m_LinePipeline = nullptr;
+    WGPURenderPipeline m_FillPipeline = nullptr;
     WGPUBindGroup m_BindGroup = nullptr;
-    Ref<GPUBuffer> m_VertexBuffer;
+    Ref<GPUBuffer> m_LineVertexBuffer;
+    Ref<GPUBuffer> m_FillVertexBuffer;
+    Ref<GPUBuffer> m_FillIndexBuffer;
     Ref<GPUBuffer> m_UniformBuffer;
-    uint32_t m_VertexCount = 0;
+    uint32_t m_LineVertexCount = 0;
+    uint32_t m_FillIndexCount = 0;
     bool m_Ready = false;
   };
 }  // namespace WebEngine

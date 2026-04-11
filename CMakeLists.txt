@@ -33,6 +33,10 @@ endif()
 
 add_executable(WebEngine ${SOURCES})
 
+target_include_directories(WebEngine PRIVATE
+  ${CMAKE_SOURCE_DIR}/vendor/earcut.hpp/include
+)
+
 target_compile_options(WebEngine PRIVATE
   $<$<CXX_COMPILER_ID:GNU>:-Wno-changes-meaning>
 )
