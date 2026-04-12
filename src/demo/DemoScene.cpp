@@ -90,7 +90,7 @@ namespace WebEngine
       int boxesInRow = layers - layer;
       float offsetX = -(boxesInRow - 1) * boxActualSize * 0.5f;
       float offsetZ = -(boxesInRow - 1) * boxActualSize * 0.5f;
-      float y = startY + layer * boxActualSize;
+			float y = (startY + layer * boxActualSize) * 2.8;
 
       for (int x = 0; x < boxesInRow; x++)
       {

@@ -10,6 +10,7 @@
 #include "ImGuizmo.h"
 #include "Application.h"
 #include "render/ResourceManager.h"
+#include "render/WGSLPreprocessor.h"
 #include <glm/gtc/type_ptr.hpp>
 
 namespace WebEngine
@@ -156,6 +157,9 @@ namespace WebEngine
     }
 
     m_EditorCamera.Position += m_EditorCamera.Velocity * dt;
+
+		RN_LOG("X: {} Y: {} Z: {}", m_EditorCamera.Position.x, m_EditorCamera.Position.y,m_EditorCamera.Position.z );
+		RN_LOG("YAW: {} PITCH: {}", m_EditorCamera.Yaw, m_EditorCamera.Pitch);
   }
 
   void EditorLayer::OnUpdate(float dt)
@@ -216,6 +220,13 @@ namespace WebEngine
 
           m_Scene = std::make_unique<DemoSceneSponza>("Test Scene");
           m_Scene->Init();
+
+					m_EditorCamera.Position.x = -39.43;
+					m_EditorCamera.Position.y = 15.53;
+					m_EditorCamera.Position.z = -8.87;
+
+					m_EditorCamera.Yaw = 23.09;
+					m_EditorCamera.Pitch = -18.39;
         }
         ImGui::EndMenu();
       }
