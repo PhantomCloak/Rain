@@ -173,14 +173,14 @@ namespace WebEngine
 
     if (ImGui::BeginMainMenuBar())
     {
-      //if (ImGui::BeginMenu("File"))
+      // if (ImGui::BeginMenu("File"))
       //{
-      //  ImGui::EndMenu();
-      //}
-      //if (ImGui::BeginMenu("Entity"))
+      //   ImGui::EndMenu();
+      // }
+      // if (ImGui::BeginMenu("Entity"))
       //{
-      //  ImGui::EndMenu();
-      //}
+      //   ImGui::EndMenu();
+      // }
       if (ImGui::BeginMenu("Stacking Boxes (Demo)"))
       {
         if (ImGui::MenuItem("Load"))
@@ -395,7 +395,11 @@ namespace WebEngine
 
     RenderEntityList();
     RenderPropertyPanel();
-    RenderLogViewer();
+
+    if (!WGSLPreprocessor::IsDefined("MOBILE_PLATFORM"))
+    {
+      RenderLogViewer();
+    }
   }
 
   void EditorLayer::RenderEntityList()
