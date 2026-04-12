@@ -173,17 +173,17 @@ namespace WebEngine
 
     if (ImGui::BeginMainMenuBar())
     {
-      if (ImGui::BeginMenu("File"))
+      //if (ImGui::BeginMenu("File"))
+      //{
+      //  ImGui::EndMenu();
+      //}
+      //if (ImGui::BeginMenu("Entity"))
+      //{
+      //  ImGui::EndMenu();
+      //}
+      if (ImGui::BeginMenu("Stacking Boxes (Demo)"))
       {
-        ImGui::EndMenu();
-      }
-      if (ImGui::BeginMenu("Entity"))
-      {
-        ImGui::EndMenu();
-      }
-      if (ImGui::BeginMenu("Demo"))
-      {
-        if (ImGui::MenuItem("Stacking Boxes"))
+        if (ImGui::MenuItem("Load"))
         {
           m_Scene->Cleanup();
           m_Scene.reset();
@@ -191,7 +191,12 @@ namespace WebEngine
           m_Scene = std::make_unique<DemoScenePhysicCollisions>("Test Scene");
           m_Scene->Init();
         }
-        if (ImGui::MenuItem("Animations & PBR"))
+
+        ImGui::EndMenu();
+      }
+      if (ImGui::BeginMenu("Animations & PBR (Demo)"))
+      {
+        if (ImGui::MenuItem("Load"))
         {
           m_Scene->Cleanup();
           m_Scene.reset();
@@ -199,7 +204,12 @@ namespace WebEngine
           m_Scene = std::make_unique<DemoSceneDefault>("Test Scene");
           m_Scene->Init();
         }
-        if (ImGui::MenuItem("Sponza"))
+
+        ImGui::EndMenu();
+      }
+      if (ImGui::BeginMenu("Sponza"))
+      {
+        if (ImGui::MenuItem("Load"))
         {
           m_Scene->Cleanup();
           m_Scene.reset();
